@@ -7,8 +7,14 @@ import com.checkingcontainer.feature.units.UnitEntryRoute
 
 const val UNITS_ROUTE = "units"
 
-fun NavGraphBuilder.unitsGraph(navController: NavHostController) {
+fun NavGraphBuilder.unitsGraph(
+    navController: NavHostController,
+    onNavigateToSettings: () -> Unit,
+) {
     composable(route = UNITS_ROUTE) {
-        UnitEntryRoute(onBack = { navController.popBackStack() })
+        UnitEntryRoute(
+            onBack = { navController.popBackStack() },
+            onNavigateToSettings = onNavigateToSettings,
+        )
     }
 }

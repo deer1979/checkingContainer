@@ -17,11 +17,15 @@ private const val NEW_USER_ID = -1L
 fun userFormRoute(userId: Long? = null): String =
     "users/form?userId=${userId ?: NEW_USER_ID}"
 
-fun NavGraphBuilder.usersGraph(navController: NavHostController) {
+fun NavGraphBuilder.usersGraph(
+    navController: NavHostController,
+    onNavigateToSettings: () -> Unit,
+) {
     composable(route = USERS_LIST_ROUTE) {
         UserManagementRoute(
             onAddUser = { navController.navigate(userFormRoute()) },
             onEditUser = { id -> navController.navigate(userFormRoute(id)) },
+            onNavigateToSettings = onNavigateToSettings,
         )
     }
     composable(

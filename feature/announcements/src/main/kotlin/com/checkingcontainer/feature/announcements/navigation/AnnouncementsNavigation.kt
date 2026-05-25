@@ -23,11 +23,9 @@ fun announcementDetailRoute(id: String): String = "announcements/$id"
 fun NavGraphBuilder.announcementsGraph(
     navController: NavHostController,
     sharedTransitionScope: SharedTransitionScope,
+    onNavigateToSettings: () -> Unit,
 ) {
     composable(route = ANNOUNCEMENTS_LIST_ROUTE) { backStackEntry ->
-        // Share the same ViewModel between list and detail by scoping it to
-        // the parent NavBackStackEntry (the announcements graph). Cleaner than
-        // hoisting state up to the App level for a single feature.
         val parent = remember(backStackEntry) {
             navController.getBackStackEntry(ANNOUNCEMENTS_LIST_ROUTE)
         }
@@ -39,6 +37,7 @@ fun NavGraphBuilder.announcementsGraph(
             onAnnouncementClick = { id ->
                 navController.navigate(announcementDetailRoute(id))
             },
+            onNavigateToSettings = onNavigateToSettings,
             viewModel = vm,
         )
     }

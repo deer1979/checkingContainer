@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -44,6 +45,7 @@ import com.checkingcontainer.core.designsystem.theme.AppTheme
 @Composable
 fun UnitEntryRoute(
     onBack: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     viewModel: UnitEntryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -55,6 +57,7 @@ fun UnitEntryRoute(
     UnitEntryScreen(
         state = state,
         onBack = onBack,
+        onNavigateToSettings = onNavigateToSettings,
         onEvent = viewModel::onEvent,
         onSave = viewModel::saveUnit,
     )
@@ -65,6 +68,7 @@ fun UnitEntryRoute(
 fun UnitEntryScreen(
     state: UnitEntryUiState,
     onBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     onEvent: (UnitEntryEvent) -> Unit,
     onSave: () -> Unit,
 ) {
@@ -84,8 +88,13 @@ fun UnitEntryScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Atrás",
+                            contentDescription = "Atras",
                         )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Outlined.Settings, contentDescription = "Ajustes")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

@@ -18,12 +18,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.FlashOff
+import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -74,9 +78,13 @@ fun OcrScannerBottomSheet(
     }
 
     val controller = remember { LifecycleCameraController(context) }
+    var torchEnabled by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
-        onDispose { controller.unbind() }
+        onDispose {
+            controller.enableTorch(false)
+            controller.unbind()
+        }
     }
 
     ModalBottomSheet(
@@ -124,6 +132,22 @@ fun OcrScannerBottomSheet(
                     // Bottom-right
                     drawLine(white, Offset(size.width - pad, size.height - pad), Offset(size.width - pad - corner, size.height - pad), stroke)
                     drawLine(white, Offset(size.width - pad, size.height - pad), Offset(size.width - pad, size.height - pad - corner), stroke)
+                }
+                IconButton(
+                    onClick = {
+                        torchEnabled = !torchEnabled
+                        controller.enableTorch(torchEnabled)
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .background(Color.Black.copy(alpha = 0.45f), CircleShape),
+                ) {
+                    Icon(
+                        imageVector = if (torchEnabled) Icons.Outlined.FlashOn else Icons.Outlined.FlashOff,
+                        contentDescription = if (torchEnabled) "Apagar flash" else "Encender flash",
+                        tint = if (torchEnabled) Color.Yellow else Color.White,
+                    )
                 }
                 Text(
                     text = "Encuadre el texto",
