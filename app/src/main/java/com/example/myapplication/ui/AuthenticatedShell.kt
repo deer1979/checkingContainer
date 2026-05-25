@@ -16,21 +16,21 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.myapplication.navigation.TopLevelDestination
 import com.testo3.core.model.User
-import com.testo3.core.model.UserRole
-import com.testo3.feature.admin.navigation.ADMIN_ROUTE
 import com.testo3.feature.admin.navigation.adminScreen
 import com.testo3.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
 import com.testo3.feature.announcements.navigation.announcementsGraph
 import com.testo3.feature.settings.navigation.settingsScreen
 import com.testo3.feature.tasks.navigation.tasksScreen
+import com.testo3.feature.users.navigation.USERS_LIST_ROUTE
+import com.testo3.feature.users.navigation.usersGraph
 
 /**
- * Post-login flow. Scaffold + bottom NavigationBar wrap the inner NavHost.
- * Start destination depends on the role: Admin lands on the admin panel,
- * regular users on the announcements list.
+ * Post-login shell. Scaffold + bottom NavigationBar wrap an inner NavHost
+ * holding all authenticated destinations. Start destination is role-based:
+ * admins land on user management; everyone else lands on announcements.
  *
- * Wrapped in [SharedTransitionLayout] so the announcements list → detail
- * transition can share visual elements.
+ * Wrapped in [SharedTransitionLayout] so list → detail flows (announcements)
+ * can share visual elements across destinations.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -39,7 +39,7 @@ fun AuthenticatedShell(user: User) {
     val currentEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentEntry?.destination?.route
     val destinations = remember(user.role) { TopLevelDestination.forRole(user.role) }
-    val startDestination = if (user.role == UserRole.Admin) ADMIN_ROUTE else ANNOUNCEMENTS_LIST_ROUTE
+    val startDestination = if (user.role.isAdmin) USERS_LIST_ROUTE else ANNOUNCEMENTS_LIST_ROUTE
 
     Scaffold(
         bottomBar = {
@@ -65,6 +65,7 @@ fun AuthenticatedShell(user: User) {
                     navController = navController,
                     sharedTransitionScope = this@SharedTransitionLayout,
                 )
+                usersGraph(navController = navController)
                 adminScreen()
                 tasksScreen()
                 settingsScreen()

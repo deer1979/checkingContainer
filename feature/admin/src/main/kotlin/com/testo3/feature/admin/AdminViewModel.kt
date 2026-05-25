@@ -33,7 +33,7 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isPublishing = true) }
             val author = (authRepository.state.first() as? AuthState.Authenticated)
-                ?.user?.displayName ?: "Admin"
+                ?.user?.fullName ?: "Admin"
             announcements.publish(
                 title = current.draftTitle,
                 summary = current.draftSummary.ifBlank { current.draftTitle },

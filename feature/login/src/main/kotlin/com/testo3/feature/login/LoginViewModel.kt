@@ -19,16 +19,18 @@ class LoginViewModel @Inject constructor(
     private val _state = MutableStateFlow(LoginUiState())
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
 
-    fun onUsernameChange(value: String) {
-        _state.update { it.copy(username = value, errorMessage = null) }
+    fun onEmailChange(value: String) {
+        _state.update { it.copy(email = value, errorMessage = null) }
     }
 
-    fun onPasswordChange(value: String) {
-        _state.update { it.copy(password = value, errorMessage = null) }
+    /** PIN is constrained to numeric digits, max 6. Anything else is dropped. */
+    fun onPinChange(value: String) {
+        val cleaned = value.filter(Char::isDigit).take(6)
+        _state.update { it.copy(pin = cleaned, errorMessage = null) }
     }
 
-    fun onTogglePasswordVisibility() {
-        _state.update { it.copy(passwordVisible = !it.passwordVisible) }
+    fun onTogglePinVisibility() {
+        _state.update { it.copy(pinVisible = !it.pinVisible) }
     }
 
     fun onSubmit() {
@@ -36,7 +38,7 @@ class LoginViewModel @Inject constructor(
         if (!current.canSubmit) return
         viewModelScope.launch {
             _state.update { it.copy(isSubmitting = true, errorMessage = null) }
-            authRepository.login(current.username, current.password)
+            authRepository.login(current.email, current.pin)
                 .onFailure { error ->
                     _state.update {
                         it.copy(
@@ -46,8 +48,8 @@ class LoginViewModel @Inject constructor(
                     }
                 }
                 .onSuccess {
-                    // App shell observes AuthRepository.state and swaps to the
-                    // authenticated graph automatically. We just clear the form.
+                    // AuthRepository state flips; the App shell swaps to the
+                    // authenticated graph automatically.
                     _state.value = LoginUiState()
                 }
         }

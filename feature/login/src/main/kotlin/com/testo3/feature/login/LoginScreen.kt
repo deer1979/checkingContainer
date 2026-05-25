@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
@@ -24,7 +24,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -38,15 +37,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
-fun LoginRoute(
-    viewModel: LoginViewModel = hiltViewModel(),
-) {
+fun LoginRoute(viewModel: LoginViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LoginScreen(
         state = state,
-        onUsernameChange = viewModel::onUsernameChange,
-        onPasswordChange = viewModel::onPasswordChange,
-        onTogglePasswordVisibility = viewModel::onTogglePasswordVisibility,
+        onEmailChange = viewModel::onEmailChange,
+        onPinChange = viewModel::onPinChange,
+        onTogglePinVisibility = viewModel::onTogglePinVisibility,
         onSubmit = viewModel::onSubmit,
     )
 }
@@ -54,9 +51,9 @@ fun LoginRoute(
 @Composable
 private fun LoginScreen(
     state: LoginUiState,
-    onUsernameChange: (String) -> Unit,
-    onPasswordChange: (String) -> Unit,
-    onTogglePasswordVisibility: () -> Unit,
+    onEmailChange: (String) -> Unit,
+    onPinChange: (String) -> Unit,
+    onTogglePinVisibility: () -> Unit,
     onSubmit: () -> Unit,
 ) {
     Box(
@@ -73,12 +70,12 @@ private fun LoginScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 LoginHeader()
-                UsernameField(state.username, onUsernameChange)
-                PasswordField(
-                    password = state.password,
-                    visible = state.passwordVisible,
-                    onChange = onPasswordChange,
-                    onToggleVisibility = onTogglePasswordVisibility,
+                EmailField(state.email, onEmailChange)
+                PinField(
+                    pin = state.pin,
+                    visible = state.pinVisible,
+                    onChange = onPinChange,
+                    onToggleVisibility = onTogglePinVisibility,
                 )
                 if (state.errorMessage != null) {
                     Text(
@@ -93,17 +90,10 @@ private fun LoginScreen(
                     loading = state.isSubmitting,
                     onClick = onSubmit,
                 )
-                TextButton(
-                    onClick = { /* TODO: recovery flow */ },
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                ) {
-                    Text("¿Olvidaste tu contraseña?")
-                }
                 Text(
-                    text = "Pista: cualquier usuario con contraseña ≥4 entra. Usa 'admin' para el panel administrativo.",
+                    text = "Acceso de prueba: sadmin@tt3.com · PIN 000000 (SuperAdmin sembrado en la primera apertura).",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
         }
@@ -118,19 +108,20 @@ private fun LoginHeader() {
         color = MaterialTheme.colorScheme.onSurface,
     )
     Text(
-        text = "Inicia sesión para continuar",
+        text = "Inicia sesión con tu email corporativo y PIN",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
 @Composable
-private fun UsernameField(value: String, onChange: (String) -> Unit) {
+private fun EmailField(value: String, onChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text("Usuario o email") },
-        leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+        label = { Text("Email") },
+        placeholder = { Text("ejemplo@tt3.com") },
+        leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = null) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(
@@ -141,22 +132,22 @@ private fun UsernameField(value: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun PasswordField(
-    password: String,
+private fun PinField(
+    pin: String,
     visible: Boolean,
     onChange: (String) -> Unit,
     onToggleVisibility: () -> Unit,
 ) {
     OutlinedTextField(
-        value = password,
+        value = pin,
         onValueChange = onChange,
-        label = { Text("Contraseña") },
-        leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
+        label = { Text("PIN de 6 dígitos") },
+        leadingIcon = { Icon(Icons.Outlined.Pin, contentDescription = null) },
         trailingIcon = {
             IconButton(onClick = onToggleVisibility) {
                 Icon(
                     imageVector = if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                    contentDescription = if (visible) "Ocultar contraseña" else "Mostrar contraseña",
+                    contentDescription = if (visible) "Ocultar PIN" else "Mostrar PIN",
                 )
             }
         },
@@ -164,7 +155,7 @@ private fun PasswordField(
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Password,
+            keyboardType = KeyboardType.NumberPassword,
             imeAction = ImeAction.Done,
         ),
     )
@@ -180,7 +171,7 @@ private fun LoginSubmitButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
-        shape = CircleShape,  // M3 pill
+        shape = CircleShape,
     ) {
         if (loading) {
             CircularProgressIndicator(

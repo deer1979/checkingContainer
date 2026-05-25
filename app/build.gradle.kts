@@ -63,6 +63,7 @@ dependencies {
     implementation(project(":feature:login"))
     implementation(project(":feature:announcements"))
     implementation(project(":feature:admin"))
+    implementation(project(":feature:users"))
     implementation(project(":feature:tasks"))
     implementation(project(":feature:settings"))
     implementation(libs.androidx.material.icons.extended)

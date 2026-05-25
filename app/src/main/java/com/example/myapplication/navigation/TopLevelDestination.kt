@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.testo3.core.model.UserRole
@@ -11,10 +12,13 @@ import com.testo3.feature.admin.navigation.ADMIN_ROUTE
 import com.testo3.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
 import com.testo3.feature.settings.navigation.SETTINGS_ROUTE
 import com.testo3.feature.tasks.navigation.TASKS_ROUTE
+import com.testo3.feature.users.navigation.USERS_LIST_ROUTE
 
 /**
- * Tabs in the authenticated bottom NavigationBar. The Admin tab only appears
- * for [UserRole.Admin] users; the public flow never reaches this list.
+ * Tabs in the authenticated bottom NavigationBar. Admin-only tabs are
+ * filtered out for non-admin roles. The selection of which tab a tap lands
+ * on is driven by [route]; nested screens (e.g. announcement detail, user
+ * form) keep the tab highlighted via prefix-matching in the bottom bar.
  */
 enum class TopLevelDestination(
     val route: String,
@@ -26,6 +30,12 @@ enum class TopLevelDestination(
         route = ANNOUNCEMENTS_LIST_ROUTE,
         label = "Anuncios",
         icon = Icons.Outlined.Campaign,
+    ),
+    Users(
+        route = USERS_LIST_ROUTE,
+        label = "Usuarios",
+        icon = Icons.Outlined.Group,
+        adminOnly = true,
     ),
     Admin(
         route = ADMIN_ROUTE,
@@ -46,7 +56,7 @@ enum class TopLevelDestination(
 
     companion object {
         fun forRole(role: UserRole): List<TopLevelDestination> = entries.filter {
-            !it.adminOnly || role == UserRole.Admin
+            !it.adminOnly || role.isAdmin
         }
     }
 }
