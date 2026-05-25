@@ -166,7 +166,7 @@ jobs:
           retention-days: 14
 
       - name: Publish APK as rolling release (mobile-downloadable)
-        if: steps.assemble.outcome == 'success' && github.event_name == 'pull_request'
+        if: steps.assemble.outcome == 'success' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -177,7 +177,7 @@ jobs:
           if [ -z "$src_apk" ]; then
             echo "No APK produced"; exit 1
           fi
-          renamed="testo3-debug-${short_sha}.apk"
+          renamed="checkingContainer-debug-${short_sha}.apk"
           cp "$src_apk" "/tmp/$renamed"
 
           # Move the rolling tag: delete old release+tag, create new one.
@@ -186,18 +186,18 @@ jobs:
 
           gh release create "$tag" "/tmp/$renamed" \
             --repo "${{ github.repository }}" \
-            --target "${{ github.event.pull_request.head.sha }}" \
+            --target "${GITHUB_SHA}" \
             --title "Latest debug build" \
             --prerelease \
             --notes "$(cat <<EOF
-          Auto-generated debug APK from PR #${{ github.event.pull_request.number }}, commit \`${short_sha}\`.
+          Auto-generated debug APK — commit \`${short_sha}\` en \`${{ github.ref_name }}\`.
 
-          **Install on Android:**
-          1. Tap the \`testo3-debug-*.apk\` asset below.
-          2. Allow your browser to install unknown apps when prompted.
-          3. Open the installer, then \"Testo3 (debug)\".
+          **Instalar en Android:**
+          1. Tocá el archivo \`checkingContainer-debug-*.apk\` de abajo.
+          2. Permitir la instalación desde fuentes desconocidas si lo pide.
+          3. Abrí el instalador.
 
-          The release tag is moved on every successful CI run, so this is always the latest build of the current PR branch.
+          El tag se mueve en cada CI exitoso, siempre es el build más reciente.
           EOF
           )"
 
