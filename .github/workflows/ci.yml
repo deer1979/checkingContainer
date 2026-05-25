@@ -8,8 +8,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Use the head SHA so that re-runs of older commits don't cancel the run
+  # for the current commit (and vice versa). A new push to the branch is the
+  # only thing that should kill a stale in-progress run.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
