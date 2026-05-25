@@ -52,14 +52,26 @@ jobs:
         if: always()
         run: |
           report="app/build/reports/lint-results-debug.txt"
-          if [ -f "$report" ]; then
-            echo "::group::Lint text report"
-            cat "$report"
-            echo "::endgroup::"
-          else
-            echo "Lint text report not found at $report"
-            find app/build/reports -type f 2>/dev/null || true
-          fi
+          {
+            echo "## Lint debug report"
+            echo ""
+            if [ -f "$report" ]; then
+              echo '```'
+              cat "$report"
+              echo '```'
+            else
+              echo "_Text report not found at \`$report\`._"
+              echo ""
+              echo "Files under \`app/build/reports\`:"
+              echo '```'
+              find app/build/reports -type f 2>/dev/null || echo "(none)"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::group::Lint text report"
+          [ -f "$report" ] && cat "$report" || echo "(missing)"
+          echo "::endgroup::"
 
       - name: Fail if lint step failed
         if: steps.lint.outcome == 'failure'
