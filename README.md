@@ -24,7 +24,7 @@ Aplicación Android corporativa de gestión de personal y operaciones, construid
 - Gestión de usuarios (alta, edición, activación)
 - Tareas y anuncios por rol
 - Panel de administración
-- Seed automático de SuperAdmin al primer arranque (`sadmin@tt3.com` / `000000`)
+- Seed automático de SuperAdmin al primer arranque (`sadmin@checkingcontainer.app` / `000000`)
 
 ## Arquitectura
 
@@ -45,6 +45,7 @@ checkingContainer/
     ├── tasks/
     ├── announcements/
     ├── users/
+    ├── units/
     ├── admin/
     └── settings/
 ```

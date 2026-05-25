@@ -1,4 +1,4 @@
-package com.example.myapplication.ui
+package com.checkingcontainer.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -9,7 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.myapplication.MainViewModel
+import com.checkingcontainer.MainViewModel
 import com.checkingcontainer.core.domain.AuthState
 
 /**

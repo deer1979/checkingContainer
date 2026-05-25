@@ -1,4 +1,4 @@
-package com.example.myapplication.ui
+package com.checkingcontainer.ui
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween

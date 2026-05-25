@@ -5,10 +5,10 @@ plugins {
 }
 
 android {
-    namespace = "com.example.myapplication"
+    namespace = "com.checkingcontainer"
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "com.checkingcontainer"
         versionCode = 2
         versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

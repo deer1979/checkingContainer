@@ -1,4 +1,4 @@
-package com.example.myapplication.navigation
+package com.checkingcontainer.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AcUnit

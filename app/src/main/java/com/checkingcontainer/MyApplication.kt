@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.checkingcontainer
 
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp

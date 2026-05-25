@@ -1,4 +1,4 @@
-package com.example.myapplication.ui
+package com.checkingcontainer.ui
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
@@ -14,7 +14,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.myapplication.navigation.TopLevelDestination
+import com.checkingcontainer.navigation.TopLevelDestination
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.feature.admin.navigation.adminScreen
 import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE

@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.checkingcontainer
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,7 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.example.myapplication.ui.CheckingContainerApp
+import com.checkingcontainer.ui.CheckingContainerApp
 import com.checkingcontainer.core.designsystem.theme.AppTheme
 import dagger.hilt.android.AndroidEntryPoint
 
