@@ -2,10 +2,12 @@ package com.testo3.core.data.di
 
 import com.testo3.core.data.AnnouncementsRepositoryImpl
 import com.testo3.core.data.AuthRepositoryImpl
+import com.testo3.core.data.ReeferUnitRepositoryImpl
 import com.testo3.core.data.TaskRepositoryImpl
 import com.testo3.core.data.UsersRepositoryImpl
 import com.testo3.core.domain.AnnouncementsRepository
 import com.testo3.core.domain.AuthRepository
+import com.testo3.core.domain.ReeferUnitRepository
 import com.testo3.core.domain.TaskRepository
 import com.testo3.core.domain.UsersRepository
 import dagger.Binds
@@ -39,4 +41,8 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindUsersRepository(impl: UsersRepositoryImpl): UsersRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindReeferUnitRepository(impl: ReeferUnitRepositoryImpl): ReeferUnitRepository
 }

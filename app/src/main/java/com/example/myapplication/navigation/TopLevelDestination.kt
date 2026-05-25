@@ -1,6 +1,7 @@
 package com.example.myapplication.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Checklist
@@ -12,6 +13,7 @@ import com.testo3.feature.admin.navigation.ADMIN_ROUTE
 import com.testo3.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
 import com.testo3.feature.settings.navigation.SETTINGS_ROUTE
 import com.testo3.feature.tasks.navigation.TASKS_ROUTE
+import com.testo3.feature.units.navigation.UNITS_ROUTE
 import com.testo3.feature.users.navigation.USERS_LIST_ROUTE
 
 /**
@@ -47,6 +49,11 @@ enum class TopLevelDestination(
         route = TASKS_ROUTE,
         label = "Tareas",
         icon = Icons.Outlined.Checklist,
+    ),
+    Units(
+        route = UNITS_ROUTE,
+        label = "Unidades",
+        icon = Icons.Outlined.AcUnit,
     ),
     Settings(
         route = SETTINGS_ROUTE,

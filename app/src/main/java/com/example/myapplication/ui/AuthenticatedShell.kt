@@ -21,6 +21,7 @@ import com.testo3.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
 import com.testo3.feature.announcements.navigation.announcementsGraph
 import com.testo3.feature.settings.navigation.settingsScreen
 import com.testo3.feature.tasks.navigation.tasksScreen
+import com.testo3.feature.units.navigation.unitsGraph
 import com.testo3.feature.users.navigation.USERS_LIST_ROUTE
 import com.testo3.feature.users.navigation.usersGraph
 
@@ -68,6 +69,7 @@ fun AuthenticatedShell(user: User) {
                 usersGraph(navController = navController)
                 adminScreen()
                 tasksScreen()
+                unitsGraph(navController = navController)
                 settingsScreen()
             }
         }

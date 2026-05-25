@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.testo3.core.database.Testo3Database
+import com.testo3.core.database.dao.ReeferUnitDao
 import com.testo3.core.database.dao.TaskDao
 import com.testo3.core.database.dao.UserDao
 import com.testo3.core.model.JobTitle
@@ -42,6 +43,9 @@ object DatabaseModule {
 
     @Provides
     fun providesUserDao(db: Testo3Database): UserDao = db.userDao()
+
+    @Provides
+    fun providesReeferUnitDao(db: Testo3Database): ReeferUnitDao = db.reeferUnitDao()
 
     /**
      * Seeds a SuperAdmin on first database creation so the user can log in
