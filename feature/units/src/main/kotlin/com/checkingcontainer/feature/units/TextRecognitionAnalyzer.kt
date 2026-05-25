@@ -43,17 +43,21 @@ class TextRecognitionAnalyzer(
     private fun processDataPlate(text: String) {
         val result = mutableMapOf<String, String>()
 
-        Regex("""(?:UNIT MODEL|MACHINE MODEL|MODEL NO\.|MODEL)[\s:]*([A-Za-z0-9\-]+)""", RegexOption.IGNORE_CASE)
+        // Carrier 69NT40-511-353 or Star Cool SCI-40-CA
+        Regex("""(69NT40[-\s]*\d{3}[-\s]*\d{3}|SCI-\d{2}-[A-Z]{2})""")
             .find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
-            ?.let { result["Unit Model"] = it }
+            ?.let { result["Unit Model"] = it.replace(Regex("\\s+"), "") }
 
-        Regex("""(?:UNIT SERIAL NO\.?|SERIAL NO\.?|S/N)[\s:]*([A-Za-z0-9]+)""", RegexOption.IGNORE_CASE)
+        // Carrier WSC61225053 (3 letters + optional space + 8 digits)
+        // or Star Cool AA00-00000 (2 letters + 2 digits + hyphen + 5 digits)
+        Regex("""([A-Z]{3}[\s]?\d{8}|[A-Z]{2}\d{2}-\d{5})""")
             .find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
-            ?.let { result["Unit Serial No."] = it }
+            ?.let { result["Unit Serial No."] = it.replace(Regex("\\s+"), "") }
 
-        Regex("""(?:MFG\.?\s*DATE|DATE OF MANUFACTURE|BUILT)[\s:]*([0-9]{2}/[0-9]{4}|[0-9]{4})""", RegexOption.IGNORE_CASE)
+        // MM/YYYY → extract only the 4-digit year
+        Regex("""(?:0[1-9]|1[0-2])/((?:19|20)\d{2})""")
             .find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
-            ?.let { result["Year of Built"] = it.takeLast(4) }
+            ?.let { result["Year of Built"] = it }
 
         if (result.isNotEmpty() && resultEmitted.compareAndSet(false, true)) {
             onSuccess(result)

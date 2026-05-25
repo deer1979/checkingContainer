@@ -15,6 +15,14 @@ data class UnitEntryUiState(
     val showScanner: Boolean = false,
     val scannerMode: ScannerMode = ScannerMode.CONTAINER,
 ) {
+    /** True when containerNo passes ISO 6346 check-digit validation. */
+    val isContainerValid: Boolean
+        get() = Iso6346.isValid(containerNo)
+
+    /** Show a red error hint on the field only after the user has typed enough chars. */
+    val showContainerError: Boolean
+        get() = containerNo.length >= 4 && !isContainerValid
+
     val canSave: Boolean
         get() = !isSaving &&
             containerNo.isNotBlank() &&

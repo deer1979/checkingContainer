@@ -13,4 +13,5 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:common"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.datastore.preferences)
 }

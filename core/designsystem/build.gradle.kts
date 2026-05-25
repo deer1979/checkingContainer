@@ -5,3 +5,7 @@ plugins {
 android {
     namespace = "com.checkingcontainer.core.designsystem"
 }
+
+dependencies {
+    api(project(":core:model"))
+}

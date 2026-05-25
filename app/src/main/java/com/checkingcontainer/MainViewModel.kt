@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.AuthRepository
 import com.checkingcontainer.core.domain.AuthState
+import com.checkingcontainer.core.domain.ThemeRepository
+import com.checkingcontainer.core.model.ThemeConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,12 +15,24 @@ import kotlinx.coroutines.flow.stateIn
 @HiltViewModel
 class MainViewModel @Inject constructor(
     authRepository: AuthRepository,
+    themeRepository: ThemeRepository,
 ) : ViewModel() {
 
-    /** Drives which shell (public vs authenticated) the app shows. */
     val authState: StateFlow<AuthState> = authRepository.state.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = AuthState.Loading,
+    )
+
+    val themeConfig: StateFlow<ThemeConfig> = themeRepository.themeConfig.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = ThemeConfig.FOLLOW_SYSTEM,
+    )
+
+    val dynamicColor: StateFlow<Boolean> = themeRepository.dynamicColor.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = true,
     )
 }

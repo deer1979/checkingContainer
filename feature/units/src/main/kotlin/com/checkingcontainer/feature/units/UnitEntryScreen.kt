@@ -151,6 +151,10 @@ private fun IdentificationCard(
                 label = { Text("Container No.") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+                isError = state.showContainerError,
+                supportingText = if (state.showContainerError) {
+                    { Text("Formato ISO 6346 inválido") }
+                } else null,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Characters,
                     imeAction = ImeAction.Done,
@@ -189,6 +193,7 @@ private fun EquipmentDataCard(
             )
             OutlinedButton(
                 onClick = { onEvent(UnitEntryEvent.OpenScanner(ScannerMode.DATA_PLATE)) },
+                enabled = state.isContainerValid,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(

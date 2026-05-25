@@ -1,11 +1,9 @@
 package com.checkingcontainer.feature.settings
 
-/**
- * In-memory state. When we add Preferences DataStore later, this becomes the
- * mapped view of the persisted preferences flow — the screen doesn't change.
- */
+import com.checkingcontainer.core.model.ThemeConfig
+
 data class SettingsUiState(
-    val darkMode: Boolean = false,
+    val theme: ThemeConfig = ThemeConfig.FOLLOW_SYSTEM,
     val dynamicColor: Boolean = true,
     val notifications: Boolean = true,
     val autoSync: Boolean = true,

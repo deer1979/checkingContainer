@@ -1,6 +1,8 @@
 package com.checkingcontainer.feature.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +14,7 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -26,14 +29,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.checkingcontainer.core.model.ThemeConfig
 
 @Composable
 fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     SettingsScreen(
         state = state,
-        onToggleDarkMode = viewModel::onToggleDarkMode,
-        onToggleDynamicColor = viewModel::onToggleDynamicColor,
+        onThemeChange = viewModel::onThemeChange,
+        onToggleDynamicColor = viewModel::onDynamicColorChange,
         onToggleNotifications = viewModel::onToggleNotifications,
         onToggleAutoSync = viewModel::onToggleAutoSync,
         onLogout = viewModel::onLogout,
@@ -43,7 +47,7 @@ fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
 @Composable
 private fun SettingsScreen(
     state: SettingsUiState,
-    onToggleDarkMode: (Boolean) -> Unit,
+    onThemeChange: (ThemeConfig) -> Unit,
     onToggleDynamicColor: (Boolean) -> Unit,
     onToggleNotifications: (Boolean) -> Unit,
     onToggleAutoSync: (Boolean) -> Unit,
@@ -53,12 +57,31 @@ private fun SettingsScreen(
         item { SectionHeader("Apariencia") }
 
         item {
-            SettingsRow(
-                title = "Modo oscuro",
-                description = "Override del sistema (forzar tema oscuro)",
-                icon = Icons.Outlined.DarkMode,
-                checked = state.darkMode,
-                onCheckedChange = onToggleDarkMode,
+            ListItem(
+                headlineContent = { Text("Tema") },
+                supportingContent = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 4.dp),
+                    ) {
+                        ThemeConfig.entries.forEach { config ->
+                            FilterChip(
+                                selected = state.theme == config,
+                                onClick = { onThemeChange(config) },
+                                label = {
+                                    Text(
+                                        when (config) {
+                                            ThemeConfig.FOLLOW_SYSTEM -> "Sistema"
+                                            ThemeConfig.LIGHT -> "Claro"
+                                            ThemeConfig.DARK -> "Oscuro"
+                                        },
+                                    )
+                                },
+                            )
+                        }
+                    }
+                },
+                leadingContent = { Icon(Icons.Outlined.DarkMode, contentDescription = null) },
             )
         }
         item { HorizontalDivider() }
@@ -131,9 +154,7 @@ private fun SettingsScreen(
                         tint = MaterialTheme.colorScheme.error,
                     )
                 },
-                colors = ListItemDefaults.colors(
-                    headlineColor = MaterialTheme.colorScheme.error,
-                ),
+                colors = ListItemDefaults.colors(headlineColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.clickable(onClick = onLogout),
             )
         }
@@ -162,8 +183,6 @@ private fun SettingsRow(
         headlineContent = { Text(title) },
         supportingContent = { Text(description) },
         leadingContent = { Icon(icon, contentDescription = null) },
-        trailingContent = {
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
-        },
+        trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
     )
 }

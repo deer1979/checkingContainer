@@ -7,10 +7,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.checkingcontainer.ui.CheckingContainerApp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.checkingcontainer.core.designsystem.theme.AppTheme
+import com.checkingcontainer.ui.CheckingContainerApp
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -22,7 +25,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            AppTheme {
+            val viewModel: MainViewModel = hiltViewModel()
+            val themeConfig by viewModel.themeConfig.collectAsStateWithLifecycle()
+            val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
+
+            AppTheme(themeConfig = themeConfig, dynamicColor = dynamicColor) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,

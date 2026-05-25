@@ -1,11 +1,13 @@
 package com.checkingcontainer.core.data.di
 
 import com.checkingcontainer.core.data.AnnouncementsRepositoryImpl
+import com.checkingcontainer.core.data.ThemeRepositoryImpl
 import com.checkingcontainer.core.data.AuthRepositoryImpl
 import com.checkingcontainer.core.data.ReeferUnitRepositoryImpl
 import com.checkingcontainer.core.data.TaskRepositoryImpl
 import com.checkingcontainer.core.data.UsersRepositoryImpl
 import com.checkingcontainer.core.domain.AnnouncementsRepository
+import com.checkingcontainer.core.domain.ThemeRepository
 import com.checkingcontainer.core.domain.AuthRepository
 import com.checkingcontainer.core.domain.ReeferUnitRepository
 import com.checkingcontainer.core.domain.TaskRepository
@@ -45,4 +47,8 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindReeferUnitRepository(impl: ReeferUnitRepositoryImpl): ReeferUnitRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindThemeRepository(impl: ThemeRepositoryImpl): ThemeRepository
 }
