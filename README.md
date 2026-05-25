@@ -1,61 +1,79 @@
-# Testo3 — Modern Android Starter
+# checkingContainer
 
-Proyecto Android construido apuntando al **stack más alto posible** para validar
-compatibilidad y preparación a las próximas tecnologías de Android (foldables,
-pantallas grandes, HDR, predictive back, 16KB page size, etc.).
+Aplicación Android corporativa de gestión de personal y operaciones, construida con arquitectura multi-módulo moderna.
 
 ## Stack
 
-| Componente            | Versión / objetivo                                |
-|-----------------------|----------------------------------------------------|
-| Android Gradle Plugin | 9.2.1 (Kotlin built-in)                           |
-| Gradle                | 9.4.1                                             |
-| Kotlin                | 2.2.20 (K2)                                       |
-| JDK                   | 21 (AGP 9.2 mínimo: 17)                           |
-| compileSdk            | 36 (Android 16)                                   |
-| targetSdk             | 36                                                |
-| minSdk                | 26 (Android 8.0)                                  |
-| UI                    | Jetpack Compose (Material 3)                      |
-| Compose BOM           | 2026.05.01                                        |
-| Adaptive layouts      | androidx.compose.material3.adaptive 1.2.0         |
+| Componente             | Versión                       |
+|------------------------|-------------------------------|
+| Android Gradle Plugin  | 9.2.1                         |
+| Gradle                 | 9.4.1                         |
+| Kotlin                 | 2.2.20 (K2)                   |
+| JDK                    | 21                            |
+| compileSdk / targetSdk | 36 (Android 16)               |
+| minSdk                 | 26 (Android 8.0)              |
+| Jetpack Compose BOM    | 2026.05.01 (Material 3 1.4.0) |
+| Hilt                   | 2.59.2                        |
+| Room                   | 2.7.1                         |
+| Navigation Compose     | 2.9.0                         |
 
-## Características modernas habilitadas
+## Funcionalidades
 
-- ✅ Edge-to-edge (`enableEdgeToEdge`) y manejo de insets sin barras.
-- ✅ Predictive Back Gesture (`enableOnBackInvokedCallback="true"`).
-- ✅ Splash Screen API.
-- ✅ Material 3 con **Dynamic Color** (Android 12+).
-- ✅ `WindowSizeClass` para foldables y pantallas grandes.
-- ✅ Alineación a páginas de **16 KB** (AGP ≥ 8.5 lo aplica por defecto).
-- ✅ Backup rules y data extraction rules (Android 12+).
-- ✅ Java/Kotlin toolchain en 21 (mismo bytecode que AGP requiere).
+- Autenticación con email generado + PIN de 6 dígitos
+- Roles: SuperAdmin, Admin, Editor, Viewer
+- Gestión de usuarios (alta, edición, activación)
+- Tareas y anuncios por rol
+- Panel de administración
+- Seed automático de SuperAdmin al primer arranque (`sadmin@tt3.com` / `000000`)
 
-## Cómo abrir
+## Arquitectura
 
-1. Abre Android Studio (Narwhal | 2025.1.1 o superior recomendado).
-2. **File → Open** → selecciona la raíz del repo.
-3. Deja que Gradle sincronice (descargará AGP, Kotlin y el SDK 36 si falta).
-4. **Run ▶** sobre el módulo `app`.
+```
+checkingContainer/
+├── app/                        # módulo principal, navegación raíz
+├── build-logic/convention/     # plugins Gradle personalizados
+├── core/
+│   ├── model/                  # entidades de dominio
+│   ├── domain/                 # casos de uso
+│   ├── data/                   # repositorios
+│   ├── database/               # Room + DAOs
+│   ├── designsystem/           # tema, colores, tipografía
+│   └── common/                 # utilidades compartidas
+└── feature/
+    ├── splash/
+    ├── login/
+    ├── tasks/
+    ├── announcements/
+    ├── users/
+    ├── admin/
+    └── settings/
+```
+
+## Abrir en Android Studio
+
+1. Android Studio Panda 4 (2025.3.4) o superior
+2. **File → Open** → selecciona la raíz del repo
+3. Gradle sincroniza automáticamente (requiere JDK 21)
+4. **Run ▶** sobre el módulo `app`
 
 ## Compilar por línea de comandos
 
 ```bash
-./gradlew assembleDebug          # APK debug
-./gradlew installDebug           # instalar en dispositivo conectado
-./gradlew test                   # unit tests
-./gradlew connectedAndroidTest   # instrumented tests (necesita device/emulator)
-./gradlew lint                   # análisis estático
+# Requiere JAVA_HOME apuntando a JDK 21
+./gradlew :app:assembleDebug        # APK debug
+./gradlew :app:compileDebugKotlin   # solo compilación Kotlin
+./gradlew test                      # unit tests
+./gradlew lint                      # análisis estático
 ```
 
-## Estructura
+En Windows (PowerShell):
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio2\jbr"
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+.\gradlew :app:assembleDebug --no-daemon
+```
 
-```
-.
-├── app/
-│   ├── src/main/java/com/example/myapplication/    # código Kotlin
-│   ├── src/main/res/                                # recursos
-│   └── build.gradle.kts
-├── gradle/libs.versions.toml                        # version catalog
-├── settings.gradle.kts
-└── build.gradle.kts
-```
+## CI/CD
+
+GitHub Actions compila y publica el APK debug automáticamente en cada push a `main`.
+El APK queda disponible en la sección **Releases** del repositorio bajo el tag `latest-debug`.

@@ -21,7 +21,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Testo3"
+rootProject.name = "checkingContainer"
 
 include(":app")
 
