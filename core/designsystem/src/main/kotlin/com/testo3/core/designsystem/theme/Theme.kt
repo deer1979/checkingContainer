@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.theme
+package com.testo3.core.designsystem.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -25,9 +25,8 @@ private val LightColors = lightColorScheme(
 @Composable
 fun Testo3Theme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Material You — pulls colors from the system wallpaper on Android 12+.
     dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
