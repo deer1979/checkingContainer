@@ -44,7 +44,28 @@ jobs:
         run: ./gradlew :app:compileDebugKotlin --stacktrace
 
       - name: Lint (debug)
+        id: lint
+        continue-on-error: true
         run: ./gradlew :app:lintDebug --stacktrace
+
+      - name: Print lint text report
+        if: always()
+        run: |
+          report="app/build/reports/lint-results-debug.txt"
+          if [ -f "$report" ]; then
+            echo "::group::Lint text report"
+            cat "$report"
+            echo "::endgroup::"
+          else
+            echo "Lint text report not found at $report"
+            find app/build/reports -type f 2>/dev/null || true
+          fi
+
+      - name: Fail if lint step failed
+        if: steps.lint.outcome == 'failure'
+        run: |
+          echo "Lint task failed — see 'Print lint text report' above."
+          exit 1
 
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace
