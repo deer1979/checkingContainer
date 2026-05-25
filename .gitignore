@@ -1,0 +1,37 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.cxx/
+captures/
+local.properties
+
+# Android build outputs
+/app/release/
+/app/debug/
+/app/build/
+*.apk
+*.aab
+*.aar
+*.ap_
+
+# Kotlin
+.kotlin/
+
+# macOS / Linux / Windows
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Keystore (NEVER commit secrets)
+*.jks
+*.keystore
+release.keystore.properties

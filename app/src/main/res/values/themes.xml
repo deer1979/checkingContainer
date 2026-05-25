@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Base app theme — Compose handles the actual UI styling. -->
+    <style name="Theme.Testo3" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Splash screen theme (Splash Screen API). Used as the launcher theme
+         so the splash appears before MainActivity composes its first frame. -->
+    <style name="Theme.Testo3.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Testo3</item>
+    </style>
+
+</resources>
