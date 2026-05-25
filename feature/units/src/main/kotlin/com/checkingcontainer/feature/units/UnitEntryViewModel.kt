@@ -30,6 +30,12 @@ class UnitEntryViewModel @Inject constructor(
                     s.copy(unitSerialNo = event.value.uppercase(), errorMessage = null)
                 is UnitEntryEvent.YearOfBuiltChange ->
                     s.copy(yearOfBuilt = event.value, errorMessage = null)
+                is UnitEntryEvent.OpenScanner ->
+                    s.copy(showScanner = true, scannerMode = event.mode)
+                UnitEntryEvent.CloseScanner ->
+                    s.copy(showScanner = false)
+                is UnitEntryEvent.OcrResult ->
+                    applyOcrResult(s, event.fields)
             }
         }
     }
@@ -52,5 +58,19 @@ class UnitEntryViewModel @Inject constructor(
                     }
                 }
         }
+    }
+
+    private fun applyOcrResult(s: UnitEntryUiState, fields: Map<String, String>): UnitEntryUiState {
+        var updated = s.copy(showScanner = false, errorMessage = null)
+        fields.forEach { (key, value) ->
+            updated = when (key) {
+                "Container No." -> updated.copy(containerNo = value.uppercase())
+                "Unit Model" -> updated.copy(unitModel = value)
+                "Unit Serial No." -> updated.copy(unitSerialNo = value.uppercase())
+                "Year of Built" -> updated.copy(yearOfBuilt = value)
+                else -> updated
+            }
+        }
+        return updated
     }
 }

@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +22,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -65,6 +68,14 @@ fun UnitEntryScreen(
     onEvent: (UnitEntryEvent) -> Unit,
     onSave: () -> Unit,
 ) {
+    if (state.showScanner) {
+        OcrScannerBottomSheet(
+            mode = state.scannerMode,
+            onSuccess = { fields -> onEvent(UnitEntryEvent.OcrResult(fields)) },
+            onDismiss = { onEvent(UnitEntryEvent.CloseScanner) },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -112,7 +123,6 @@ fun UnitEntryScreen(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            // Extra space so the FAB never covers the last field
             Spacer(modifier = Modifier.height(80.dp))
         }
     }
@@ -146,11 +156,12 @@ private fun IdentificationCard(
                     imeAction = ImeAction.Done,
                 ),
                 trailingIcon = {
-                    // Placeholder para el futuro flujo de OCR con cámara
-                    IconButton(onClick = {}, enabled = false) {
+                    IconButton(
+                        onClick = { onEvent(UnitEntryEvent.OpenScanner(ScannerMode.CONTAINER)) },
+                    ) {
                         Icon(
                             imageVector = Icons.Outlined.CameraAlt,
-                            contentDescription = "Escanear (próximamente)",
+                            contentDescription = "Escanear Container No.",
                         )
                     }
                 },
@@ -176,6 +187,18 @@ private fun EquipmentDataCard(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
+            OutlinedButton(
+                onClick = { onEvent(UnitEntryEvent.OpenScanner(ScannerMode.DATA_PLATE)) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.CameraAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Scan Data Plate")
+            }
             OutlinedTextField(
                 value = state.unitModel,
                 onValueChange = { onEvent(UnitEntryEvent.UnitModelChange(it)) },
