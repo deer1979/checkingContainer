@@ -50,7 +50,10 @@ jobs:
       - name: Compile debug
         id: compile
         continue-on-error: true
-        run: ./gradlew :app:compileDebugKotlin --stacktrace 2>&1 | tee /tmp/compile.log
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:compileDebugKotlin --stacktrace 2>&1 | tee /tmp/compile.log
 
       - name: Lint (debug)
         id: lint
@@ -115,8 +118,31 @@ jobs:
             --body-file /tmp/lint-comment.md
 
       - name: Unit tests
+        id: unit_tests
         if: steps.compile.outcome == 'success'
-        run: ./gradlew :app:testDebugUnitTest --stacktrace
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:testDebugUnitTest --stacktrace 2>&1 | tee /tmp/unit-tests.log
+
+      - name: Post unit test failure as PR comment
+        if: steps.unit_tests.outcome == 'failure' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## Unit tests failed (run ${{ github.run_id }})"
+            echo ""
+            echo "_Last 200 lines of test output:_"
+            echo ''
+            echo '```'
+            tail -n 200 /tmp/unit-tests.log 2>/dev/null || echo "(no log)"
+            echo '```'
+          } > /tmp/tests-comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file /tmp/tests-comment.md
 
       - name: Assemble debug APK
         id: assemble
@@ -168,10 +194,11 @@ jobs:
           EOF
           )"
 
-      - name: Fail if compile failed
-        if: steps.compile.outcome == 'failure'
+      - name: Fail if compile or assemble failed
+        if: steps.compile.outcome == 'failure' || steps.assemble.outcome == 'failure'
         run: |
-          echo "Compile failed — see 'Post compile error as PR comment' for details."
+          echo "Build failed: compile=${{ steps.compile.outcome }} assemble=${{ steps.assemble.outcome }}"
+          echo "Lint and unit-tests are informational and do not fail the build."
           exit 1
 
       - name: Upload lint report
