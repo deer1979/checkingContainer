@@ -82,6 +82,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.hilt.navigation.compose)
 
     // Compose (BOM resolves versions)
     implementation(platform(libs.androidx.compose.bom))
