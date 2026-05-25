@@ -13,7 +13,7 @@ import com.checkingcontainer.core.database.entity.UserEntity
 
 @Database(
     entities = [TaskEntity::class, UserEntity::class, ReeferUnitEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 @TypeConverters(EnumConverters::class)

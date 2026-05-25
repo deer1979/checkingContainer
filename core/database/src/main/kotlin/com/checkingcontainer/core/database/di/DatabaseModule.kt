@@ -11,7 +11,7 @@ import com.checkingcontainer.core.database.dao.TaskDao
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.UserRole
-import com.checkingcontainer.core.model.buildEmail
+import com.checkingcontainer.core.model.generateNick
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,8 +33,6 @@ object DatabaseModule {
         "checkingcontainer.db",
     )
         .addCallback(seedFirstSuperAdminCallback)
-        // OK in early dev: schema bumps wipe local data instead of forcing
-        // a migration. Add migrations before we ship to production users.
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
 
@@ -47,13 +45,7 @@ object DatabaseModule {
     @Provides
     fun providesReeferUnitDao(db: AppDatabase): ReeferUnitDao = db.reeferUnitDao()
 
-    /**
-     * Seeds a SuperAdmin on first database creation so the user can log in
-     * without a separate registration flow. Credentials are deliberately
-     * obvious for testing; change the PIN via the user management screen.
-     *   email: sadmin@checkingcontainer.app
-     *   pin:   000000
-     */
+    /** Seeds SuperAdmin on first install. Login: nick = sadmin, PIN = 000000. */
     private val seedFirstSuperAdminCallback = object : RoomDatabase.Callback() {
         override fun onCreate(db: SupportSQLiteDatabase) {
             val firstName = "Super"
@@ -61,7 +53,7 @@ object DatabaseModule {
             val values = ContentValues().apply {
                 put("firstName", firstName)
                 put("lastName", lastName)
-                put("email", buildEmail(firstName, lastName))
+                put("nick", generateNick(firstName, lastName))
                 put("pin", "000000")
                 put("jobTitle", JobTitle.Lider.name)
                 put("role", UserRole.SuperAdmin.name)

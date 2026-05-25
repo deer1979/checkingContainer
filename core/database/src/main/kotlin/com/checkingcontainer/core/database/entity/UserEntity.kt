@@ -9,13 +9,13 @@ import com.checkingcontainer.core.model.UserRole
 
 @Entity(
     tableName = "users",
-    indices = [Index(value = ["email"], unique = true)],
+    indices = [Index(value = ["nick"], unique = true)],
 )
 data class UserEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val firstName: String,
     val lastName: String,
-    val email: String,
+    val nick: String,
     val pin: String,
     val jobTitle: JobTitle,
     val role: UserRole,
@@ -27,7 +27,7 @@ data class UserEntity(
         id = id,
         firstName = firstName,
         lastName = lastName,
-        email = email,
+        nick = nick,
         pin = pin,
         jobTitle = jobTitle,
         role = role,
@@ -41,7 +41,7 @@ fun User.toEntity(): UserEntity = UserEntity(
     id = id,
     firstName = firstName,
     lastName = lastName,
-    email = email,
+    nick = nick,
     pin = pin,
     jobTitle = jobTitle,
     role = role,

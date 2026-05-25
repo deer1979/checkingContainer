@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -29,11 +29,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
@@ -41,7 +42,7 @@ fun LoginRoute(viewModel: LoginViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LoginScreen(
         state = state,
-        onEmailChange = viewModel::onEmailChange,
+        onNickChange = viewModel::onNickChange,
         onPinChange = viewModel::onPinChange,
         onTogglePinVisibility = viewModel::onTogglePinVisibility,
         onSubmit = viewModel::onSubmit,
@@ -51,7 +52,7 @@ fun LoginRoute(viewModel: LoginViewModel = hiltViewModel()) {
 @Composable
 private fun LoginScreen(
     state: LoginUiState,
-    onEmailChange: (String) -> Unit,
+    onNickChange: (String) -> Unit,
     onPinChange: (String) -> Unit,
     onTogglePinVisibility: () -> Unit,
     onSubmit: () -> Unit,
@@ -70,7 +71,7 @@ private fun LoginScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 LoginHeader()
-                EmailField(state.email, onEmailChange)
+                NickField(state.nick, onNickChange)
                 PinField(
                     pin = state.pin,
                     visible = state.pinVisible,
@@ -91,7 +92,7 @@ private fun LoginScreen(
                     onClick = onSubmit,
                 )
                 Text(
-                    text = "Acceso de prueba: sadmin@checkingcontainer.app · PIN 000000 (SuperAdmin sembrado en la primera apertura).",
+                    text = "Acceso de prueba: nick = sadmin · PIN 000000 (SuperAdmin sembrado en la primera apertura).",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -108,24 +109,25 @@ private fun LoginHeader() {
         color = MaterialTheme.colorScheme.onSurface,
     )
     Text(
-        text = "Inicia sesión con tu email corporativo y PIN",
+        text = "Inicia sesión con tu nick y PIN",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
 @Composable
-private fun EmailField(value: String, onChange: (String) -> Unit) {
+private fun NickField(value: String, onChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text("Email") },
-        placeholder = { Text("ejemplo@checkingcontainer.app") },
-        leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = null) },
+        label = { Text("Nick / Usuario") },
+        placeholder = { Text("jperez") },
+        leadingIcon = { Icon(Icons.Outlined.AccountCircle, contentDescription = null) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Email,
+            keyboardType = KeyboardType.Text,
+            capitalization = KeyboardCapitalization.None,
             imeAction = ImeAction.Next,
         ),
     )

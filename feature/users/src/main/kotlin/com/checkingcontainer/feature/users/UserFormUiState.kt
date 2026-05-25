@@ -3,12 +3,8 @@ package com.checkingcontainer.feature.users
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.core.model.UserRole
-import com.checkingcontainer.core.model.buildEmail
+import com.checkingcontainer.core.model.generateNick
 
-/**
- * Shape of the create/edit form. [previewEmail] is derived in real time from
- * the first and last name fields and surfaced to the UI as read-only.
- */
 data class UserFormUiState(
     val id: Long? = null,
     val firstName: String = "",
@@ -24,8 +20,8 @@ data class UserFormUiState(
     val errorMessage: String? = null,
     val savedSuccessfully: Boolean = false,
 ) {
-    val previewEmail: String
-        get() = if (firstName.isBlank() || lastName.isBlank()) "" else buildEmail(firstName, lastName)
+    val previewNick: String
+        get() = if (firstName.isBlank() || lastName.isBlank()) "" else generateNick(firstName, lastName)
 
     val canSave: Boolean
         get() = !isSaving &&
@@ -40,7 +36,7 @@ fun UserFormUiState.toDomain(): User = User(
     id = id ?: 0L,
     firstName = firstName.trim(),
     lastName = lastName.trim(),
-    email = previewEmail,
+    nick = previewNick,
     pin = pin,
     jobTitle = jobTitle,
     role = role,

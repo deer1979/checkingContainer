@@ -41,7 +41,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.UserRole
@@ -182,22 +182,22 @@ private fun PersonalSection(
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             )
-            EmailReadonlyField(state.previewEmail)
+            NickReadonlyField(state.previewNick)
             PinFormField(state.pin, state.pinVisible, onPinChange, onTogglePin)
         }
     }
 }
 
 @Composable
-private fun EmailReadonlyField(email: String) {
+private fun NickReadonlyField(nick: String) {
     Column {
         Text(
-            text = "Email generado",
+            text = "Nick de acceso",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = email.ifBlank { "—" },
+            text = nick.ifBlank { "—" },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(top = 4.dp),
