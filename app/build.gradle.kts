@@ -55,9 +55,13 @@ android {
         // 16 KB page size alignment is on by default in AGP ≥ 8.5 for native libs.
     }
 
-    androidResources {
-        // Generate per-locale APK splits if we add more languages later.
-        generateLocaleConfig = true
+    lint {
+        // Keep lint strict on app code but don't choke the build on style nits
+        // until we add a baseline. Real issues still fail.
+        warningsAsErrors = false
+        abortOnError = true
+        checkDependencies = false
+        textReport = true
     }
 }
 

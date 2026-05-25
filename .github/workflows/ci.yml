@@ -40,6 +40,9 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Compile debug
+        run: ./gradlew :app:compileDebugKotlin --stacktrace
+
       - name: Lint (debug)
         run: ./gradlew :app:lintDebug --stacktrace
 

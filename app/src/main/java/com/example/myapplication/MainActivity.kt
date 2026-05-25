@@ -19,7 +19,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,8 +55,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppShell() {
-    val info = currentWindowAdaptiveInfo()
-    val widthClass = info.windowSizeClass.windowWidthSizeClass
+    val widthClass = currentWindowAdaptiveInfo().windowSizeClass.toString()
 
     Scaffold(
         topBar = {
@@ -78,7 +77,7 @@ private fun AppShell() {
             verticalArrangement = Arrangement.Center
         ) {
             Icon(
-                imageVector = Icons.Default.PhoneAndroid,
+                imageVector = Icons.Default.Star,
                 contentDescription = null,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
