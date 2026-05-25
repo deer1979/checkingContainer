@@ -1,6 +1,8 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // Kotlin is bundled with AGP 9.x — only the Compose compiler plugin is applied.
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -39,10 +41,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
-    kotlin {
-        jvmToolchain(21)
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -56,12 +54,19 @@ android {
     }
 
     lint {
-        // Keep lint strict on app code but don't choke the build on style nits
-        // until we add a baseline. Real issues still fail.
+        // Stable releases: don't fail CI on transient "newer version available"
+        // chatter. Real correctness issues (default severity Error) still abort.
         warningsAsErrors = false
         abortOnError = true
         checkDependencies = false
         textReport = true
+        disable += setOf("GradleDependency", "AndroidGradlePluginVersion")
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
 

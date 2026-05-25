@@ -6,18 +6,18 @@ pantallas grandes, HDR, predictive back, 16KB page size, etc.).
 
 ## Stack
 
-| Componente            | Versión / objetivo                        |
-|-----------------------|--------------------------------------------|
-| Android Gradle Plugin | 8.9.1                                     |
-| Gradle                | 8.14.3                                    |
-| Kotlin                | 2.1.10 (compilador K2)                    |
-| JDK toolchain         | 21                                        |
-| compileSdk            | 36 (Android 16 "Baklava")                 |
-| targetSdk             | 36                                        |
-| minSdk                | 26 (Android 8.0)                          |
-| UI                    | Jetpack Compose (Material 3)              |
-| Compose BOM           | 2025.04.01                                |
-| Adaptive layouts      | androidx.compose.material3.adaptive       |
+| Componente            | Versión / objetivo                                |
+|-----------------------|----------------------------------------------------|
+| Android Gradle Plugin | 9.2.1 (Kotlin built-in)                           |
+| Gradle                | 9.4.1                                             |
+| Kotlin                | 2.2.20 (K2)                                       |
+| JDK                   | 21 (AGP 9.2 mínimo: 17)                           |
+| compileSdk            | 36 (Android 16)                                   |
+| targetSdk             | 36                                                |
+| minSdk                | 26 (Android 8.0)                                  |
+| UI                    | Jetpack Compose (Material 3)                      |
+| Compose BOM           | 2026.05.01                                        |
+| Adaptive layouts      | androidx.compose.material3.adaptive 1.2.0         |
 
 ## Características modernas habilitadas
 
