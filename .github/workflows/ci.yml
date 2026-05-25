@@ -82,10 +82,17 @@ jobs:
           {
             echo "## Compile debug failed (run ${{ github.run_id }})"
             echo ""
-            echo "_Last 200 lines of compile output:_"
-            echo ''
+            echo "### Kotlin compiler errors (lines starting with \`e:\`)"
             echo '```'
-            tail -n 200 /tmp/compile.log 2>/dev/null || echo "(no log captured)"
+            grep -E '^(e:|w:|FAILURE|Caused by|\* What went wrong|> Task .* FAILED)' /tmp/compile.log 2>/dev/null \
+              | head -n 80 \
+              || echo "(no compiler errors matched)"
+            echo '```'
+            echo ""
+            echo "### First 80 lines around the failed task"
+            echo '```'
+            awk '/Task :.*compileDebugKotlin/{p=1} p' /tmp/compile.log 2>/dev/null | head -n 80 \
+              || echo "(no task section found)"
             echo '```'
           } > /tmp/compile-comment.md
           gh pr comment "${{ github.event.pull_request.number }}" \
