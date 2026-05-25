@@ -9,13 +9,15 @@ import com.example.myapplication.navigation.TopLevelDestination
 
 @Composable
 fun Testo3BottomBar(
+    destinations: List<TopLevelDestination>,
     currentRoute: String?,
     onSelect: (TopLevelDestination) -> Unit,
 ) {
     NavigationBar {
-        TopLevelDestination.all.forEach { dest ->
+        destinations.forEach { dest ->
             NavigationBarItem(
-                selected = currentRoute == dest.route,
+                selected = currentRoute == dest.route ||
+                    currentRoute?.startsWith("${dest.route}/") == true,
                 onClick = { onSelect(dest) },
                 icon = { Icon(dest.icon, contentDescription = null) },
                 label = { Text(dest.label) },

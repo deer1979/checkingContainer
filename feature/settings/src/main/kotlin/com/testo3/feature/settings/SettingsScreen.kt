@@ -1,9 +1,11 @@
 package com.testo3.feature.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -25,9 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
-fun SettingsRoute(
-    viewModel: SettingsViewModel = hiltViewModel(),
-) {
+fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     SettingsScreen(
         state = state,
@@ -35,6 +36,7 @@ fun SettingsRoute(
         onToggleDynamicColor = viewModel::onToggleDynamicColor,
         onToggleNotifications = viewModel::onToggleNotifications,
         onToggleAutoSync = viewModel::onToggleAutoSync,
+        onLogout = viewModel::onLogout,
     )
 }
 
@@ -45,6 +47,7 @@ private fun SettingsScreen(
     onToggleDynamicColor: (Boolean) -> Unit,
     onToggleNotifications: (Boolean) -> Unit,
     onToggleAutoSync: (Boolean) -> Unit,
+    onLogout: () -> Unit,
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item { SectionHeader("Apariencia") }
@@ -76,7 +79,7 @@ private fun SettingsScreen(
         item {
             SettingsRow(
                 title = "Notificaciones",
-                description = "Avisos sobre tareas próximas a vencer",
+                description = "Avisos sobre nuevos anuncios y tareas próximas",
                 icon = Icons.Outlined.Notifications,
                 checked = state.notifications,
                 onCheckedChange = onToggleNotifications,
@@ -109,8 +112,29 @@ private fun SettingsScreen(
         item {
             ListItem(
                 headlineContent = { Text("Versión") },
-                supportingContent = { Text("0.2.0 · debug build") },
+                supportingContent = { Text("0.3.0 · debug build") },
                 leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
+            )
+        }
+        item { HorizontalDivider() }
+
+        item { SectionHeader("Sesión") }
+
+        item {
+            ListItem(
+                headlineContent = { Text("Cerrar sesión") },
+                supportingContent = { Text("Vuelves a la pantalla de login.") },
+                leadingContent = {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.Logout,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                },
+                colors = ListItemDefaults.colors(
+                    headlineColor = MaterialTheme.colorScheme.error,
+                ),
+                modifier = Modifier.clickable(onClick = onLogout),
             )
         }
     }

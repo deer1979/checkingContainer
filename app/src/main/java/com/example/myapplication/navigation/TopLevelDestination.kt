@@ -1,24 +1,38 @@
 package com.example.myapplication.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Login
+import androidx.compose.material.icons.outlined.AdminPanelSettings
+import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.testo3.feature.login.navigation.LOGIN_ROUTE
+import com.testo3.core.model.UserRole
+import com.testo3.feature.admin.navigation.ADMIN_ROUTE
+import com.testo3.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
 import com.testo3.feature.settings.navigation.SETTINGS_ROUTE
 import com.testo3.feature.tasks.navigation.TASKS_ROUTE
 
 /**
- * Top-level destinations rendered as items in the bottom NavigationBar.
- * Adding a new tab is one entry in this list — the scaffold reads from here
- * and the NavHost picks the matching `xxxScreen()` extension.
+ * Tabs in the authenticated bottom NavigationBar. The Admin tab only appears
+ * for [UserRole.Admin] users; the public flow never reaches this list.
  */
 enum class TopLevelDestination(
     val route: String,
     val label: String,
     val icon: ImageVector,
+    val adminOnly: Boolean = false,
 ) {
+    Announcements(
+        route = ANNOUNCEMENTS_LIST_ROUTE,
+        label = "Anuncios",
+        icon = Icons.Outlined.Campaign,
+    ),
+    Admin(
+        route = ADMIN_ROUTE,
+        label = "Admin",
+        icon = Icons.Outlined.AdminPanelSettings,
+        adminOnly = true,
+    ),
     Tasks(
         route = TASKS_ROUTE,
         label = "Tareas",
@@ -28,14 +42,11 @@ enum class TopLevelDestination(
         route = SETTINGS_ROUTE,
         label = "Ajustes",
         icon = Icons.Outlined.Settings,
-    ),
-    Login(
-        route = LOGIN_ROUTE,
-        label = "Cuenta",
-        icon = Icons.AutoMirrored.Outlined.Login,
     );
 
     companion object {
-        val all = entries.toList()
+        fun forRole(role: UserRole): List<TopLevelDestination> = entries.filter {
+            !it.adminOnly || role == UserRole.Admin
+        }
     }
 }

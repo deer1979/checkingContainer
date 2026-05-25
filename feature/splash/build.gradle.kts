@@ -3,10 +3,9 @@ plugins {
 }
 
 android {
-    namespace = "com.testo3.feature.settings"
+    namespace = "com.testo3.feature.splash"
 }
 
 dependencies {
     implementation(project(":core:designsystem"))
-    implementation(project(":core:domain"))
 }

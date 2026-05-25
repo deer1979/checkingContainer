@@ -3,10 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "com.testo3.feature.settings"
+    namespace = "com.testo3.feature.announcements"
 }
 
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:domain"))
+    implementation(project(":core:model"))
 }

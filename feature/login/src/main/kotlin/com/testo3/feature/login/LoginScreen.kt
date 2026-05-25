@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -79,6 +80,13 @@ private fun LoginScreen(
                     onChange = onPasswordChange,
                     onToggleVisibility = onTogglePasswordVisibility,
                 )
+                if (state.errorMessage != null) {
+                    Text(
+                        text = state.errorMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
                 LoginSubmitButton(
                     enabled = state.canSubmit,
@@ -86,11 +94,17 @@ private fun LoginScreen(
                     onClick = onSubmit,
                 )
                 TextButton(
-                    onClick = { /* TODO: recover password flow */ },
+                    onClick = { /* TODO: recovery flow */ },
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 ) {
                     Text("¿Olvidaste tu contraseña?")
                 }
+                Text(
+                    text = "Pista: cualquier usuario con contraseña ≥4 entra. Usa 'admin' para el panel administrativo.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
         }
     }
@@ -111,10 +125,7 @@ private fun LoginHeader() {
 }
 
 @Composable
-private fun UsernameField(
-    value: String,
-    onChange: (String) -> Unit,
-) {
+private fun UsernameField(value: String, onChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -169,12 +180,11 @@ private fun LoginSubmitButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
-        // M3 pill: fully rounded ends.
-        shape = CircleShape,
+        shape = CircleShape,  // M3 pill
     ) {
         if (loading) {
             CircularProgressIndicator(
-                modifier = Modifier.height(20.dp),
+                modifier = Modifier.size(20.dp),
                 strokeWidth = 2.dp,
                 color = MaterialTheme.colorScheme.onPrimary,
             )

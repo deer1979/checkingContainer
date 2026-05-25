@@ -9,8 +9,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.myapplication"
-        versionCode = 1
-        versionName = "0.2.0"
+        versionCode = 2
+        versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -59,8 +59,11 @@ android {
 
 dependencies {
     // Feature modules
-    implementation(project(":feature:tasks"))
+    implementation(project(":feature:splash"))
     implementation(project(":feature:login"))
+    implementation(project(":feature:announcements"))
+    implementation(project(":feature:admin"))
+    implementation(project(":feature:tasks"))
     implementation(project(":feature:settings"))
     implementation(libs.androidx.material.icons.extended)
 

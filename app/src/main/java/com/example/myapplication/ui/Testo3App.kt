@@ -1,51 +1,46 @@
 package com.example.myapplication.ui
 
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
-import com.example.myapplication.navigation.Testo3NavHost
-import com.example.myapplication.navigation.TopLevelDestination
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.myapplication.MainViewModel
+import com.testo3.core.domain.AuthState
 
+/**
+ * App entry. Observes the auth state at the activity scope and crossfades
+ * between two completely separate compositions:
+ *   - [PublicShell] → splash + login. No Scaffold, no bottom bar.
+ *   - [AuthenticatedShell] → Scaffold + bottom NavigationBar + per-role start
+ *     destination (Admin → admin panel, Normal → announcements).
+ */
 @Composable
-fun Testo3App() {
-    val navController = rememberNavController()
-    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+fun Testo3App(viewModel: MainViewModel = hiltViewModel()) {
+    val authState by viewModel.authState.collectAsStateWithLifecycle()
 
-    Scaffold(
-        bottomBar = {
-            Testo3BottomBar(
-                currentRoute = currentRoute,
-                onSelect = { dest -> navigateToTopLevel(navController, dest) },
-            )
+    AnimatedContent(
+        targetState = authState,
+        label = "auth-state",
+        transitionSpec = {
+            fadeIn(tween(durationMillis = 250)) togetherWith fadeOut(tween(durationMillis = 200))
         },
-        modifier = Modifier.fillMaxSize(),
-    ) { innerPadding ->
-        Testo3NavHost(
-            navController = navController,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        )
-    }
-}
-
-private fun navigateToTopLevel(
-    navController: androidx.navigation.NavHostController,
-    dest: TopLevelDestination,
-) {
-    navController.navigate(dest.route) {
-        // Pop up to the graph's start so the back stack stays a single entry
-        // per top-level destination — standard Material 3 bottom-bar behavior.
-        popUpTo(navController.graph.findStartDestination().id) {
-            saveState = true
+        contentKey = {
+            when (it) {
+                AuthState.Loading -> "loading"
+                AuthState.Unauthenticated -> "public"
+                is AuthState.Authenticated -> "auth"
+            }
+        },
+    ) { state ->
+        when (state) {
+            AuthState.Loading,
+            AuthState.Unauthenticated -> PublicShell()
+            is AuthState.Authenticated -> AuthenticatedShell(user = state.user)
         }
-        launchSingleTop = true
-        restoreState = true
     }
 }
