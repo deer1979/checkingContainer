@@ -11,6 +11,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build:
     name: Lint · Test · Build
@@ -52,26 +56,39 @@ jobs:
         if: always()
         run: |
           report="app/build/reports/lint-results-debug.txt"
+          if [ -f "$report" ]; then
+            echo "::group::Lint text report"
+            cat "$report"
+            echo "::endgroup::"
+          else
+            echo "Lint text report not found at $report"
+            find app/build/reports -type f 2>/dev/null || true
+          fi
+
+      - name: Post lint report as PR comment
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          report="app/build/reports/lint-results-debug.txt"
           {
-            echo "## Lint debug report"
+            echo "## Lint debug report (run ${{ github.run_id }})"
             echo ""
             if [ -f "$report" ]; then
               echo '```'
               cat "$report"
               echo '```'
             else
-              echo "_Text report not found at \`$report\`._"
-              echo ""
-              echo "Files under \`app/build/reports\`:"
+              echo "_Text report not produced. Files under \`app/build/reports\`:_"
+              echo ''
               echo '```'
               find app/build/reports -type f 2>/dev/null || echo "(none)"
               echo '```'
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          echo "::group::Lint text report"
-          [ -f "$report" ] && cat "$report" || echo "(missing)"
-          echo "::endgroup::"
+          } > /tmp/lint-comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file /tmp/lint-comment.md
 
       - name: Fail if lint step failed
         if: steps.lint.outcome == 'failure'
