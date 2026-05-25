@@ -15,6 +15,20 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    signingConfigs {
+        // Committed debug keystore so every CI-built APK is signed identically.
+        // Without this each runner generates its own keystore and the user
+        // gets INSTALL_FAILED_UPDATE_INCOMPATIBLE when upgrading the debug
+        // build on the same device. Safe to commit: debug-only, never used
+        // for release / Play Store.
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -27,6 +41,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -45,6 +60,9 @@ android {
 dependencies {
     // Feature modules
     implementation(project(":feature:tasks"))
+    implementation(project(":feature:login"))
+    implementation(project(":feature:settings"))
+    implementation(libs.androidx.material.icons.extended)
 
     // Core modules
     implementation(project(":core:designsystem"))

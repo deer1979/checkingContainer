@@ -9,11 +9,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.rememberNavController
+import com.example.myapplication.ui.Testo3App
 import com.testo3.core.designsystem.theme.Testo3Theme
-import com.testo3.feature.tasks.navigation.TASKS_ROUTE
-import com.testo3.feature.tasks.navigation.tasksScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -34,16 +31,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-}
-
-@androidx.compose.runtime.Composable
-private fun Testo3App() {
-    val navController = rememberNavController()
-    NavHost(
-        navController = navController,
-        startDestination = TASKS_ROUTE,
-    ) {
-        tasksScreen()
     }
 }

@@ -3,11 +3,9 @@ plugins {
 }
 
 android {
-    namespace = "com.testo3.feature.tasks"
+    namespace = "com.testo3.feature.settings"
 }
 
 dependencies {
-    implementation(project(":core:domain"))
-    implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
 }
