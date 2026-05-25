@@ -48,10 +48,13 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Compile debug
-        run: ./gradlew :app:compileDebugKotlin --stacktrace
+        id: compile
+        continue-on-error: true
+        run: ./gradlew :app:compileDebugKotlin --stacktrace 2>&1 | tee /tmp/compile.log
 
       - name: Lint (debug)
         id: lint
+        if: steps.compile.outcome == 'success'
         continue-on-error: true
         run: ./gradlew :app:lintDebug --stacktrace
 
@@ -68,8 +71,26 @@ jobs:
             find app/build/reports -type f 2>/dev/null || true
           fi
 
+      - name: Post compile error as PR comment
+        if: steps.compile.outcome == 'failure' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## Compile debug failed (run ${{ github.run_id }})"
+            echo ""
+            echo "_Last 200 lines of compile output:_"
+            echo ''
+            echo '```'
+            tail -n 200 /tmp/compile.log 2>/dev/null || echo "(no log captured)"
+            echo '```'
+          } > /tmp/compile-comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file /tmp/compile-comment.md
+
       - name: Post lint report as PR comment
-        if: always() && github.event_name == 'pull_request'
+        if: always() && steps.lint.outcome != 'skipped' && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -93,26 +114,29 @@ jobs:
             --repo "${{ github.repository }}" \
             --body-file /tmp/lint-comment.md
 
-      - name: Fail if lint step failed
-        if: steps.lint.outcome == 'failure'
-        run: |
-          echo "Lint task failed — see 'Print lint text report' above."
-          exit 1
-
       - name: Unit tests
+        if: steps.compile.outcome == 'success'
         run: ./gradlew :app:testDebugUnitTest --stacktrace
 
       - name: Assemble debug APK
+        id: assemble
+        if: steps.compile.outcome == 'success'
         run: ./gradlew :app:assembleDebug --stacktrace
 
       - name: Upload debug APK
-        if: success()
+        if: steps.assemble.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Fail if compile failed
+        if: steps.compile.outcome == 'failure'
+        run: |
+          echo "Compile failed — see 'Post compile error as PR comment' for details."
+          exit 1
 
       - name: Upload lint report
         if: always()

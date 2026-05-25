@@ -84,10 +84,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.material3.window.size)
-    implementation(libs.androidx.material3.adaptive)
-    implementation(libs.androidx.material3.adaptive.layout)
-    implementation(libs.androidx.material3.adaptive.navigation)
+    // Adaptive layouts (foldables/window size classes) — re-add when we
+    // actually use them. They were behind the previous compile failure.
 
     // Tests
     testImplementation(libs.junit)

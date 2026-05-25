@@ -10,16 +10,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,12 +28,9 @@ import com.example.myapplication.ui.theme.Testo3Theme
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Splash Screen API — keep splash until the first frame is ready.
-        val splash = installSplashScreen()
+        installSplashScreen()
         super.onCreate(savedInstanceState)
-        // Edge-to-edge: draws under the status & navigation bars.
         enableEdgeToEdge()
-        splash.setKeepOnScreenCondition { false }
 
         setContent {
             Testo3Theme {
@@ -55,8 +48,6 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppShell() {
-    val widthClass = currentWindowAdaptiveInfo().windowSizeClass.toString()
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -76,18 +67,13 @@ private fun AppShell() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Star,
-                contentDescription = null,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
             Text(
-                text = "Hello, Android ${Build.VERSION.RELEASE}",
+                text = "Hola, Android ${Build.VERSION.RELEASE}",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "API ${Build.VERSION.SDK_INT} · widthClass = $widthClass",
+                text = "API ${Build.VERSION.SDK_INT} · ${Build.MANUFACTURER} ${Build.MODEL}",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -95,8 +81,7 @@ private fun AppShell() {
     }
 }
 
-@Preview(showBackground = true, name = "Phone")
-@Preview(showBackground = true, name = "Tablet", widthDp = 840, heightDp = 1200)
+@Preview(showBackground = true)
 @Composable
 private fun AppShellPreview() {
     Testo3Theme {
