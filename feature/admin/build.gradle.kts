@@ -1,9 +1,9 @@
 plugins {
-    alias(libs.plugins.testo3.android.feature)
+    alias(libs.plugins.checkingcontainer.android.feature)
 }
 
 android {
-    namespace = "com.testo3.feature.admin"
+    namespace = "com.checkingcontainer.feature.admin"
 }
 
 dependencies {

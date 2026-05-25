@@ -2,8 +2,8 @@ package com.example.myapplication
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.testo3.core.domain.AuthRepository
-import com.testo3.core.domain.AuthState
+import com.checkingcontainer.core.domain.AuthRepository
+import com.checkingcontainer.core.domain.AuthState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted

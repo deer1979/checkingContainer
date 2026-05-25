@@ -1,10 +1,10 @@
 plugins {
-    alias(libs.plugins.testo3.android.library)
-    alias(libs.plugins.testo3.android.hilt)
+    alias(libs.plugins.checkingcontainer.android.library)
+    alias(libs.plugins.checkingcontainer.android.hilt)
 }
 
 android {
-    namespace = "com.testo3.core.data"
+    namespace = "com.checkingcontainer.core.data"
 }
 
 dependencies {

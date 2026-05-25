@@ -96,10 +96,10 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 
 # Convention plugins exposed by build-logic/ (registered in
 # build-logic/convention/build.gradle.kts).
-testo3-android-application = { id = "testo3.android.application", version = "unspecified" }
-testo3-android-library = { id = "testo3.android.library", version = "unspecified" }
-testo3-android-library-compose = { id = "testo3.android.library.compose", version = "unspecified" }
-testo3-android-feature = { id = "testo3.android.feature", version = "unspecified" }
-testo3-android-hilt = { id = "testo3.android.hilt", version = "unspecified" }
-testo3-android-room = { id = "testo3.android.room", version = "unspecified" }
-testo3-jvm-library = { id = "testo3.jvm.library", version = "unspecified" }
+checkingcontainer-android-application = { id = "checkingcontainer.android.application", version = "unspecified" }
+checkingcontainer-android-library = { id = "checkingcontainer.android.library", version = "unspecified" }
+checkingcontainer-android-library-compose = { id = "checkingcontainer.android.library.compose", version = "unspecified" }
+checkingcontainer-android-feature = { id = "checkingcontainer.android.feature", version = "unspecified" }
+checkingcontainer-android-hilt = { id = "checkingcontainer.android.hilt", version = "unspecified" }
+checkingcontainer-android-room = { id = "checkingcontainer.android.room", version = "unspecified" }
+checkingcontainer-jvm-library = { id = "checkingcontainer.jvm.library", version = "unspecified" }

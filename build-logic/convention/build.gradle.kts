@@ -2,7 +2,7 @@ plugins {
     `kotlin-dsl`
 }
 
-group = "com.testo3.buildlogic"
+group = "com.checkingcontainer.buildlogic"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -18,31 +18,31 @@ dependencies {
 gradlePlugin {
     plugins {
         register("androidApplication") {
-            id = "testo3.android.application"
+            id = "checkingcontainer.android.application"
             implementationClass = "AndroidApplicationConventionPlugin"
         }
         register("androidLibrary") {
-            id = "testo3.android.library"
+            id = "checkingcontainer.android.library"
             implementationClass = "AndroidLibraryConventionPlugin"
         }
         register("androidLibraryCompose") {
-            id = "testo3.android.library.compose"
+            id = "checkingcontainer.android.library.compose"
             implementationClass = "AndroidLibraryComposeConventionPlugin"
         }
         register("androidFeature") {
-            id = "testo3.android.feature"
+            id = "checkingcontainer.android.feature"
             implementationClass = "AndroidFeatureConventionPlugin"
         }
         register("androidHilt") {
-            id = "testo3.android.hilt"
+            id = "checkingcontainer.android.hilt"
             implementationClass = "AndroidHiltConventionPlugin"
         }
         register("androidRoom") {
-            id = "testo3.android.room"
+            id = "checkingcontainer.android.room"
             implementationClass = "AndroidRoomConventionPlugin"
         }
         register("jvmLibrary") {
-            id = "testo3.jvm.library"
+            id = "checkingcontainer.jvm.library"
             implementationClass = "JvmLibraryConventionPlugin"
         }
     }

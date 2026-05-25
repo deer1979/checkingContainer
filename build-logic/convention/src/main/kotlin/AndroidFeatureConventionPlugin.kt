@@ -1,4 +1,4 @@
-import com.testo3.buildlogic.libs
+import com.checkingcontainer.buildlogic.libs
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.dependencies
@@ -11,8 +11,8 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
             with(pluginManager) {
-                apply("testo3.android.library.compose")
-                apply("testo3.android.hilt")
+                apply("checkingcontainer.android.library.compose")
+                apply("checkingcontainer.android.hilt")
             }
             dependencies {
                 add("implementation", libs.findLibrary("androidx-lifecycle-runtime-compose").get())

@@ -15,15 +15,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.myapplication.navigation.TopLevelDestination
-import com.testo3.core.model.User
-import com.testo3.feature.admin.navigation.adminScreen
-import com.testo3.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
-import com.testo3.feature.announcements.navigation.announcementsGraph
-import com.testo3.feature.settings.navigation.settingsScreen
-import com.testo3.feature.tasks.navigation.tasksScreen
-import com.testo3.feature.units.navigation.unitsGraph
-import com.testo3.feature.users.navigation.USERS_LIST_ROUTE
-import com.testo3.feature.users.navigation.usersGraph
+import com.checkingcontainer.core.model.User
+import com.checkingcontainer.feature.admin.navigation.adminScreen
+import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
+import com.checkingcontainer.feature.announcements.navigation.announcementsGraph
+import com.checkingcontainer.feature.settings.navigation.settingsScreen
+import com.checkingcontainer.feature.tasks.navigation.tasksScreen
+import com.checkingcontainer.feature.units.navigation.unitsGraph
+import com.checkingcontainer.feature.users.navigation.USERS_LIST_ROUTE
+import com.checkingcontainer.feature.users.navigation.usersGraph
 
 /**
  * Post-login shell. Scaffold + bottom NavigationBar wrap an inner NavHost
@@ -44,7 +44,7 @@ fun AuthenticatedShell(user: User) {
 
     Scaffold(
         bottomBar = {
-            Testo3BottomBar(
+            AppBottomBar(
                 destinations = destinations,
                 currentRoute = currentRoute,
                 onSelect = { dest -> navigateToTopLevel(navController, dest) },

@@ -8,13 +8,13 @@ import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.testo3.core.model.UserRole
-import com.testo3.feature.admin.navigation.ADMIN_ROUTE
-import com.testo3.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
-import com.testo3.feature.settings.navigation.SETTINGS_ROUTE
-import com.testo3.feature.tasks.navigation.TASKS_ROUTE
-import com.testo3.feature.units.navigation.UNITS_ROUTE
-import com.testo3.feature.users.navigation.USERS_LIST_ROUTE
+import com.checkingcontainer.core.model.UserRole
+import com.checkingcontainer.feature.admin.navigation.ADMIN_ROUTE
+import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
+import com.checkingcontainer.feature.settings.navigation.SETTINGS_ROUTE
+import com.checkingcontainer.feature.tasks.navigation.TASKS_ROUTE
+import com.checkingcontainer.feature.units.navigation.UNITS_ROUTE
+import com.checkingcontainer.feature.users.navigation.USERS_LIST_ROUTE
 
 /**
  * Tabs in the authenticated bottom NavigationBar. Admin-only tabs are

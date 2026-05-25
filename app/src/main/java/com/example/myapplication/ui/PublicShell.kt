@@ -10,8 +10,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.testo3.feature.login.LoginRoute
-import com.testo3.feature.splash.SplashScreen
+import com.checkingcontainer.feature.login.LoginRoute
+import com.checkingcontainer.feature.splash.SplashScreen
 
 /**
  * Pre-authentication flow. Renders a splash, then transitions to the login

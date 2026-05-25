@@ -1,4 +1,4 @@
-import com.testo3.buildlogic.libs
+import com.checkingcontainer.buildlogic.libs
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.dependencies

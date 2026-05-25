@@ -1,6 +1,6 @@
 plugins {
-    alias(libs.plugins.testo3.android.application)
-    alias(libs.plugins.testo3.android.hilt)
+    alias(libs.plugins.checkingcontainer.android.application)
+    alias(libs.plugins.checkingcontainer.android.hilt)
     alias(libs.plugins.kotlin.compose)
 }
 

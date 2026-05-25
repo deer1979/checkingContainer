@@ -1,7 +1,7 @@
 import com.android.build.api.dsl.ApplicationExtension
-import com.testo3.buildlogic.configureKotlin
-import com.testo3.buildlogic.intVersion
-import com.testo3.buildlogic.libs
+import com.checkingcontainer.buildlogic.configureKotlin
+import com.checkingcontainer.buildlogic.intVersion
+import com.checkingcontainer.buildlogic.libs
 import org.gradle.api.JavaVersion
 import org.gradle.api.Plugin
 import org.gradle.api.Project

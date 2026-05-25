@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.testo3.jvm.library)
+    alias(libs.plugins.checkingcontainer.jvm.library)
 }
 
 dependencies {
