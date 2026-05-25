@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write       # needed to create/move release tags
   pull-requests: write
 
 jobs:
@@ -131,6 +131,42 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish APK as rolling release (mobile-downloadable)
+        if: steps.assemble.outcome == 'success' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="latest-debug"
+          short_sha="${GITHUB_SHA:0:7}"
+          src_apk=$(find app/build/outputs/apk/debug -name '*.apk' | head -n 1)
+          if [ -z "$src_apk" ]; then
+            echo "No APK produced"; exit 1
+          fi
+          renamed="testo3-debug-${short_sha}.apk"
+          cp "$src_apk" "/tmp/$renamed"
+
+          # Move the rolling tag: delete old release+tag, create new one.
+          gh release delete "$tag" --yes --cleanup-tag \
+            --repo "${{ github.repository }}" || true
+
+          gh release create "$tag" "/tmp/$renamed" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.event.pull_request.head.sha }}" \
+            --title "Latest debug build" \
+            --prerelease \
+            --notes "$(cat <<EOF
+          Auto-generated debug APK from PR #${{ github.event.pull_request.number }}, commit \`${short_sha}\`.
+
+          **Install on Android:**
+          1. Tap the \`testo3-debug-*.apk\` asset below.
+          2. Allow your browser to install unknown apps when prompted.
+          3. Open the installer, then \"Testo3 (debug)\".
+
+          The release tag is moved on every successful CI run, so this is always the latest build of the current PR branch.
+          EOF
+          )"
 
       - name: Fail if compile failed
         if: steps.compile.outcome == 'failure'
