@@ -9,4 +9,11 @@ data class ReeferUnit(
     val unitSerialNo: String,
     val yearOfBuilt: String,
     val createdAt: Long = System.currentTimeMillis(),
+    val status: InspStatus = InspStatus.INSP,
+    val ptiInstruction: PtiInstruction? = null,
+    val unitType: UnitType = UnitType.CARRIER,
+    val deployedAs: String? = null,
+    val technicianId: Long = 0,
+    val technicianName: String = "",
+    val observations: String = "",
 )

@@ -31,7 +31,7 @@ fun CheckingContainerApp(viewModel: MainViewModel = hiltViewModel()) {
         },
         contentKey = {
             when (it) {
-                AuthState.Loading -> "loading"
+                AuthState.Loading,
                 AuthState.Unauthenticated -> "public"
                 is AuthState.Authenticated -> "auth"
             }

@@ -4,27 +4,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Save
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -33,9 +24,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -45,7 +33,6 @@ import com.checkingcontainer.core.designsystem.theme.AppTheme
 @Composable
 fun UnitEntryRoute(
     onBack: () -> Unit,
-    onNavigateToSettings: () -> Unit,
     viewModel: UnitEntryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -57,7 +44,6 @@ fun UnitEntryRoute(
     UnitEntryScreen(
         state = state,
         onBack = onBack,
-        onNavigateToSettings = onNavigateToSettings,
         onEvent = viewModel::onEvent,
         onSave = viewModel::saveUnit,
     )
@@ -68,7 +54,6 @@ fun UnitEntryRoute(
 fun UnitEntryScreen(
     state: UnitEntryUiState,
     onBack: () -> Unit,
-    onNavigateToSettings: () -> Unit = {},
     onEvent: (UnitEntryEvent) -> Unit,
     onSave: () -> Unit,
 ) {
@@ -86,15 +71,7 @@ fun UnitEntryScreen(
                 title = { Text("Ingreso de Unidad") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Atras",
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "Ajustes")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Atrás")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -125,124 +102,15 @@ fun UnitEntryScreen(
         ) {
             IdentificationCard(state = state, onEvent = onEvent)
             EquipmentDataCard(state = state, onEvent = onEvent)
-            if (state.errorMessage != null) {
+            InspectionCard(state = state, onEvent = onEvent)
+            state.errorMessage?.let { msg ->
                 Text(
-                    text = state.errorMessage,
+                    text = msg,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
             }
             Spacer(modifier = Modifier.height(80.dp))
-        }
-    }
-}
-
-@Composable
-private fun IdentificationCard(
-    state: UnitEntryUiState,
-    onEvent: (UnitEntryEvent) -> Unit,
-) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = "Identificación",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            OutlinedTextField(
-                value = state.containerNo,
-                onValueChange = { onEvent(UnitEntryEvent.ContainerNoChange(it)) },
-                label = { Text("Container No.") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                isError = state.showContainerError,
-                supportingText = if (state.showContainerError) {
-                    { Text("Formato ISO 6346 inválido") }
-                } else null,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Characters,
-                    imeAction = ImeAction.Done,
-                ),
-                trailingIcon = {
-                    IconButton(
-                        onClick = { onEvent(UnitEntryEvent.OpenScanner(ScannerMode.CONTAINER)) },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.CameraAlt,
-                            contentDescription = "Escanear Container No.",
-                        )
-                    }
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun EquipmentDataCard(
-    state: UnitEntryUiState,
-    onEvent: (UnitEntryEvent) -> Unit,
-) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = "Datos del Equipo",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            OutlinedButton(
-                onClick = { onEvent(UnitEntryEvent.OpenScanner(ScannerMode.DATA_PLATE)) },
-                enabled = state.isContainerValid,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.CameraAlt,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Scan Data Plate")
-            }
-            OutlinedTextField(
-                value = state.unitModel,
-                onValueChange = { onEvent(UnitEntryEvent.UnitModelChange(it)) },
-                label = { Text("Unit Model") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            )
-            OutlinedTextField(
-                value = state.unitSerialNo,
-                onValueChange = { onEvent(UnitEntryEvent.UnitSerialNoChange(it)) },
-                label = { Text("Unit Serial No.") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Characters,
-                    imeAction = ImeAction.Next,
-                ),
-            )
-            OutlinedTextField(
-                value = state.yearOfBuilt,
-                onValueChange = { onEvent(UnitEntryEvent.YearOfBuiltChange(it)) },
-                label = { Text("Year of Built") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Done,
-                ),
-            )
         }
     }
 }
@@ -254,7 +122,7 @@ private fun UnitEntryScreenPreview() {
         UnitEntryScreen(
             state = UnitEntryUiState(
                 containerNo = "BMOU9012909",
-                unitModel = "ThinLINE",
+                unitModel = "69NT40-531-J04",
                 unitSerialNo = "KSB60036558",
                 yearOfBuilt = "2008",
             ),

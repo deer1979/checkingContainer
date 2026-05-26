@@ -6,6 +6,7 @@ import com.checkingcontainer.core.domain.AnnouncementsRepository
 import com.checkingcontainer.core.model.Announcement
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +22,7 @@ class AnnouncementsViewModel @Inject constructor(
 ) : ViewModel() {
 
     val list: StateFlow<AnnouncementsUiState> = repository.observeAll()
-        .map { items -> AnnouncementsUiState(items = items, isLoading = false) }
+        .map { items -> AnnouncementsUiState(items = items.toImmutableList(), isLoading = false) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

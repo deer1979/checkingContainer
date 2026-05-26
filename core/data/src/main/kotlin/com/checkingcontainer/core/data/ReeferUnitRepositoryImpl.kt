@@ -26,6 +26,13 @@ class ReeferUnitRepositoryImpl @Inject constructor(
             .map { rows -> rows.map(ReeferUnitEntity::toDomain) }
             .flowOn(ioDispatcher)
 
+    override fun observeLast24h(): Flow<List<ReeferUnit>> {
+        val since = System.currentTimeMillis() - 24L * 60 * 60 * 1000
+        return dao.observeLast24h(since)
+            .map { rows -> rows.map(ReeferUnitEntity::toDomain) }
+            .flowOn(ioDispatcher)
+    }
+
     override suspend fun getById(id: Long): ReeferUnit? = withContext(ioDispatcher) {
         dao.findById(id)?.toDomain()
     }

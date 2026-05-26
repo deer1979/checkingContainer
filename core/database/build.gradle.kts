@@ -13,4 +13,5 @@ dependencies {
     api(project(":core:domain"))
     implementation(project(":core:common"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.collections.immutable)
 }

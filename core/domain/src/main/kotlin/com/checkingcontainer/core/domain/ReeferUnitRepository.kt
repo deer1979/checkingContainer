@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface ReeferUnitRepository {
     fun observeAll(): Flow<List<ReeferUnit>>
+    fun observeLast24h(): Flow<List<ReeferUnit>>
     suspend fun getById(id: Long): ReeferUnit?
     suspend fun create(unit: ReeferUnit): Result<Long>
     suspend fun update(unit: ReeferUnit): Result<Unit>

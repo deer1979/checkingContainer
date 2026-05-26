@@ -1,5 +1,8 @@
 package com.checkingcontainer.feature.admin
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class AdminUiState(
     val draftTitle: String = "",
     val draftSummary: String = "",

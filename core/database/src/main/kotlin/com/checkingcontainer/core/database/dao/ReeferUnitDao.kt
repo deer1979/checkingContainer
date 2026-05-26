@@ -14,6 +14,9 @@ interface ReeferUnitDao {
     @Query("SELECT * FROM reefer_units ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<ReeferUnitEntity>>
 
+    @Query("SELECT * FROM reefer_units WHERE createdAt > :since ORDER BY createdAt DESC")
+    fun observeLast24h(since: Long): Flow<List<ReeferUnitEntity>>
+
     @Query("SELECT * FROM reefer_units WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): ReeferUnitEntity?
 
