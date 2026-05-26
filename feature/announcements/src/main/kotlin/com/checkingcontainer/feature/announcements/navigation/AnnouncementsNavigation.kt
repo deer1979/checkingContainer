@@ -9,6 +9,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.checkingcontainer.feature.announcements.AnnouncementDetailRoute
 import com.checkingcontainer.feature.announcements.AnnouncementsListRoute
 import com.checkingcontainer.feature.announcements.AnnouncementsViewModel
@@ -23,21 +24,18 @@ fun announcementDetailRoute(id: String): String = "announcements/$id"
 fun NavGraphBuilder.announcementsGraph(
     navController: NavHostController,
     sharedTransitionScope: SharedTransitionScope,
-    onNavigateToSettings: () -> Unit,
 ) {
     composable(route = ANNOUNCEMENTS_LIST_ROUTE) { backStackEntry ->
         val parent = remember(backStackEntry) {
             navController.getBackStackEntry(ANNOUNCEMENTS_LIST_ROUTE)
         }
-        val vm: AnnouncementsViewModel =
-            androidx.hilt.navigation.compose.hiltViewModel(parent)
+        val vm: AnnouncementsViewModel = hiltViewModel(parent)
         AnnouncementsListRoute(
             sharedTransitionScope = sharedTransitionScope,
             animatedVisibilityScope = this@composable,
             onAnnouncementClick = { id ->
                 navController.navigate(announcementDetailRoute(id))
             },
-            onNavigateToSettings = onNavigateToSettings,
             viewModel = vm,
         )
     }
@@ -51,8 +49,7 @@ fun NavGraphBuilder.announcementsGraph(
         val parent = remember(backStackEntry) {
             navController.getBackStackEntry(ANNOUNCEMENTS_LIST_ROUTE)
         }
-        val vm: AnnouncementsViewModel =
-            androidx.hilt.navigation.compose.hiltViewModel(parent)
+        val vm: AnnouncementsViewModel = hiltViewModel(parent)
         AnnouncementDetailRoute(
             id = id,
             sharedTransitionScope = sharedTransitionScope,
