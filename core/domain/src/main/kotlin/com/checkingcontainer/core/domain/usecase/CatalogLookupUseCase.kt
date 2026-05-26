@@ -40,13 +40,15 @@ class CatalogLookupUseCase @Inject constructor(
             val match = entries
                 .filter { it.modelFamily.equals(modelFamily, ignoreCase = true) }
                 .filter { e ->
-                    (e.serialRangeStart == null || serialDigits >= e.serialRangeStart) &&
-                        (e.serialRangeEnd == null || serialDigits <= e.serialRangeEnd)
+                    val start = e.serialRangeStart
+                    val end = e.serialRangeEnd
+                    (start == null || serialDigits >= start) &&
+                        (end == null || serialDigits <= end)
                 }
                 .minByOrNull { e ->
-                    val span = if (e.serialRangeStart != null && e.serialRangeEnd != null)
-                        e.serialRangeEnd - e.serialRangeStart else Long.MAX_VALUE
-                    span
+                    val start = e.serialRangeStart
+                    val end = e.serialRangeEnd
+                    if (start != null && end != null) end - start else Long.MAX_VALUE
                 }
             if (match != null) {
                 return Result(UnitType.CARRIER, carrier.name, null)
