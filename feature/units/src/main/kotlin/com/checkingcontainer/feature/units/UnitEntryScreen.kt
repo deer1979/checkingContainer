@@ -103,9 +103,9 @@ fun UnitEntryScreen(
             IdentificationCard(state = state, onEvent = onEvent)
             EquipmentDataCard(state = state, onEvent = onEvent)
             InspectionCard(state = state, onEvent = onEvent)
-            if (state.errorMessage != null) {
+            state.errorMessage?.let { msg ->
                 Text(
-                    text = state.errorMessage,
+                    text = msg,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )

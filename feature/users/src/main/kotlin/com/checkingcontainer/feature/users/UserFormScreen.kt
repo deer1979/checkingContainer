@@ -81,9 +81,9 @@ fun UserFormRoute(
                 onRoleChange = viewModel::onRoleChange,
                 onActiveChange = viewModel::onToggleActive,
             )
-            if (state.errorMessage != null) {
+            state.errorMessage?.let { msg ->
                 Text(
-                    text = state.errorMessage,
+                    text = msg,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
