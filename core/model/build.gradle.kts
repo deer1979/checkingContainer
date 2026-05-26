@@ -3,5 +3,5 @@ plugins {
 }
 
 dependencies {
-    implementation(libs.kotlinx.collections.immutable)
+    api(libs.kotlinx.collections.immutable)
 }
