@@ -1,7 +1,9 @@
 package com.checkingcontainer.feature.units
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,15 +17,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -40,6 +46,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.checkingcontainer.core.designsystem.theme.AppTheme
+import com.checkingcontainer.core.designsystem.theme.chipColors
+import com.checkingcontainer.core.model.InspStatus
+import com.checkingcontainer.core.model.PtiInstruction
+import com.checkingcontainer.core.model.UnitType
 
 @Composable
 fun UnitEntryRoute(
@@ -82,10 +92,7 @@ fun UnitEntryScreen(
                 title = { Text("Ingreso de Unidad") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Atrás",
-                        )
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Atrás")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -116,6 +123,7 @@ fun UnitEntryScreen(
         ) {
             IdentificationCard(state = state, onEvent = onEvent)
             EquipmentDataCard(state = state, onEvent = onEvent)
+            InspectionCard(state = state, onEvent = onEvent)
             if (state.errorMessage != null) {
                 Text(
                     text = state.errorMessage,
@@ -133,6 +141,9 @@ private fun IdentificationCard(
     state: UnitEntryUiState,
     onEvent: (UnitEntryEvent) -> Unit,
 ) {
+    val isDark = isSystemInDarkTheme()
+    val validColor = InspStatus.OP.chipColors(isDark).container
+
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -140,33 +151,63 @@ private fun IdentificationCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = "Identificación",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            SectionTitle("Identificación")
             OutlinedTextField(
                 value = state.containerNo,
-                onValueChange = { onEvent(UnitEntryEvent.ContainerNoChange(it)) },
+                onValueChange = { v ->
+                    if (v.length <= 11) onEvent(UnitEntryEvent.ContainerNoChange(v))
+                },
                 label = { Text("Container No.") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 isError = state.showContainerError,
-                supportingText = if (state.showContainerError) {
-                    { Text("Formato ISO 6346 inválido") }
-                } else null,
+                supportingText = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = when {
+                                state.showContainerError -> "Formato ISO 6346 inválido"
+                                state.isContainerValid -> "Número válido"
+                                else -> ""
+                            },
+                            color = when {
+                                state.showContainerError -> MaterialTheme.colorScheme.error
+                                state.isContainerValid -> validColor
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                        Text(
+                            text = "${state.containerNo.length}/11",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                colors = if (state.isContainerValid) {
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = validColor,
+                        unfocusedBorderColor = validColor,
+                        focusedLabelColor = validColor,
+                    )
+                } else {
+                    OutlinedTextFieldDefaults.colors()
+                },
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Characters,
                     imeAction = ImeAction.Done,
                 ),
                 trailingIcon = {
-                    IconButton(
-                        onClick = { onEvent(UnitEntryEvent.OpenScanner(ScannerMode.CONTAINER)) },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.CameraAlt,
-                            contentDescription = "Escanear Container No.",
-                        )
+                    if (state.containerNo.isNotEmpty()) {
+                        IconButton(onClick = { onEvent(UnitEntryEvent.ContainerNoChange("")) }) {
+                            Icon(Icons.Outlined.Clear, contentDescription = "Limpiar")
+                        }
+                    } else {
+                        IconButton(
+                            onClick = { onEvent(UnitEntryEvent.OpenScanner(ScannerMode.CONTAINER)) },
+                        ) {
+                            Icon(Icons.Outlined.CameraAlt, contentDescription = "Escanear")
+                        }
                     }
                 },
             )
@@ -186,11 +227,7 @@ private fun EquipmentDataCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = "Datos del Equipo",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            SectionTitle("Datos del Equipo")
             OutlinedButton(
                 onClick = { onEvent(UnitEntryEvent.OpenScanner(ScannerMode.DATA_PLATE)) },
                 enabled = state.isContainerValid,
@@ -202,7 +239,7 @@ private fun EquipmentDataCard(
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Scan Data Plate")
+                Text("Escanear Placa de Datos")
             }
             OutlinedTextField(
                 value = state.unitModel,
@@ -234,8 +271,112 @@ private fun EquipmentDataCard(
                     imeAction = ImeAction.Done,
                 ),
             )
+            if (state.unitModel.isNotBlank()) {
+                UnitTypeBadge(state.unitType)
+            }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InspectionCard(
+    state: UnitEntryUiState,
+    onEvent: (UnitEntryEvent) -> Unit,
+) {
+    val isDark = isSystemInDarkTheme()
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SectionTitle("Inspección")
+
+            // Status
+            FieldLabel("Estado")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                InspStatus.entries.forEach { status ->
+                    val colors = status.chipColors(isDark)
+                    val selected = state.status == status
+                    FilterChip(
+                        selected = selected,
+                        onClick = { onEvent(UnitEntryEvent.StatusChange(status)) },
+                        label = { Text(status.label) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = colors.container,
+                            selectedLabelColor = colors.onContainer,
+                        ),
+                    )
+                }
+            }
+
+            // PTI Instruction
+            FieldLabel("Instrucción PTI")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PtiInstruction.entries.forEach { pti ->
+                    FilterChip(
+                        selected = state.ptiInstruction == pti,
+                        onClick = { onEvent(UnitEntryEvent.PtiInstructionChange(pti)) },
+                        label = { Text(pti.label) },
+                    )
+                }
+            }
+
+            // Deployed-as — only for Star Cool
+            if (state.unitType == UnitType.STAR_COOL) {
+                FieldLabel("Tipo de despliegue")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Estándar", "Atmósfera Controlada").forEach { option ->
+                        FilterChip(
+                            selected = state.deployedAs == option,
+                            onClick = { onEvent(UnitEntryEvent.DeployedAsChange(option)) },
+                            label = { Text(option) },
+                        )
+                    }
+                }
+            }
+
+            // Observations
+            OutlinedTextField(
+                value = state.observations,
+                onValueChange = { onEvent(UnitEntryEvent.ObservationsChange(it)) },
+                label = { Text("Observaciones") },
+                minLines = 2,
+                maxLines = 4,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UnitTypeBadge(unitType: UnitType) {
+    Text(
+        text = unitType.label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+    )
 }
 
 @Preview(showBackground = true, showSystemUi = true)
@@ -245,7 +386,7 @@ private fun UnitEntryScreenPreview() {
         UnitEntryScreen(
             state = UnitEntryUiState(
                 containerNo = "BMOU9012909",
-                unitModel = "ThinLINE",
+                unitModel = "69NT40-531-J04",
                 unitSerialNo = "KSB60036558",
                 yearOfBuilt = "2008",
             ),
