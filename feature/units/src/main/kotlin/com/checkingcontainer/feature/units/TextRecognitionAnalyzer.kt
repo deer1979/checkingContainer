@@ -15,52 +15,55 @@ class TextRecognitionAnalyzer(
 ) : ImageAnalysis.Analyzer {
 
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-    private val resultEmitted = AtomicBoolean(false)
+    private val captureRequested = AtomicBoolean(false)
+    private val done = AtomicBoolean(false)
+
+    fun triggerCapture() {
+        captureRequested.set(true)
+    }
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        if (resultEmitted.get()) { imageProxy.close(); return }
+        if (done.get() || !captureRequested.get()) {
+            imageProxy.close()
+            return
+        }
         val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
         val input = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         recognizer.process(input)
             .addOnSuccessListener { visionText ->
-                when (mode) {
-                    ScannerMode.CONTAINER -> processContainer(visionText.text)
-                    ScannerMode.DATA_PLATE -> processDataPlate(visionText.text)
+                val result = when (mode) {
+                    ScannerMode.CONTAINER -> parseContainer(visionText.text)
+                    ScannerMode.DATA_PLATE -> parseDataPlate(visionText.text)
+                }
+                if (result != null && done.compareAndSet(false, true)) {
+                    onSuccess(result)
+                } else {
+                    captureRequested.set(false) // nothing found — allow retry
                 }
             }
             .addOnCompleteListener { imageProxy.close() }
     }
 
-    private fun processContainer(text: String) {
-        val cleaned = text.replace(Regex("\\s+"), "")
-        val match = Regex("[A-Z]{4}[0-9]{7}").find(cleaned) ?: return
-        if (resultEmitted.compareAndSet(false, true)) {
-            onSuccess(mapOf("Container No." to match.value))
+    companion object {
+        fun parseContainer(text: String): Map<String, String>? {
+            val cleaned = text.replace(Regex("\\s+"), "")
+            val match = Regex("[A-Z]{4}[0-9]{7}").find(cleaned) ?: return null
+            return mapOf("Container No." to match.value)
         }
-    }
 
-    private fun processDataPlate(text: String) {
-        val result = mutableMapOf<String, String>()
-
-        // Carrier 69NT40-511-353 or Star Cool SCI-40-CA
-        Regex("""(69NT40[-\s]*\d{3}[-\s]*\d{3}|SCI-\d{2}-[A-Z]{2})""")
-            .find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
-            ?.let { result["Unit Model"] = it.replace(Regex("\\s+"), "") }
-
-        // Carrier WSC61225053 (3 letters + optional space + 8 digits)
-        // or Star Cool AA00-00000 (2 letters + 2 digits + hyphen + 5 digits)
-        Regex("""([A-Z]{3}[\s]?\d{8}|[A-Z]{2}\d{2}-\d{5})""")
-            .find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
-            ?.let { result["Unit Serial No."] = it.replace(Regex("\\s+"), "") }
-
-        // MM/YYYY → extract only the 4-digit year
-        Regex("""(?:0[1-9]|1[0-2])/((?:19|20)\d{2})""")
-            .find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
-            ?.let { result["Year of Built"] = it }
-
-        if (result.isNotEmpty() && resultEmitted.compareAndSet(false, true)) {
-            onSuccess(result)
+        fun parseDataPlate(text: String): Map<String, String>? {
+            val result = mutableMapOf<String, String>()
+            Regex("""(69NT40[-\s]*\d{3}[-\s]*\d{3}|SCI-\d{2}-[A-Z]{2})""")
+                .find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
+                ?.let { result["Unit Model"] = it.replace(Regex("\\s+"), "") }
+            Regex("""([A-Z]{3}[\s]?\d{8}|[A-Z]{2}\d{2}-\d{5})""")
+                .find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
+                ?.let { result["Unit Serial No."] = it.replace(Regex("\\s+"), "") }
+            Regex("""(?:0[1-9]|1[0-2])/((?:19|20)\d{2})""")
+                .find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
+                ?.let { result["Year of Built"] = it }
+            return result.takeIf { it.isNotEmpty() }
         }
     }
 }

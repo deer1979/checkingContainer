@@ -9,18 +9,23 @@ import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -37,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -47,6 +53,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,9 +83,36 @@ fun OcrScannerBottomSheet(
     }
 
     val controller = remember { LifecycleCameraController(context) }
+    val analyzer = remember(mode) {
+        TextRecognitionAnalyzer(mode = mode) { fields ->
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onSuccess(fields)
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose { controller.unbind() }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        try {
+            val image = InputImage.fromFilePath(context, uri)
+            TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                .process(image)
+                .addOnSuccessListener { visionText ->
+                    val result = when (mode) {
+                        ScannerMode.CONTAINER -> TextRecognitionAnalyzer.parseContainer(visionText.text)
+                        ScannerMode.DATA_PLATE -> TextRecognitionAnalyzer.parseDataPlate(visionText.text)
+                    }
+                    if (result != null) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSuccess(result)
+                    }
+                }
+        } catch (_: Exception) { }
     }
 
     ModalBottomSheet(
@@ -87,7 +123,7 @@ fun OcrScannerBottomSheet(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(440.dp),
+                    .height(480.dp),
             ) {
                 AndroidView(
                     factory = { ctx ->
@@ -95,10 +131,7 @@ fun OcrScannerBottomSheet(
                             controller.setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
                             controller.setImageAnalysisAnalyzer(
                                 ContextCompat.getMainExecutor(ctx),
-                                TextRecognitionAnalyzer(mode = mode) { fields ->
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onSuccess(fields)
-                                },
+                                analyzer,
                             )
                             previewView.controller = controller
                             controller.bindToLifecycle(lifecycleOwner)
@@ -106,35 +139,83 @@ fun OcrScannerBottomSheet(
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
-                // Corner-bracket framing overlay
+
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val stroke = 4.dp.toPx()
                     val corner = 36.dp.toPx()
                     val pad = 48.dp.toPx()
                     val white = Color.White
-                    // Top-left
                     drawLine(white, Offset(pad, pad), Offset(pad + corner, pad), stroke)
                     drawLine(white, Offset(pad, pad), Offset(pad, pad + corner), stroke)
-                    // Top-right
                     drawLine(white, Offset(size.width - pad, pad), Offset(size.width - pad - corner, pad), stroke)
                     drawLine(white, Offset(size.width - pad, pad), Offset(size.width - pad, pad + corner), stroke)
-                    // Bottom-left
                     drawLine(white, Offset(pad, size.height - pad), Offset(pad + corner, size.height - pad), stroke)
                     drawLine(white, Offset(pad, size.height - pad), Offset(pad, size.height - pad - corner), stroke)
-                    // Bottom-right
                     drawLine(white, Offset(size.width - pad, size.height - pad), Offset(size.width - pad - corner, size.height - pad), stroke)
                     drawLine(white, Offset(size.width - pad, size.height - pad), Offset(size.width - pad, size.height - pad - corner), stroke)
                 }
+
                 Text(
-                    text = "Encuadre el texto",
+                    text = when (mode) {
+                        ScannerMode.CONTAINER -> "Encuadre el número de contenedor"
+                        ScannerMode.DATA_PLATE -> "Encuadre la placa de datos"
+                    },
                     color = Color.White,
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 20.dp)
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
                         .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                 )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 36.dp, vertical = 28.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Gallery picker (for testing)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .clickable { galleryLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.PhotoLibrary,
+                            contentDescription = "Seleccionar de galería",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+
+                    // Shutter button
+                    Box(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clickable { analyzer.triggerCapture() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .border(3.dp, Color.White, CircleShape),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(60.dp)
+                                .background(Color.White, CircleShape),
+                        )
+                    }
+
+                    // Balance spacer
+                    Spacer(modifier = Modifier.size(48.dp))
+                }
             }
         } else {
             Column(
