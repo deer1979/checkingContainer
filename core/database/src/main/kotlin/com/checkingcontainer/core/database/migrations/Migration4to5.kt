@@ -46,6 +46,12 @@ fun seedCatalog(db: SupportSQLiteDatabase) {
     db.execSQL(
         "INSERT OR IGNORE INTO manufacturers (name, modelPrefixes) VALUES ('Star Cool', 'SCI-')",
     )
+    db.execSQL(
+        "INSERT OR IGNORE INTO manufacturers (name, modelPrefixes) VALUES ('Thermo King', 'SL-,T-,SLX,Mag')",
+    )
+    db.execSQL(
+        "INSERT OR IGNORE INTO manufacturers (name, modelPrefixes) VALUES ('Daikin', 'NaturaLINE,Maverick')",
+    )
 
     // Carrier model families — ranges to be populated by admin
     val carrierFamilies = listOf(

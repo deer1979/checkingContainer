@@ -43,6 +43,7 @@ sealed interface UnitEntryEvent {
     data class UnitModelChange(val value: String) : UnitEntryEvent
     data class UnitSerialNoChange(val value: String) : UnitEntryEvent
     data class YearOfBuiltChange(val value: String) : UnitEntryEvent
+    data class UnitTypeChange(val value: UnitType) : UnitEntryEvent
     data class StatusChange(val value: InspStatus) : UnitEntryEvent
     data class PtiInstructionChange(val value: PtiInstruction) : UnitEntryEvent
     data class DeployedAsChange(val value: String) : UnitEntryEvent
@@ -54,10 +55,7 @@ sealed interface UnitEntryEvent {
 
 fun UnitEntryUiState.toDomain(technicianId: Long, technicianName: String): ReeferUnit = ReeferUnit(
     containerNo = containerNo.trim().uppercase(),
-    manufacturer = when (unitType) {
-        UnitType.CARRIER -> "Carrier"
-        UnitType.STAR_COOL -> "Star Cool"
-    },
+    manufacturer = unitType.label,
     unitModel = unitModel.trim(),
     unitSerialNo = unitSerialNo.trim().uppercase(),
     yearOfBuilt = yearOfBuilt.trim(),

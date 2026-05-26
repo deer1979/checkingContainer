@@ -38,6 +38,8 @@ class UnitEntryViewModel @Inject constructor(
                     s.copy(unitSerialNo = event.value.uppercase(), errorMessage = null)
                 is UnitEntryEvent.YearOfBuiltChange ->
                     s.copy(yearOfBuilt = event.value, errorMessage = null)
+                is UnitEntryEvent.UnitTypeChange ->
+                    s.copy(unitType = event.value, deployedAs = null)
                 is UnitEntryEvent.StatusChange ->
                     s.copy(status = event.value)
                 is UnitEntryEvent.PtiInstructionChange ->

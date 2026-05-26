@@ -47,9 +47,26 @@ class TextRecognitionAnalyzer(
 
     companion object {
         fun parseContainer(text: String): Map<String, String>? {
-            val cleaned = text.replace(Regex("\\s+"), "")
-            val match = Regex("[A-Z]{4}[0-9]{7}").find(cleaned) ?: return null
-            return mapOf("Container No." to match.value)
+            // Pass 1: strip all whitespace — handles single-line and space-separated formats
+            val noSpaces = text.replace(Regex("\\s+"), "")
+            Regex("[A-Z]{4}[0-9]{7}").find(noSpaces)?.let { m ->
+                return mapOf("Container No." to m.value)
+            }
+            // Pass 2: owner code and serial on separate physical lines
+            // Strip non-alphanumeric per line so "901290 9" → "9012909"
+            val lines = text.lines()
+                .map { it.replace(Regex("[^A-Z0-9]"), "") }
+                .filter { it.isNotEmpty() }
+            val ownerIdx = lines.indexOfFirst { it.matches(Regex("[A-Z]{4}")) }
+            if (ownerIdx >= 0) {
+                val owner = lines[ownerIdx]
+                for (j in (ownerIdx + 1)..minOf(ownerIdx + 3, lines.lastIndex)) {
+                    Regex("[0-9]{7}").find(lines[j])?.let { serial ->
+                        return mapOf("Container No." to "$owner${serial.value}")
+                    }
+                }
+            }
+            return null
         }
 
         fun parseDataPlate(text: String): Map<String, String>? {

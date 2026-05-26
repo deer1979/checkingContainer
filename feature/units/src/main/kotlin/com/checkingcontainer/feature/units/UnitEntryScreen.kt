@@ -1,5 +1,8 @@
 package com.checkingcontainer.feature.units
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,13 +35,18 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -45,6 +54,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.checkingcontainer.core.designsystem.R
 import com.checkingcontainer.core.designsystem.theme.AppTheme
 import com.checkingcontainer.core.designsystem.theme.chipColors
 import com.checkingcontainer.core.model.InspStatus
@@ -241,6 +251,14 @@ private fun EquipmentDataCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Escanear Placa de Datos")
             }
+
+            // Manufacturer selector
+            FieldLabel("Fabricante")
+            ManufacturerSelector(
+                selected = state.unitType,
+                onSelect = { onEvent(UnitEntryEvent.UnitTypeChange(it)) },
+            )
+
             OutlinedTextField(
                 value = state.unitModel,
                 onValueChange = { onEvent(UnitEntryEvent.UnitModelChange(it)) },
@@ -271,8 +289,49 @@ private fun EquipmentDataCard(
                     imeAction = ImeAction.Done,
                 ),
             )
-            if (state.unitModel.isNotBlank()) {
-                UnitTypeBadge(state.unitType)
+        }
+    }
+}
+
+@Composable
+private fun ManufacturerSelector(
+    selected: UnitType,
+    onSelect: (UnitType) -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        UnitType.entries.forEach { type ->
+            val isSelected = type == selected
+            val logoRes = when (type) {
+                UnitType.CARRIER -> R.drawable.logo_carrier
+                UnitType.STAR_COOL -> R.drawable.logo_starcool
+                UnitType.THERMO_KING -> R.drawable.logo_thermoking
+                UnitType.DAIKIN -> R.drawable.logo_daikin
+            }
+            Surface(
+                color = Color.White,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier
+                    .height(36.dp)
+                    .weight(1f)
+                    .border(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.outlineVariant,
+                        shape = RoundedCornerShape(6.dp),
+                    )
+                    .clickable { onSelect(type) },
+            ) {
+                Image(
+                    painter = painterResource(id = logoRes),
+                    contentDescription = type.label,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.padding(4.dp),
+                )
             }
         }
     }
@@ -295,14 +354,12 @@ private fun InspectionCard(
         ) {
             SectionTitle("Inspección")
 
-            // Status
             FieldLabel("Estado")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 InspStatus.entries.forEach { status ->
                     val colors = status.chipColors(isDark)
-                    val selected = state.status == status
                     FilterChip(
-                        selected = selected,
+                        selected = state.status == status,
                         onClick = { onEvent(UnitEntryEvent.StatusChange(status)) },
                         label = { Text(status.label) },
                         colors = FilterChipDefaults.filterChipColors(
@@ -313,7 +370,6 @@ private fun InspectionCard(
                 }
             }
 
-            // PTI Instruction
             FieldLabel("Instrucción PTI")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PtiInstruction.entries.forEach { pti ->
@@ -325,7 +381,6 @@ private fun InspectionCard(
                 }
             }
 
-            // Deployed-as — only for Star Cool
             if (state.unitType == UnitType.STAR_COOL) {
                 FieldLabel("Tipo de despliegue")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -339,7 +394,6 @@ private fun InspectionCard(
                 }
             }
 
-            // Observations
             OutlinedTextField(
                 value = state.observations,
                 onValueChange = { onEvent(UnitEntryEvent.ObservationsChange(it)) },
@@ -350,15 +404,6 @@ private fun InspectionCard(
             )
         }
     }
-}
-
-@Composable
-private fun UnitTypeBadge(unitType: UnitType) {
-    Text(
-        text = unitType.label,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
-    )
 }
 
 @Composable
