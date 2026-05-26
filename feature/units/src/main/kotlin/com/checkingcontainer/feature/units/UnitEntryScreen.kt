@@ -1,8 +1,6 @@
 package com.checkingcontainer.feature.units
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -252,12 +250,9 @@ private fun EquipmentDataCard(
                 Text("Escanear Placa de Datos")
             }
 
-            // Manufacturer selector
-            FieldLabel("Fabricante")
-            ManufacturerSelector(
-                selected = state.unitType,
-                onSelect = { onEvent(UnitEntryEvent.UnitTypeChange(it)) },
-            )
+            if (state.unitModel.isNotBlank()) {
+                ManufacturerBadge(state.unitType)
+            }
 
             OutlinedTextField(
                 value = state.unitModel,
@@ -294,46 +289,34 @@ private fun EquipmentDataCard(
 }
 
 @Composable
-private fun ManufacturerSelector(
-    selected: UnitType,
-    onSelect: (UnitType) -> Unit,
-) {
+private fun ManufacturerBadge(unitType: UnitType) {
+    val logoRes = when (unitType) {
+        UnitType.CARRIER -> R.drawable.logo_carrier
+        UnitType.STAR_COOL -> R.drawable.logo_starcool
+        UnitType.THERMO_KING -> R.drawable.logo_thermoking
+        UnitType.DAIKIN -> R.drawable.logo_daikin
+    }
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        UnitType.entries.forEach { type ->
-            val isSelected = type == selected
-            val logoRes = when (type) {
-                UnitType.CARRIER -> R.drawable.logo_carrier
-                UnitType.STAR_COOL -> R.drawable.logo_starcool
-                UnitType.THERMO_KING -> R.drawable.logo_thermoking
-                UnitType.DAIKIN -> R.drawable.logo_daikin
-            }
-            Surface(
-                color = Color.White,
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier
-                    .height(36.dp)
-                    .weight(1f)
-                    .border(
-                        width = if (isSelected) 2.dp else 1.dp,
-                        color = if (isSelected)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.outlineVariant,
-                        shape = RoundedCornerShape(6.dp),
-                    )
-                    .clickable { onSelect(type) },
-            ) {
-                Image(
-                    painter = painterResource(id = logoRes),
-                    contentDescription = type.label,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.padding(4.dp),
-                )
-            }
+        Surface(
+            color = Color.White,
+            shape = RoundedCornerShape(4.dp),
+            modifier = Modifier.width(56.dp).height(28.dp),
+        ) {
+            Image(
+                painter = painterResource(id = logoRes),
+                contentDescription = unitType.label,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.padding(3.dp),
+            )
         }
+        Text(
+            text = unitType.label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

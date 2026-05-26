@@ -43,7 +43,6 @@ sealed interface UnitEntryEvent {
     data class UnitModelChange(val value: String) : UnitEntryEvent
     data class UnitSerialNoChange(val value: String) : UnitEntryEvent
     data class YearOfBuiltChange(val value: String) : UnitEntryEvent
-    data class UnitTypeChange(val value: UnitType) : UnitEntryEvent
     data class StatusChange(val value: InspStatus) : UnitEntryEvent
     data class PtiInstructionChange(val value: PtiInstruction) : UnitEntryEvent
     data class DeployedAsChange(val value: String) : UnitEntryEvent
