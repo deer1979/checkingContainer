@@ -1,10 +1,12 @@
 package com.checkingcontainer.feature.users
 
+import androidx.compose.runtime.Immutable
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.core.model.generateNick
 
+@Immutable
 data class UserFormUiState(
     val id: Long? = null,
     val firstName: String = "",

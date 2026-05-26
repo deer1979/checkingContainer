@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.UsersRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -17,7 +18,7 @@ class UsersListViewModel @Inject constructor(
 ) : ViewModel() {
 
     val state: StateFlow<UsersListUiState> = repository.observeAll()
-        .map { UsersListUiState(users = it, isLoading = false) }
+        .map { UsersListUiState(users = it.toImmutableList(), isLoading = false) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

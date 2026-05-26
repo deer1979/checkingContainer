@@ -3,6 +3,7 @@ package com.checkingcontainer.core.database.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.checkingcontainer.core.model.Manufacturer
+import kotlinx.collections.immutable.toImmutableList
 
 @Entity(tableName = "manufacturers")
 data class ManufacturerEntity(
@@ -13,7 +14,7 @@ data class ManufacturerEntity(
     fun toDomain() = Manufacturer(
         id = id,
         name = name,
-        modelPrefixes = modelPrefixes.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+        modelPrefixes = modelPrefixes.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toImmutableList(),
     )
 }
 

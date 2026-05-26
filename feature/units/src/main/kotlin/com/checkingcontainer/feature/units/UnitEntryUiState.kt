@@ -1,5 +1,6 @@
 package com.checkingcontainer.feature.units
 
+import androidx.compose.runtime.Immutable
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.PtiInstruction
 import com.checkingcontainer.core.model.ReeferUnit
@@ -7,6 +8,7 @@ import com.checkingcontainer.core.model.UnitType
 
 enum class ScannerMode { CONTAINER, DATA_PLATE }
 
+@Immutable
 data class UnitEntryUiState(
     val containerNo: String = "",
     val unitModel: String = "",

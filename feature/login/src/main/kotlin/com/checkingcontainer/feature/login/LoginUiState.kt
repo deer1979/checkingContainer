@@ -1,5 +1,8 @@
 package com.checkingcontainer.feature.login
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class LoginUiState(
     val nick: String = "",
     val pin: String = "",

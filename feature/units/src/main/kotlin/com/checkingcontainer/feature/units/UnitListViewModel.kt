@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.ReeferUnitRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,7 +23,7 @@ class UnitListViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             repository.observeLast24h().collect { units ->
-                _state.update { UnitListUiState(units = units, isLoading = false) }
+                _state.update { UnitListUiState(units = units.toImmutableList(), isLoading = false) }
             }
         }
     }
