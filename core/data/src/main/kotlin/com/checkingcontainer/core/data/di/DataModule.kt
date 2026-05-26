@@ -5,14 +5,12 @@ import com.checkingcontainer.core.data.CatalogRepositoryImpl
 import com.checkingcontainer.core.data.ThemeRepositoryImpl
 import com.checkingcontainer.core.data.AuthRepositoryImpl
 import com.checkingcontainer.core.data.ReeferUnitRepositoryImpl
-import com.checkingcontainer.core.data.TaskRepositoryImpl
 import com.checkingcontainer.core.data.UsersRepositoryImpl
 import com.checkingcontainer.core.domain.AnnouncementsRepository
 import com.checkingcontainer.core.domain.CatalogRepository
 import com.checkingcontainer.core.domain.ThemeRepository
 import com.checkingcontainer.core.domain.AuthRepository
 import com.checkingcontainer.core.domain.ReeferUnitRepository
-import com.checkingcontainer.core.domain.TaskRepository
 import com.checkingcontainer.core.domain.UsersRepository
 import dagger.Binds
 import dagger.Module
@@ -23,10 +21,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class DataModule {
-
-    @Binds
-    @Singleton
-    abstract fun bindTaskRepository(impl: TaskRepositoryImpl): TaskRepository
 
     @Binds
     @Singleton

@@ -20,7 +20,6 @@ import com.checkingcontainer.feature.admin.navigation.adminScreen
 import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
 import com.checkingcontainer.feature.announcements.navigation.announcementsGraph
 import com.checkingcontainer.feature.settings.navigation.settingsScreen
-import com.checkingcontainer.feature.tasks.navigation.tasksScreen
 import com.checkingcontainer.feature.units.navigation.unitsGraph
 import com.checkingcontainer.feature.users.navigation.USERS_LIST_ROUTE
 import com.checkingcontainer.feature.users.navigation.usersGraph
@@ -68,7 +67,6 @@ fun AuthenticatedShell(user: User) {
                 )
                 usersGraph(navController = navController)
                 adminScreen()
-                tasksScreen()
                 unitsGraph(navController = navController)
                 settingsScreen()
             }

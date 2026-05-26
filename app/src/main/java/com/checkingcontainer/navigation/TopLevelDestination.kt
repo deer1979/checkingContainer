@@ -4,7 +4,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Campaign
-import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -12,16 +11,9 @@ import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.feature.admin.navigation.ADMIN_ROUTE
 import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
 import com.checkingcontainer.feature.settings.navigation.SETTINGS_ROUTE
-import com.checkingcontainer.feature.tasks.navigation.TASKS_ROUTE
 import com.checkingcontainer.feature.units.navigation.UNITS_ROUTE
 import com.checkingcontainer.feature.users.navigation.USERS_LIST_ROUTE
 
-/**
- * Tabs in the authenticated bottom NavigationBar. Admin-only tabs are
- * filtered out for non-admin roles. The selection of which tab a tap lands
- * on is driven by [route]; nested screens (e.g. announcement detail, user
- * form) keep the tab highlighted via prefix-matching in the bottom bar.
- */
 enum class TopLevelDestination(
     val route: String,
     val label: String,
@@ -44,11 +36,6 @@ enum class TopLevelDestination(
         label = "Admin",
         icon = Icons.Outlined.AdminPanelSettings,
         adminOnly = true,
-    ),
-    Tasks(
-        route = TASKS_ROUTE,
-        label = "Tareas",
-        icon = Icons.Outlined.Checklist,
     ),
     Units(
         route = UNITS_ROUTE,

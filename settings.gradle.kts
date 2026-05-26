@@ -34,7 +34,6 @@ include(":core:data")
 include(":core:domain")
 
 // Feature modules
-include(":feature:tasks")
 include(":feature:login")
 include(":feature:settings")
 include(":feature:splash")

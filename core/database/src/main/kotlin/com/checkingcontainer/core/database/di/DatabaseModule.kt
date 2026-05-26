@@ -8,7 +8,6 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.checkingcontainer.core.database.AppDatabase
 import com.checkingcontainer.core.database.dao.CatalogDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
-import com.checkingcontainer.core.database.dao.TaskDao
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.database.migrations.MIGRATION_4_5
 import com.checkingcontainer.core.database.migrations.seedCatalog
@@ -39,9 +38,6 @@ object DatabaseModule {
         .addCallback(seedOnCreateCallback)
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
-
-    @Provides
-    fun providesTaskDao(db: AppDatabase): TaskDao = db.taskDao()
 
     @Provides
     fun providesUserDao(db: AppDatabase): UserDao = db.userDao()

@@ -66,6 +66,13 @@ class TextRecognitionAnalyzer(
                     }
                 }
             }
+            // Pass 3: check digit printed in a separate box may be missed by OCR.
+            // If we find 4 letters + 6 digits, compute the ISO 6346 check digit algorithmically.
+            Regex("[A-Z]{4}[0-9]{6}").find(noSpaces)?.let { m ->
+                val first10 = m.value
+                val check = Iso6346.computeCheckDigit(first10)
+                if (check >= 0) return mapOf("Container No." to "$first10$check")
+            }
             return null
         }
 
