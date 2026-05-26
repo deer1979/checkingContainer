@@ -29,6 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
@@ -109,7 +112,7 @@ fun AnnouncementDetailRoute(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Por ${item.authorName}",
+                    text = "Por ${item.authorName} · ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(item.publishedAt))}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

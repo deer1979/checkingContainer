@@ -47,8 +47,16 @@ class UserFormViewModel @Inject constructor(
         _state.update { it.copy(pin = cleaned, errorMessage = null) }
     }
 
+    fun onConfirmPinChange(value: String) {
+        val cleaned = value.filter(Char::isDigit).take(6)
+        _state.update { it.copy(confirmPin = cleaned, errorMessage = null) }
+    }
+
     fun onTogglePinVisibility() =
         _state.update { it.copy(pinVisible = !it.pinVisible) }
+
+    fun onToggleConfirmPinVisibility() =
+        _state.update { it.copy(confirmPinVisible = !it.confirmPinVisible) }
 
     fun onCompanyChange(value: String) =
         _state.update { it.copy(company = value, errorMessage = null) }

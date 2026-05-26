@@ -12,7 +12,9 @@ data class UserFormUiState(
     val firstName: String = "",
     val lastName: String = "",
     val pin: String = "",
+    val confirmPin: String = "",
     val pinVisible: Boolean = false,
+    val confirmPinVisible: Boolean = false,
     val jobTitle: JobTitle = JobTitle.Tecnico,
     val role: UserRole = UserRole.Viewer,
     val company: String = "",
@@ -25,13 +27,20 @@ data class UserFormUiState(
     val previewNick: String
         get() = if (firstName.isBlank() || lastName.isBlank()) "" else generateNick(firstName, lastName)
 
+    val pinIsValid: Boolean
+        get() = pin.length == 6 && pin.all(Char::isDigit)
+
+    val pinsMatch: Boolean
+        get() = pin == confirmPin
+
     val canSave: Boolean
         get() = !isSaving &&
             firstName.isNotBlank() &&
             lastName.isNotBlank() &&
             company.isNotBlank() &&
             location.isNotBlank() &&
-            pin.length == 6 && pin.all(Char::isDigit)
+            pinIsValid &&
+            pinsMatch
 }
 
 fun UserFormUiState.toDomain(): User = User(
@@ -52,6 +61,7 @@ fun User.toFormState(): UserFormUiState = UserFormUiState(
     firstName = firstName,
     lastName = lastName,
     pin = pin,
+    confirmPin = pin,
     jobTitle = jobTitle,
     role = role,
     company = company,

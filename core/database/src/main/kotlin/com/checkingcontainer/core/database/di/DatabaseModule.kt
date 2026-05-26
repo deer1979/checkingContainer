@@ -6,11 +6,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.checkingcontainer.core.database.AppDatabase
+import com.checkingcontainer.core.database.dao.AnnouncementDao
 import com.checkingcontainer.core.database.dao.CatalogDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.database.migrations.MIGRATION_4_5
+import com.checkingcontainer.core.database.migrations.MIGRATION_5_6
+import com.checkingcontainer.core.database.migrations.seedAnnouncements
 import com.checkingcontainer.core.database.migrations.seedCatalog
+import com.checkingcontainer.core.database.migrations.seedExtraCatalog
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.core.model.generateNick
@@ -34,7 +38,7 @@ object DatabaseModule {
         AppDatabase::class.java,
         "checkingcontainer.db",
     )
-        .addMigrations(MIGRATION_4_5)
+        .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
         .addCallback(seedOnCreateCallback)
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
@@ -66,6 +70,11 @@ object DatabaseModule {
             }
             db.insert("users", android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE, values)
             seedCatalog(db)
+            seedExtraCatalog(db)
+            seedAnnouncements(db)
         }
     }
+
+    @Provides
+    fun providesAnnouncementDao(db: AppDatabase): AnnouncementDao = db.announcementDao()
 }

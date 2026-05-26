@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Logout
@@ -30,6 +31,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -64,6 +66,13 @@ private fun SettingsScreen(
     onToggleAutoSync: (Boolean) -> Unit,
     onLogout: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val versionName = remember(context) {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "—"
+        }.getOrDefault("—")
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -165,7 +174,7 @@ private fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("Version") },
-                    supportingContent = { Text("0.3.0 · debug build") },
+                    supportingContent = { Text(versionName) },
                     leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
                 )
             }

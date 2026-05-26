@@ -29,6 +29,8 @@ internal fun PersonalSection(
     onLastNameChange: (String) -> Unit,
     onPinChange: (String) -> Unit,
     onTogglePin: () -> Unit,
+    onConfirmPinChange: (String) -> Unit,
+    onToggleConfirmPin: () -> Unit,
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -54,10 +56,24 @@ internal fun PersonalSection(
             )
             NickReadonlyField(state.previewNick)
             PinFormField(
+                label = "PIN de 6 dígitos",
                 pin = state.pin,
                 visible = state.pinVisible,
                 onChange = onPinChange,
                 onToggle = onTogglePin,
+                imeAction = ImeAction.Next,
+            )
+            PinFormField(
+                label = "Confirmar PIN",
+                pin = state.confirmPin,
+                visible = state.confirmPinVisible,
+                onChange = onConfirmPinChange,
+                onToggle = onToggleConfirmPin,
+                isError = state.confirmPin.isNotEmpty() && !state.pinsMatch,
+                supportingText = if (state.confirmPin.isNotEmpty() && !state.pinsMatch) {
+                    { Text("Los PINs no coinciden") }
+                } else null,
+                imeAction = ImeAction.Next,
             )
         }
     }
@@ -82,15 +98,21 @@ private fun NickReadonlyField(nick: String) {
 
 @Composable
 private fun PinFormField(
+    label: String,
     pin: String,
     visible: Boolean,
     onChange: (String) -> Unit,
     onToggle: () -> Unit,
+    imeAction: ImeAction = ImeAction.Next,
+    isError: Boolean = false,
+    supportingText: (@Composable () -> Unit)? = null,
 ) {
     OutlinedTextField(
         value = pin,
         onValueChange = onChange,
-        label = { Text("PIN de 6 dígitos") },
+        label = { Text(label) },
+        isError = isError,
+        supportingText = supportingText,
         trailingIcon = {
             IconButton(onClick = onToggle) {
                 Icon(
@@ -104,7 +126,7 @@ private fun PinFormField(
         modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.NumberPassword,
-            imeAction = ImeAction.Next,
+            imeAction = imeAction,
         ),
     )
 }

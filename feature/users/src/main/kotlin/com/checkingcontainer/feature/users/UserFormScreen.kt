@@ -69,6 +69,8 @@ fun UserFormRoute(
                 onLastNameChange = viewModel::onLastNameChange,
                 onPinChange = viewModel::onPinChange,
                 onTogglePin = viewModel::onTogglePinVisibility,
+                onConfirmPinChange = viewModel::onConfirmPinChange,
+                onToggleConfirmPin = viewModel::onToggleConfirmPinVisibility,
             )
             OperationalSection(
                 state = state,
