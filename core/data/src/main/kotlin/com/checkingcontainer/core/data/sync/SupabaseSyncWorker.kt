@@ -37,7 +37,7 @@ private const val WORK_NAME_IMMEDIATE = "supabase_sync_immediate"
  * WorkManager worker that pushes all local Room data to Supabase.
  *
  * Triggered:
- * - Immediately (one-time) from [MyApplication] — runs as soon as the device
+ * - Immediately (one-time) on app start — runs as soon as the device
  *   has network connectivity, even if that's hours after the app was last used.
  * - Periodically every 15 minutes while network is connected.
  *
@@ -155,7 +155,7 @@ private fun ReeferUnitEntity.toDto() = ReeferUnitDto(
     createdAtMs = createdAt,
     status = status.name,
     ptiInstruction = ptiInstruction?.name,
-    unitType = unitType.name,
+    unitType = unitType,
     deployedAs = deployedAs,
     technicianId = technicianId,
     technicianName = technicianName,
