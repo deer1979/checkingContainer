@@ -13,7 +13,16 @@ import com.checkingcontainer.core.model.ReeferUnit
 import com.checkingcontainer.core.network.SupabaseClientHolder
 import com.checkingcontainer.core.network.dto.ReeferUnitDto
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.postgresChangeFlow
 import javax.inject.Inject
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +49,8 @@ class ReeferUnitRepositoryImpl @Inject constructor(
     init {
         // Pull remote rows into Room on first instantiation (startup sync).
         syncScope.launch { pullFromSupabase() }
+        // Realtime: subscribe to live changes from other devices / dashboard.
+        supabase.client?.let { setupRealtime(it) }
     }
 
     // ── Reads ─────────────────────────────────────────────────────────────────
@@ -91,6 +102,52 @@ class ReeferUnitRepositoryImpl @Inject constructor(
     }
 
     // ── Supabase helpers ─────────────────────────────────────────────────────
+
+    /**
+     * Opens a Realtime channel for the `reefer_units` table.
+     * INSERT → insert locally if not already present (avoids re-inserting our own writes).
+     * UPDATE → update locally, preserving local-only fields (brand, syncId).
+     * DELETE → delete locally (requires REPLICA IDENTITY FULL on the table in Supabase).
+     */
+    private fun setupRealtime(client: io.github.jan.supabase.SupabaseClient) {
+        val json = Json { ignoreUnknownKeys = true }
+        val channel = client.channel("realtime:reefer_units")
+        channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+            table = TABLE
+        }.onEach { action ->
+            when (action) {
+                is PostgresAction.Insert -> runCatching {
+                    val dto = json.decodeFromJsonElement<ReeferUnitDto>(action.record)
+                    val localId = dto.localId
+                    if (localId != null && dao.findById(localId) != null) return@runCatching
+                    dao.insert(dto.toEntity().copy(syncPending = false))
+                    Log.d(TAG, "Realtime INSERT — containerNo=${dto.containerNo}")
+                }.onFailure { Log.w(TAG, "Realtime INSERT error", it) }
+
+                is PostgresAction.Update -> runCatching {
+                    val dto = json.decodeFromJsonElement<ReeferUnitDto>(action.record)
+                    val localId = dto.localId ?: return@runCatching
+                    val existing = dao.findById(localId) ?: return@runCatching
+                    dao.update(dto.toEntity().copy(
+                        brand       = existing.brand,
+                        syncId      = existing.syncId,
+                        syncPending = false,
+                    ))
+                    Log.d(TAG, "Realtime UPDATE — containerNo=${dto.containerNo}")
+                }.onFailure { Log.w(TAG, "Realtime UPDATE error", it) }
+
+                is PostgresAction.Delete -> runCatching {
+                    val localId = action.oldRecord["local_id"]?.jsonPrimitive?.longOrNull
+                        ?: return@runCatching
+                    dao.delete(localId)
+                    Log.d(TAG, "Realtime DELETE — localId=$localId")
+                }.onFailure { Log.w(TAG, "Realtime DELETE error", it) }
+
+                else -> Unit
+            }
+        }.launchIn(syncScope)
+        syncScope.launch { channel.subscribe() }
+    }
 
     private suspend fun pullFromSupabase() {
         val client = supabase.client ?: return

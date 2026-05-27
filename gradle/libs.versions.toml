@@ -113,6 +113,7 @@ mlkit-text-recognition = { group = "com.google.android.gms", name = "play-servic
 # Supabase  (group = io.github.jan-tennert.supabase, BOM artifact = bom)
 supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
 supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
+supabase-realtime  = { group = "io.github.jan-tennert.supabase", name = "realtime-kt" }
 ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.8.1" }
 workmanager-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }

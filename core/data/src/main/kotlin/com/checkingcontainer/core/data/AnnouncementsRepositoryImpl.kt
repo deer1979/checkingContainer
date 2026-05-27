@@ -10,7 +10,14 @@ import com.checkingcontainer.core.model.Announcement
 import com.checkingcontainer.core.network.SupabaseClientHolder
 import com.checkingcontainer.core.network.dto.AnnouncementDto
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.postgresChangeFlow
 import java.util.UUID
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
@@ -36,6 +43,7 @@ class AnnouncementsRepositoryImpl @Inject constructor(
 
     init {
         syncScope.launch { pullFromSupabase() }
+        supabase.client?.let { setupRealtime(it) }
     }
 
     // ── Reads ─────────────────────────────────────────────────────────────────
@@ -71,6 +79,25 @@ class AnnouncementsRepositoryImpl @Inject constructor(
     }
 
     // ── Supabase helpers ─────────────────────────────────────────────────────
+
+    /**
+     * INSERT → inserts with REPLACE (UUID PK deduplicates naturally).
+     * announcements are immutable by design; UPDATE/DELETE are ignored.
+     */
+    private fun setupRealtime(client: io.github.jan.supabase.SupabaseClient) {
+        val json = Json { ignoreUnknownKeys = true }
+        val channel = client.channel("realtime:announcements")
+        channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+            table = TABLE
+        }.onEach { action ->
+            runCatching {
+                val dto = json.decodeFromJsonElement<AnnouncementDto>(action.record)
+                dao.insert(dto.toEntity())
+                Log.d(TAG, "Realtime INSERT — title='${dto.title}'")
+            }.onFailure { Log.w(TAG, "Realtime INSERT error", it) }
+        }.launchIn(syncScope)
+        syncScope.launch { channel.subscribe() }
+    }
 
     private suspend fun pullFromSupabase() {
         val client = supabase.client ?: return

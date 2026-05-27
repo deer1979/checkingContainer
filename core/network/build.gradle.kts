@@ -12,6 +12,7 @@ dependencies {
     // Supabase BOM pins all supabase-kt sub-module versions
     api(platform(libs.supabase.bom))
     api(libs.supabase.postgrest)
+    api(libs.supabase.realtime)
     // Ktor HTTP engine (OkHttp-backed) required by the Supabase SDK
     implementation(libs.ktor.client.okhttp)
     implementation(libs.kotlinx.serialization.json)

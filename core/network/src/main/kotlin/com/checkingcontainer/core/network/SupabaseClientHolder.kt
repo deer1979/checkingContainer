@@ -4,6 +4,7 @@ import android.util.Log
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.realtime.Realtime
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
@@ -41,6 +42,7 @@ class SupabaseClientHolder @Inject constructor(
                         supabaseKey = anonKey,
                     ) {
                         install(Postgrest)
+                        install(Realtime)
                     }.also { Log.d(TAG, "Cliente Supabase creado correctamente") }
                 }.onFailure { e ->
                     Log.e(TAG, "Error creando cliente Supabase: ${e.message}", e)

@@ -13,7 +13,15 @@ import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.core.network.SupabaseClientHolder
 import com.checkingcontainer.core.network.dto.UserDto
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.postgresChangeFlow
 import javax.inject.Inject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +46,7 @@ class UsersRepositoryImpl @Inject constructor(
 
     init {
         syncScope.launch { pullFromSupabase() }
+        supabase.client?.let { setupRealtime(it) }
     }
 
     // ── Reads ─────────────────────────────────────────────────────────────────
@@ -84,6 +93,50 @@ class UsersRepositoryImpl @Inject constructor(
     }
 
     // ── Supabase helpers ─────────────────────────────────────────────────────
+
+    /**
+     * INSERT → skip if already local (same nick); otherwise insert.
+     * UPDATE → update preserving local id and sync fields.
+     * DELETE → delete by local_id (requires REPLICA IDENTITY FULL).
+     */
+    private fun setupRealtime(client: io.github.jan.supabase.SupabaseClient) {
+        val json = Json { ignoreUnknownKeys = true }
+        val channel = client.channel("realtime:users")
+        channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+            table = TABLE
+        }.onEach { action ->
+            when (action) {
+                is PostgresAction.Insert -> runCatching {
+                    val dto = json.decodeFromJsonElement<UserDto>(action.record)
+                    if (userDao.findByNick(dto.nick) != null) return@runCatching
+                    userDao.insert(dto.toEntity().copy(syncPending = false))
+                    Log.d(TAG, "Realtime INSERT — nick=${dto.nick}")
+                }.onFailure { Log.w(TAG, "Realtime INSERT error", it) }
+
+                is PostgresAction.Update -> runCatching {
+                    val dto = json.decodeFromJsonElement<UserDto>(action.record)
+                    val existing = userDao.findByNick(dto.nick) ?: return@runCatching
+                    userDao.update(dto.toEntity().copy(
+                        id          = existing.id,
+                        syncId      = existing.syncId,
+                        syncPending = false,
+                    ))
+                    Log.d(TAG, "Realtime UPDATE — nick=${dto.nick}")
+                }.onFailure { Log.w(TAG, "Realtime UPDATE error", it) }
+
+                is PostgresAction.Delete -> runCatching {
+                    val nick = action.oldRecord["nick"]?.jsonPrimitive?.content
+                        ?: return@runCatching
+                    val existing = userDao.findByNick(nick) ?: return@runCatching
+                    userDao.delete(existing.id)
+                    Log.d(TAG, "Realtime DELETE — nick=$nick")
+                }.onFailure { Log.w(TAG, "Realtime DELETE error", it) }
+
+                else -> Unit
+            }
+        }.launchIn(syncScope)
+        syncScope.launch { channel.subscribe() }
+    }
 
     private suspend fun pullFromSupabase() {
         val client = supabase.client ?: return
