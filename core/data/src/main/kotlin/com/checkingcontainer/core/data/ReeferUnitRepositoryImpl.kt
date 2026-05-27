@@ -10,7 +10,6 @@ import com.checkingcontainer.core.domain.ReeferUnitRepository
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.PtiInstruction
 import com.checkingcontainer.core.model.ReeferUnit
-import com.checkingcontainer.core.model.UnitType
 import com.checkingcontainer.core.network.SupabaseClientHolder
 import com.checkingcontainer.core.network.dto.ReeferUnitDto
 import io.github.jan.supabase.postgrest.from
@@ -89,7 +88,6 @@ class ReeferUnitRepositoryImpl @Inject constructor(
     override suspend fun delete(id: Long): Unit = withContext(ioDispatcher) {
         dao.delete(id)
         syncScope.launch { pushDelete(id) }
-        Unit
     }
 
     // ── Supabase helpers ─────────────────────────────────────────────────────
@@ -134,7 +132,7 @@ class ReeferUnitRepositoryImpl @Inject constructor(
                 set("created_at_ms", unit.createdAt)
                 set("status", unit.status.name)
                 set("pti_instruction", unit.ptiInstruction?.name)
-                set("unit_type", unit.unitType.name)
+                set("unit_type", unit.unitType)
                 set("deployed_as", unit.deployedAs)
                 set("technician_id", unit.technicianId)
                 set("technician_name", unit.technicianName)
@@ -171,7 +169,7 @@ private fun ReeferUnit.toDto() = ReeferUnitDto(
     createdAtMs = createdAt,
     status = status.name,
     ptiInstruction = ptiInstruction?.name,
-    unitType = unitType.name,
+    unitType = unitType,
     deployedAs = deployedAs,
     technicianId = technicianId,
     technicianName = technicianName,
@@ -190,7 +188,7 @@ private fun ReeferUnitDto.toEntity() = ReeferUnitEntity(
     createdAt = createdAtMs,
     status = runCatching { InspStatus.valueOf(status) }.getOrDefault(InspStatus.INSP),
     ptiInstruction = ptiInstruction?.let { runCatching { PtiInstruction.valueOf(it) }.getOrNull() },
-    unitType = runCatching { UnitType.valueOf(unitType) }.getOrDefault(UnitType.CARRIER),
+    unitType = unitType,
     deployedAs = deployedAs,
     technicianId = technicianId,
     technicianName = technicianName,
