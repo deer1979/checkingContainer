@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -15,11 +16,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.checkingcontainer.core.designsystem.theme.chipColors
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.PtiInstruction
-import com.checkingcontainer.core.model.UnitType
+import com.checkingcontainer.core.model.Brand
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +55,10 @@ internal fun InspectionCard(
                 }
             }
 
-            FieldLabel("Instrucción PTI")
+            FieldLabel(
+                text = "Instrucción PTI",
+                isError = state.showPtiError,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PtiInstruction.entries.forEach { pti ->
                     FilterChip(
@@ -62,8 +68,15 @@ internal fun InspectionCard(
                     )
                 }
             }
+            if (state.showPtiError) {
+                Text(
+                    text = "Selecciona una instrucción PTI",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
 
-            if (state.unitType == UnitType.STAR_COOL) {
+            if (state.brand == Brand.STAR_COOL) {
                 FieldLabel("Tipo de despliegue")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("Estándar", "Atmósfera Controlada").forEach { option ->
@@ -90,6 +103,10 @@ internal fun InspectionCard(
                 minLines = 2,
                 maxLines = 4,
                 modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    capitalization = KeyboardCapitalization.Sentences,
+                ),
             )
         }
     }

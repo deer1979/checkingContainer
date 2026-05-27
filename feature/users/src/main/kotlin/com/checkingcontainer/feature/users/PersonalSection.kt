@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -43,16 +44,32 @@ internal fun PersonalSection(
                 onValueChange = onFirstNameChange,
                 label = { Text("Nombre") },
                 singleLine = true,
+                isError = state.showFirstNameError,
+                supportingText = if (state.showFirstNameError) {
+                    { Text("Campo obligatorio") }
+                } else null,
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Next,
+                ),
             )
             OutlinedTextField(
                 value = state.lastName,
                 onValueChange = onLastNameChange,
                 label = { Text("Apellido") },
                 singleLine = true,
+                isError = state.showLastNameError,
+                supportingText = if (state.showLastNameError) {
+                    { Text("Campo obligatorio") }
+                } else null,
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Next,
+                ),
             )
             NickReadonlyField(state.previewNick)
             PinFormField(
@@ -62,6 +79,10 @@ internal fun PersonalSection(
                 onChange = onPinChange,
                 onToggle = onTogglePin,
                 imeAction = ImeAction.Next,
+                isError = state.showPinError,
+                supportingText = if (state.showPinError) {
+                    { Text("El PIN debe tener exactamente 6 dígitos") }
+                } else null,
             )
             PinFormField(
                 label = "Confirmar PIN",

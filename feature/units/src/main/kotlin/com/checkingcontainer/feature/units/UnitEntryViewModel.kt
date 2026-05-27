@@ -6,7 +6,7 @@ import com.checkingcontainer.core.domain.AuthRepository
 import com.checkingcontainer.core.domain.AuthState
 import com.checkingcontainer.core.domain.ReeferUnitRepository
 import com.checkingcontainer.core.domain.usecase.CatalogLookupUseCase
-import com.checkingcontainer.core.model.UnitType
+import com.checkingcontainer.core.model.Brand
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,8 +32,8 @@ class UnitEntryViewModel @Inject constructor(
             when (event) {
                 is UnitEntryEvent.ContainerNoChange ->
                     s.copy(containerNo = event.value.uppercase(), errorMessage = null)
-                is UnitEntryEvent.UnitModelChange ->
-                    s.copy(unitModel = event.value, errorMessage = null)
+                is UnitEntryEvent.UnitModelNoChange ->
+                    s.copy(unitModelNo = event.value, errorMessage = null)
                 is UnitEntryEvent.UnitSerialNoChange ->
                     s.copy(unitSerialNo = event.value.uppercase(), errorMessage = null)
                 is UnitEntryEvent.YearOfBuiltChange ->
@@ -58,7 +58,10 @@ class UnitEntryViewModel @Inject constructor(
 
     fun saveUnit() {
         val current = _state.value
-        if (!current.canSave) return
+        if (!current.canSave) {
+            _state.update { it.copy(showValidation = true) }
+            return
+        }
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true, errorMessage = null) }
             val authUser = authRepository.state
@@ -85,33 +88,37 @@ class UnitEntryViewModel @Inject constructor(
         fields.forEach { (key, value) ->
             updated = when (key) {
                 "Container No." -> updated.copy(containerNo = value.uppercase())
-                "Unit Model" -> updated.copy(unitModel = value)
+                "Unit Model" -> updated.copy(unitModelNo = value)
                 "Unit Serial No." -> updated.copy(unitSerialNo = value.uppercase())
                 "Year of Built" -> updated.copy(yearOfBuilt = value)
                 else -> updated
             }
         }
-        // Trigger catalog lookup when data plate fields arrive
-        val model = updated.unitModel
-        val serial = updated.unitSerialNo
-        if (fields.containsKey("Unit Model") && model.isNotBlank()) {
-            viewModelScope.launch {
-                _state.update { it.copy(isLookingUpCatalog = true) }
-                val result = runCatching { catalogLookupUseCase(model, serial) }.getOrNull()
-                _state.update { current ->
-                    if (result != null) {
-                        current.copy(
-                            isLookingUpCatalog = false,
-                            unitType = result.unitType,
-                            deployedAs = if (result.unitType == UnitType.STAR_COOL)
-                                result.deployedAs else null,
-                        )
-                    } else {
-                        current.copy(isLookingUpCatalog = false)
-                    }
+        val modelNo = updated.unitModelNo
+        if (fields.containsKey("Unit Model") && modelNo.isNotBlank()) {
+            triggerCatalogLookup(modelNo)
+        }
+        return updated
+    }
+
+    private fun triggerCatalogLookup(unitModelNo: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLookingUpCatalog = true) }
+            val result = runCatching { catalogLookupUseCase(unitModelNo) }.getOrNull()
+            _state.update { current ->
+                if (result != null) {
+                    current.copy(
+                        isLookingUpCatalog = false,
+                        brand = result.brand,
+                        manufacturer = result.manufacturer,
+                        unitModel = result.unitModel,
+                        unitType = result.unitType,
+                        deployedAs = if (result.brand == Brand.STAR_COOL) result.deployedAs else null,
+                    )
+                } else {
+                    current.copy(isLookingUpCatalog = false)
                 }
             }
         }
-        return updated
     }
 }

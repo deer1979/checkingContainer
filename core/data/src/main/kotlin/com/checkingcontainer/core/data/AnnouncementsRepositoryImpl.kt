@@ -2,6 +2,7 @@ package com.checkingcontainer.core.data
 
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
+import com.checkingcontainer.core.data.remote.SupabaseSyncService
 import com.checkingcontainer.core.database.dao.AnnouncementDao
 import com.checkingcontainer.core.database.entity.AnnouncementEntity
 import com.checkingcontainer.core.domain.AnnouncementsRepository
@@ -18,6 +19,7 @@ import kotlinx.coroutines.withContext
 @Singleton
 class AnnouncementsRepositoryImpl @Inject constructor(
     private val dao: AnnouncementDao,
+    private val syncService: SupabaseSyncService,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : AnnouncementsRepository {
 
@@ -45,5 +47,9 @@ class AnnouncementsRepositoryImpl @Inject constructor(
                 publishedAt = System.currentTimeMillis(),
             ),
         )
+    }
+
+    override suspend fun refreshFromRemote() {
+        syncService.pullAnnouncements()
     }
 }

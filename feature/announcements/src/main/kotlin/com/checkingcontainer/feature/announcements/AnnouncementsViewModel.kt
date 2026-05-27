@@ -29,6 +29,10 @@ class AnnouncementsViewModel @Inject constructor(
             initialValue = AnnouncementsUiState(),
         )
 
+    init {
+        viewModelScope.launch { repository.refreshFromRemote() }
+    }
+
     private val _detail = MutableStateFlow<Announcement?>(null)
     val detail: StateFlow<Announcement?> = _detail.asStateFlow()
 

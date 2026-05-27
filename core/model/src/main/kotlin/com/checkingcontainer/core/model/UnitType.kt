@@ -1,7 +1,7 @@
 package com.checkingcontainer.core.model
 
-enum class UnitType(val label: String) {
-    CARRIER("Carrier"),
+enum class Brand(val label: String) {
+    CARRIER("Carrier Transicold"),
     STAR_COOL("Star Cool"),
     THERMO_KING("Thermo King"),
     DAIKIN("Daikin"),

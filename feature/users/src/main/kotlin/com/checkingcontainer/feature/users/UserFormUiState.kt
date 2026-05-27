@@ -23,6 +23,7 @@ data class UserFormUiState(
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
     val savedSuccessfully: Boolean = false,
+    val showValidation: Boolean = false,
 ) {
     val previewNick: String
         get() = if (firstName.isBlank() || lastName.isBlank()) "" else generateNick(firstName, lastName)
@@ -41,6 +42,12 @@ data class UserFormUiState(
             location.isNotBlank() &&
             pinIsValid &&
             pinsMatch
+
+    val showFirstNameError: Boolean get() = showValidation && firstName.isBlank()
+    val showLastNameError: Boolean get() = showValidation && lastName.isBlank()
+    val showPinError: Boolean get() = showValidation && !pinIsValid
+    val showCompanyError: Boolean get() = showValidation && company.isBlank()
+    val showLocationError: Boolean get() = showValidation && location.isBlank()
 }
 
 fun UserFormUiState.toDomain(): User = User(

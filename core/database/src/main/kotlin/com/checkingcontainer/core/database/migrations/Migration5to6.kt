@@ -42,35 +42,25 @@ fun seedAnnouncements(db: SupportSQLiteDatabase) {
         val (id, title, summary) = meta
         val publishedAt = now - (announcements.size - index) * 3_600_000L
         db.execSQL(
-            """
-            INSERT OR IGNORE INTO announcements (id, title, summary, body, authorName, publishedAt)
-            VALUES ('$id', '$title', '$summary', '$body', 'Equipo CheckingContainer', $publishedAt)
-            """.trimIndent(),
+            "INSERT OR IGNORE INTO announcements (id, title, summary, body, authorName, publishedAt) VALUES (?, ?, ?, ?, 'Equipo CheckingContainer', ?)",
+            arrayOf(id, title, summary, body, publishedAt),
         )
     }
 }
 
 fun seedExtraCatalog(db: SupportSQLiteDatabase) {
-    // Star Cool model families
     val starCoolFamilies = listOf(
-        "SCI-40" to "Star Cool Integrated 40' (estándar)",
-        "SCI-40-CA" to "Star Cool Integrated 40' (Atmósfera Controlada)",
-        "SCI-20" to "Star Cool Integrated 20'",
+        "SCI-40" to "Star Cool Integrated 40ft (estándar)",
+        "SCI-40-CA" to "Star Cool Integrated 40ft (Atmósfera Controlada)",
+        "SCI-20" to "Star Cool Integrated 20ft",
     )
     starCoolFamilies.forEach { (family, desc) ->
         db.execSQL(
-            """
-            INSERT OR IGNORE INTO catalog_entries
-                (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd)
-            VALUES (
-                (SELECT id FROM manufacturers WHERE name = 'Star Cool' LIMIT 1),
-                '$family', '$desc', NULL, NULL
-            )
-            """.trimIndent(),
+            "INSERT OR IGNORE INTO catalog_entries (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd) VALUES ((SELECT id FROM manufacturers WHERE name = 'Star Cool' LIMIT 1), ?, ?, NULL, NULL)",
+            arrayOf(family, desc),
         )
     }
 
-    // Thermo King model families
     val thermoKingFamilies = listOf(
         "SL-100" to "Thermo King SL-100",
         "SL-200" to "Thermo King SL-200",
@@ -81,33 +71,20 @@ fun seedExtraCatalog(db: SupportSQLiteDatabase) {
     )
     thermoKingFamilies.forEach { (family, desc) ->
         db.execSQL(
-            """
-            INSERT OR IGNORE INTO catalog_entries
-                (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd)
-            VALUES (
-                (SELECT id FROM manufacturers WHERE name = 'Thermo King' LIMIT 1),
-                '$family', '$desc', NULL, NULL
-            )
-            """.trimIndent(),
+            "INSERT OR IGNORE INTO catalog_entries (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd) VALUES ((SELECT id FROM manufacturers WHERE name = 'Thermo King' LIMIT 1), ?, ?, NULL, NULL)",
+            arrayOf(family, desc),
         )
     }
 
-    // Daikin model families
     val daikinFamilies = listOf(
-        "NaturaLINE" to "Daikin NaturaLINE (CO₂ natural refrigerant)",
+        "NaturaLINE" to "Daikin NaturaLINE (CO2 natural refrigerant)",
         "Maverick II" to "Daikin Maverick II",
         "Enviroline" to "Daikin Enviroline",
     )
     daikinFamilies.forEach { (family, desc) ->
         db.execSQL(
-            """
-            INSERT OR IGNORE INTO catalog_entries
-                (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd)
-            VALUES (
-                (SELECT id FROM manufacturers WHERE name = 'Daikin' LIMIT 1),
-                '$family', '$desc', NULL, NULL
-            )
-            """.trimIndent(),
+            "INSERT OR IGNORE INTO catalog_entries (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd) VALUES ((SELECT id FROM manufacturers WHERE name = 'Daikin' LIMIT 1), ?, ?, NULL, NULL)",
+            arrayOf(family, desc),
         )
     }
 }

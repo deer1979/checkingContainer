@@ -8,26 +8,29 @@ import com.checkingcontainer.core.model.CatalogEntry
 data class CatalogEntryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val manufacturerId: Long,
-    val modelFamily: String,
-    val description: String,
-    val serialRangeStart: Long?,
-    val serialRangeEnd: Long?,
+    val serie: String,
+    val rangeStart: Int,
+    val rangeEnd: Int,
+    val unitModel: String,
+    val unitType: String,
 ) {
     fun toDomain() = CatalogEntry(
         id = id,
         manufacturerId = manufacturerId,
-        modelFamily = modelFamily,
-        description = description,
-        serialRangeStart = serialRangeStart,
-        serialRangeEnd = serialRangeEnd,
+        serie = serie,
+        rangeStart = rangeStart,
+        rangeEnd = rangeEnd,
+        unitModel = unitModel,
+        unitType = unitType,
     )
 }
 
 fun CatalogEntry.toEntity() = CatalogEntryEntity(
     id = id,
     manufacturerId = manufacturerId,
-    modelFamily = modelFamily,
-    description = description,
-    serialRangeStart = serialRangeStart,
-    serialRangeEnd = serialRangeEnd,
+    serie = serie,
+    rangeStart = rangeStart,
+    rangeEnd = rangeEnd,
+    unitModel = unitModel,
+    unitType = unitType,
 )

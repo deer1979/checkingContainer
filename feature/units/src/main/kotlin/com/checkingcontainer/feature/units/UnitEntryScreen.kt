@@ -122,7 +122,9 @@ private fun UnitEntryScreenPreview() {
         UnitEntryScreen(
             state = UnitEntryUiState(
                 containerNo = "BMOU9012909",
-                unitModel = "69NT40-531-J04",
+                unitModelNo = "69NT40-531-001",
+                unitModel = "EliteLINE",
+                unitType = "T292PL",
                 unitSerialNo = "KSB60036558",
                 yearOfBuilt = "2008",
             ),

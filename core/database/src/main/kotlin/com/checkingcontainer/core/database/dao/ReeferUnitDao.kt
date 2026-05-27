@@ -20,6 +20,12 @@ interface ReeferUnitDao {
     @Query("SELECT * FROM reefer_units WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): ReeferUnitEntity?
 
+    @Query("SELECT * FROM reefer_units WHERE containerNo = :containerNo ORDER BY createdAt DESC LIMIT 1")
+    suspend fun getLatestByContainerNo(containerNo: String): ReeferUnitEntity?
+
+    @Query("SELECT * FROM reefer_units WHERE containerNo = :containerNo ORDER BY createdAt DESC")
+    suspend fun getAllByContainerNo(containerNo: String): List<ReeferUnitEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(unit: ReeferUnitEntity): Long
 
@@ -28,4 +34,10 @@ interface ReeferUnitDao {
 
     @Query("DELETE FROM reefer_units WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("SELECT * FROM reefer_units WHERE syncPending = 1")
+    suspend fun getPending(): List<ReeferUnitEntity>
+
+    @Query("UPDATE reefer_units SET syncPending = 0 WHERE id = :id")
+    suspend fun markSynced(id: Long)
 }

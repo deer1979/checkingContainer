@@ -34,4 +34,10 @@ interface UserDao {
 
     @Query("DELETE FROM users WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("SELECT * FROM users WHERE syncPending = 1")
+    suspend fun getPending(): List<UserEntity>
+
+    @Query("UPDATE users SET syncPending = 0 WHERE id = :id")
+    suspend fun markSynced(id: Long)
 }

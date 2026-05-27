@@ -14,3 +14,7 @@ enum class AppDispatcher {
     Default,
     IO,
 }
+
+@Qualifier
+@Retention(AnnotationRetention.RUNTIME)
+annotation class ApplicationScope

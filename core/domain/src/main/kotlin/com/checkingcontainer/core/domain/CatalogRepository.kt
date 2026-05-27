@@ -5,6 +5,7 @@ import com.checkingcontainer.core.model.Manufacturer
 
 interface CatalogRepository {
     suspend fun getManufacturers(): List<Manufacturer>
+    suspend fun getEntriesByManufacturerAndSerie(manufacturerId: Long, serie: String): List<CatalogEntry>
     suspend fun getEntriesForManufacturer(manufacturerId: Long): List<CatalogEntry>
     suspend fun insertManufacturer(manufacturer: Manufacturer): Long
     suspend fun insertCatalogEntry(entry: CatalogEntry): Long

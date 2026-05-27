@@ -75,7 +75,10 @@ class UserFormViewModel @Inject constructor(
 
     fun onSave() {
         val current = _state.value
-        if (!current.canSave) return
+        if (!current.canSave) {
+            _state.update { it.copy(showValidation = true) }
+            return
+        }
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true, errorMessage = null) }
             val user = current.toDomain()

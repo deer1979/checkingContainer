@@ -35,6 +35,7 @@ import java.util.Locale
 @Composable
 fun UnitListRoute(
     onNewInspection: () -> Unit,
+    onUnitClick: (String) -> Unit,
     viewModel: UnitListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -67,7 +68,10 @@ fun UnitListRoute(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(state.units, key = { it.id }) { unit ->
-                        InspectionListItem(unit = unit)
+                        InspectionListItem(
+                            unit = unit,
+                            onClick = { onUnitClick(unit.containerNo) },
+                        )
                     }
                 }
             }

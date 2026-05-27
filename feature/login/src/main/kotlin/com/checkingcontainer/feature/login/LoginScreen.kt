@@ -71,12 +71,17 @@ private fun LoginScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 LoginHeader()
-                NickField(state.nick, onNickChange)
+                NickField(
+                    value = state.nick,
+                    onChange = onNickChange,
+                    isError = state.showNickError,
+                )
                 PinField(
                     pin = state.pin,
                     visible = state.pinVisible,
                     onChange = onPinChange,
                     onToggleVisibility = onTogglePinVisibility,
+                    isError = state.showPinError,
                 )
                 state.errorMessage?.let { msg ->
                     Text(
@@ -87,7 +92,7 @@ private fun LoginScreen(
                 }
                 Spacer(Modifier.height(4.dp))
                 LoginSubmitButton(
-                    enabled = state.canSubmit,
+                    enabled = !state.isSubmitting,
                     loading = state.isSubmitting,
                     onClick = onSubmit,
                 )
@@ -116,7 +121,7 @@ private fun LoginHeader() {
 }
 
 @Composable
-private fun NickField(value: String, onChange: (String) -> Unit) {
+private fun NickField(value: String, onChange: (String) -> Unit, isError: Boolean = false) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -124,6 +129,10 @@ private fun NickField(value: String, onChange: (String) -> Unit) {
         placeholder = { Text("jperez") },
         leadingIcon = { Icon(Icons.Outlined.AccountCircle, contentDescription = null) },
         singleLine = true,
+        isError = isError,
+        supportingText = if (isError) {
+            { Text("Ingresa tu nick de acceso") }
+        } else null,
         modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Text,
@@ -139,6 +148,7 @@ private fun PinField(
     visible: Boolean,
     onChange: (String) -> Unit,
     onToggleVisibility: () -> Unit,
+    isError: Boolean = false,
 ) {
     OutlinedTextField(
         value = pin,
@@ -155,6 +165,10 @@ private fun PinField(
         },
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
         singleLine = true,
+        isError = isError,
+        supportingText = if (isError) {
+            { Text("El PIN debe tener exactamente 6 dígitos") }
+        } else null,
         modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.NumberPassword,

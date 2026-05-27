@@ -1,5 +1,9 @@
 package com.checkingcontainer.feature.units
 
+import android.util.Size
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
@@ -18,21 +22,27 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FlashOff
+import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.platform.LocalContext
 
 @Composable
 internal fun ScannerViewfinder(
@@ -43,18 +53,25 @@ internal fun ScannerViewfinder(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    var isTorchOn by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier.fillMaxWidth().height(480.dp),
-    ) {
+    Box(modifier = Modifier.fillMaxWidth().height(480.dp)) {
         AndroidView(
             factory = { ctx ->
                 PreviewView(ctx).also { previewView ->
                     controller.setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
-                    controller.setImageAnalysisAnalyzer(
-                        ContextCompat.getMainExecutor(ctx),
-                        analyzer,
+                    controller.setImageAnalysisResolutionSelector(
+                        ResolutionSelector.Builder()
+                            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+                            .setResolutionStrategy(
+                                ResolutionStrategy(
+                                    Size(1280, 720),
+                                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+                                ),
+                            )
+                            .build(),
                     )
+                    controller.setImageAnalysisAnalyzer(ContextCompat.getMainExecutor(ctx), analyzer)
                     previewView.controller = controller
                     controller.bindToLifecycle(lifecycleOwner)
                 }
@@ -107,23 +124,33 @@ internal fun ScannerViewfinder(
                     .clickable(onClick = onGalleryClick),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.PhotoLibrary,
-                    contentDescription = "Seleccionar de galería",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp),
-                )
+                Icon(Icons.Outlined.PhotoLibrary, contentDescription = "Galería", tint = Color.White, modifier = Modifier.size(24.dp))
             }
             Box(
-                modifier = Modifier
-                    .size(76.dp)
-                    .clickable { analyzer.triggerCapture() },
+                modifier = Modifier.size(76.dp).clickable { analyzer.triggerCapture() },
                 contentAlignment = Alignment.Center,
             ) {
                 Box(modifier = Modifier.fillMaxSize().border(3.dp, Color.White, CircleShape))
                 Box(modifier = Modifier.size(60.dp).background(Color.White, CircleShape))
             }
-            Box(modifier = Modifier.size(48.dp))
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(if (isTorchOn) Color(0xFFFFD600).copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.55f))
+                    .clickable {
+                        isTorchOn = !isTorchOn
+                        controller.cameraControl?.enableTorch(isTorchOn)
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (isTorchOn) Icons.Outlined.FlashOn else Icons.Outlined.FlashOff,
+                    contentDescription = "Flash",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
     }
 }

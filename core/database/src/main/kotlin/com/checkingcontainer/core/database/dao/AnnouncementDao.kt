@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.checkingcontainer.core.database.entity.AnnouncementEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -17,4 +18,16 @@ interface AnnouncementDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(announcement: AnnouncementEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(announcements: List<AnnouncementEntity>)
+
+    @Query("DELETE FROM announcements")
+    suspend fun deleteAll()
+
+    @Transaction
+    suspend fun replaceAll(announcements: List<AnnouncementEntity>) {
+        deleteAll()
+        insertAll(announcements)
+    }
 }

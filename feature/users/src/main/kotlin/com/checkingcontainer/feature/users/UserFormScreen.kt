@@ -92,7 +92,7 @@ fun UserFormRoute(
             }
             Button(
                 onClick = viewModel::onSave,
-                enabled = state.canSave,
+                enabled = !state.isSaving,
                 shape = CircleShape,
                 modifier = Modifier.fillMaxWidth(),
             ) {

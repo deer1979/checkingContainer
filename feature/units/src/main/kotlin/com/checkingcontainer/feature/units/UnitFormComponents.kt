@@ -14,10 +14,10 @@ internal fun SectionTitle(text: String) {
 }
 
 @Composable
-internal fun FieldLabel(text: String) {
+internal fun FieldLabel(text: String, isError: Boolean = false) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }

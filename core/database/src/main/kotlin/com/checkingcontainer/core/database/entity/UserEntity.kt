@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.core.model.UserRole
+import java.util.UUID
 
 @Entity(
     tableName = "users",
@@ -22,6 +23,8 @@ data class UserEntity(
     val company: String,
     val location: String,
     val isActive: Boolean = true,
+    val syncId: String = UUID.randomUUID().toString(),
+    val syncPending: Boolean = true,
 ) {
     fun toDomain(): User = User(
         id = id,

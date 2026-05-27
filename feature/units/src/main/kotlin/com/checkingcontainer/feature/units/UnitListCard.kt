@@ -2,6 +2,7 @@ package com.checkingcontainer.feature.units
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,11 +29,11 @@ import com.checkingcontainer.core.designsystem.theme.chipColors
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.PtiInstruction
 import com.checkingcontainer.core.model.ReeferUnit
-import com.checkingcontainer.core.model.UnitType
+import com.checkingcontainer.core.model.Brand
 
 @Composable
-internal fun InspectionListItem(unit: ReeferUnit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+internal fun InspectionListItem(unit: ReeferUnit, onClick: () -> Unit) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -44,7 +45,7 @@ internal fun InspectionListItem(unit: ReeferUnit) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ManufacturerLogo(unit.unitType)
+                ManufacturerLogo(unit.brand)
                 Text(
                     text = unit.containerNo,
                     style = MaterialTheme.typography.titleMedium,
@@ -84,7 +85,7 @@ internal fun InspectionListItem(unit: ReeferUnit) {
                             text = if (pti == PtiInstruction.FULL_PTI) "Full PTI" else "Visual PTI",
                         )
                     }
-                    if (unit.unitType == UnitType.STAR_COOL && unit.deployedAs != null) {
+                    if (unit.brand == Brand.STAR_COOL && unit.deployedAs != null) {
                         OutlineBadge(
                             text = if (unit.deployedAs == "Atmósfera Controlada") "CA" else "STD",
                         )
@@ -96,12 +97,12 @@ internal fun InspectionListItem(unit: ReeferUnit) {
 }
 
 @Composable
-private fun ManufacturerLogo(unitType: UnitType) {
+private fun ManufacturerLogo(unitType: Brand) {
     val logoRes = when (unitType) {
-        UnitType.CARRIER -> R.drawable.logo_carrier
-        UnitType.STAR_COOL -> R.drawable.logo_starcool
-        UnitType.THERMO_KING -> R.drawable.logo_thermoking
-        UnitType.DAIKIN -> R.drawable.logo_daikin
+        Brand.CARRIER -> R.drawable.logo_carrier
+        Brand.STAR_COOL -> R.drawable.logo_starcool
+        Brand.THERMO_KING -> R.drawable.logo_thermoking
+        Brand.DAIKIN -> R.drawable.logo_daikin
     }
     Surface(
         color = Color.White,

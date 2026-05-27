@@ -82,7 +82,7 @@ internal fun IdentificationCard(
                 },
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Characters,
-                    imeAction = ImeAction.Done,
+                    imeAction = ImeAction.Next,
                 ),
                 trailingIcon = {
                     if (state.containerNo.isNotEmpty()) {

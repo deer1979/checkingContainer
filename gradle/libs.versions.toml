@@ -37,6 +37,8 @@ mlkitTextRecognition = "19.0.1"
 coroutines = "1.10.2"
 kotlinxCollectionsImmutable = "0.3.8"
 
+# Supabase (credentials injected from app via BuildConfig; no SDK needed in core/data)
+
 # Tests
 junit = "4.13.2"
 androidxJunit = "1.3.0"
@@ -92,6 +94,9 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 # DataStore
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
+# Supabase
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.8.1" }
+
 # CameraX
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
@@ -124,3 +129,5 @@ checkingcontainer-android-feature = { id = "checkingcontainer.android.feature", 
 checkingcontainer-android-hilt = { id = "checkingcontainer.android.hilt", version = "unspecified" }
 checkingcontainer-android-room = { id = "checkingcontainer.android.room", version = "unspecified" }
 checkingcontainer-jvm-library = { id = "checkingcontainer.jvm.library", version = "unspecified" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+

@@ -17,7 +17,10 @@ interface CatalogDao {
     @Query("SELECT * FROM manufacturers WHERE id = :id LIMIT 1")
     suspend fun getManufacturerById(id: Long): ManufacturerEntity?
 
-    @Query("SELECT * FROM catalog_entries WHERE manufacturerId = :manufacturerId ORDER BY modelFamily ASC")
+    @Query("SELECT * FROM catalog_entries WHERE manufacturerId = :manufacturerId AND serie = :serie ORDER BY (rangeEnd - rangeStart) ASC")
+    suspend fun getEntriesByManufacturerAndSerie(manufacturerId: Long, serie: String): List<CatalogEntryEntity>
+
+    @Query("SELECT * FROM catalog_entries WHERE manufacturerId = :manufacturerId ORDER BY serie ASC")
     suspend fun getEntriesForManufacturer(manufacturerId: Long): List<CatalogEntryEntity>
 
     @Query("SELECT COUNT(*) FROM manufacturers")

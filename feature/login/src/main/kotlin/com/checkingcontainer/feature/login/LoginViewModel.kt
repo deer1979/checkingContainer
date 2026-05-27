@@ -34,7 +34,10 @@ class LoginViewModel @Inject constructor(
 
     fun onSubmit() {
         val current = _state.value
-        if (!current.canSubmit) return
+        if (!current.canSubmit) {
+            _state.update { it.copy(showValidation = true) }
+            return
+        }
         viewModelScope.launch {
             _state.update { it.copy(isSubmitting = true, errorMessage = null) }
             authRepository.login(current.nick, current.pin)

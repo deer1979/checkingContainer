@@ -22,6 +22,13 @@ class CatalogRepositoryImpl @Inject constructor(
         dao.getAllManufacturers().map { it.toDomain() }
     }
 
+    override suspend fun getEntriesByManufacturerAndSerie(
+        manufacturerId: Long,
+        serie: String,
+    ): List<CatalogEntry> = withContext(ioDispatcher) {
+        dao.getEntriesByManufacturerAndSerie(manufacturerId, serie).map { it.toDomain() }
+    }
+
     override suspend fun getEntriesForManufacturer(manufacturerId: Long): List<CatalogEntry> =
         withContext(ioDispatcher) {
             dao.getEntriesForManufacturer(manufacturerId).map { it.toDomain() }

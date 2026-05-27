@@ -2,10 +2,11 @@ package com.checkingcontainer.core.database.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.PtiInstruction
 import com.checkingcontainer.core.model.ReeferUnit
-import com.checkingcontainer.core.model.UnitType
+import java.util.UUID
 
 @Entity(tableName = "reefer_units")
 data class ReeferUnitEntity(
@@ -19,11 +20,14 @@ data class ReeferUnitEntity(
     val createdAt: Long,
     val status: InspStatus = InspStatus.INSP,
     val ptiInstruction: PtiInstruction? = null,
-    val unitType: UnitType = UnitType.CARRIER,
+    val brand: Brand = Brand.CARRIER,
+    val unitType: String = "",
     val deployedAs: String? = null,
     val technicianId: Long = 0,
     val technicianName: String = "",
     val observations: String = "",
+    val syncId: String = UUID.randomUUID().toString(),
+    val syncPending: Boolean = true,
 ) {
     fun toDomain(): ReeferUnit = ReeferUnit(
         id = id,
@@ -36,6 +40,7 @@ data class ReeferUnitEntity(
         createdAt = createdAt,
         status = status,
         ptiInstruction = ptiInstruction,
+        brand = brand,
         unitType = unitType,
         deployedAs = deployedAs,
         technicianId = technicianId,
@@ -55,6 +60,7 @@ fun ReeferUnit.toEntity(): ReeferUnitEntity = ReeferUnitEntity(
     createdAt = createdAt,
     status = status,
     ptiInstruction = ptiInstruction,
+    brand = brand,
     unitType = unitType,
     deployedAs = deployedAs,
     technicianId = technicianId,

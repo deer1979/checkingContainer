@@ -4,7 +4,7 @@ import androidx.room.TypeConverter
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.PtiInstruction
-import com.checkingcontainer.core.model.UnitType
+import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.UserRole
 
 class EnumConverters {
@@ -38,9 +38,9 @@ class EnumConverters {
         value?.let { runCatching { PtiInstruction.valueOf(it) }.getOrNull() }
 
     @TypeConverter
-    fun unitTypeToString(value: UnitType?): String? = value?.name
+    fun unitTypeToString(value: Brand?): String? = value?.name
 
     @TypeConverter
-    fun stringToUnitType(value: String?): UnitType? =
-        value?.let { runCatching { UnitType.valueOf(it) }.getOrNull() }
+    fun stringToBrand(value: String?): Brand? =
+        value?.let { runCatching { Brand.valueOf(it) }.getOrNull() }
 }

@@ -2,6 +2,7 @@ package com.checkingcontainer.core.data
 
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
+import com.checkingcontainer.core.data.remote.SupabaseSyncService
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.entity.ReeferUnitEntity
 import com.checkingcontainer.core.database.entity.toEntity
@@ -18,6 +19,7 @@ import kotlinx.coroutines.withContext
 @Singleton
 class ReeferUnitRepositoryImpl @Inject constructor(
     private val dao: ReeferUnitDao,
+    private val syncService: SupabaseSyncService,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : ReeferUnitRepository {
 
@@ -37,8 +39,19 @@ class ReeferUnitRepositoryImpl @Inject constructor(
         dao.findById(id)?.toDomain()
     }
 
+    override suspend fun getLatestByContainerNo(containerNo: String): ReeferUnit? =
+        withContext(ioDispatcher) { dao.getLatestByContainerNo(containerNo)?.toDomain() }
+
+    override suspend fun getAllByContainerNo(containerNo: String): List<ReeferUnit> =
+        withContext(ioDispatcher) { dao.getAllByContainerNo(containerNo).map { it.toDomain() } }
+
     override suspend fun create(unit: ReeferUnit): Result<Long> = withContext(ioDispatcher) {
-        runCatching { dao.insert(unit.toEntity()) }
+        runCatching {
+            val entity = unit.toEntity()
+            val id = dao.insert(entity)
+            syncService.pushReeferUnit(entity.copy(id = id))
+            id
+        }
     }
 
     override suspend fun update(unit: ReeferUnit): Result<Unit> = withContext(ioDispatcher) {

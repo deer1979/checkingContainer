@@ -62,22 +62,53 @@ internal fun EquipmentDataCard(
                     }
                 }
             }
-            if (state.unitModel.isNotBlank()) {
-                ManufacturerBadge(state.unitType)
+            if (state.unitModelNo.isNotBlank()) {
+                ManufacturerBadge(state.brand)
             }
             OutlinedTextField(
-                value = state.unitModel,
-                onValueChange = { onEvent(UnitEntryEvent.UnitModelChange(it)) },
-                label = { Text("Unit Model") },
+                value = state.unitModelNo,
+                onValueChange = { onEvent(UnitEntryEvent.UnitModelNoChange(it)) },
+                label = { Text("Unit model No.") },
                 singleLine = true,
+                isError = state.showUnitModelNoError,
+                supportingText = if (state.showUnitModelNoError) {
+                    { Text("Campo obligatorio") }
+                } else null,
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Characters,
+                    imeAction = ImeAction.Next,
+                ),
             )
+            if (state.unitModel.isNotBlank()) {
+                OutlinedTextField(
+                    value = state.unitModel,
+                    onValueChange = {},
+                    label = { Text("Unit Model") },
+                    singleLine = true,
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (state.unitType.isNotBlank()) {
+                OutlinedTextField(
+                    value = state.unitType,
+                    onValueChange = {},
+                    label = { Text("Unit Type") },
+                    singleLine = true,
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             OutlinedTextField(
                 value = state.unitSerialNo,
                 onValueChange = { onEvent(UnitEntryEvent.UnitSerialNoChange(it)) },
                 label = { Text("Unit Serial No.") },
                 singleLine = true,
+                isError = state.showUnitSerialNoError,
+                supportingText = if (state.showUnitSerialNoError) {
+                    { Text("Campo obligatorio") }
+                } else null,
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Characters,
@@ -86,9 +117,15 @@ internal fun EquipmentDataCard(
             )
             OutlinedTextField(
                 value = state.yearOfBuilt,
-                onValueChange = { onEvent(UnitEntryEvent.YearOfBuiltChange(it)) },
+                onValueChange = { v ->
+                    if (v.length <= 4) onEvent(UnitEntryEvent.YearOfBuiltChange(v.filter(Char::isDigit)))
+                },
                 label = { Text("Year of Built") },
                 singleLine = true,
+                isError = state.showYearOfBuiltError,
+                supportingText = if (state.showYearOfBuiltError) {
+                    { Text("Campo obligatorio") }
+                } else null,
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,

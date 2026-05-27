@@ -1,22 +1,25 @@
 package com.checkingcontainer.feature.units
 
 import androidx.compose.runtime.Immutable
+import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.PtiInstruction
 import com.checkingcontainer.core.model.ReeferUnit
-import com.checkingcontainer.core.model.UnitType
 
 enum class ScannerMode { CONTAINER, DATA_PLATE }
 
 @Immutable
 data class UnitEntryUiState(
     val containerNo: String = "",
+    val unitModelNo: String = "",
     val unitModel: String = "",
+    val unitType: String = "",
+    val manufacturer: String = "",
     val unitSerialNo: String = "",
     val yearOfBuilt: String = "",
     val status: InspStatus = InspStatus.INSP,
     val ptiInstruction: PtiInstruction? = null,
-    val unitType: UnitType = UnitType.CARRIER,
+    val brand: Brand = Brand.CARRIER,
     val deployedAs: String? = null,
     val observations: String = "",
     val isSaving: Boolean = false,
@@ -25,6 +28,7 @@ data class UnitEntryUiState(
     val showScanner: Boolean = false,
     val scannerMode: ScannerMode = ScannerMode.CONTAINER,
     val isLookingUpCatalog: Boolean = false,
+    val showValidation: Boolean = false,
 ) {
     val isContainerValid: Boolean get() = Iso6346.isValid(containerNo)
 
@@ -33,16 +37,21 @@ data class UnitEntryUiState(
     val canSave: Boolean
         get() = !isSaving &&
             isContainerValid &&
-            unitModel.isNotBlank() &&
+            unitModelNo.isNotBlank() &&
             unitSerialNo.isNotBlank() &&
             yearOfBuilt.isNotBlank() &&
             ptiInstruction != null &&
-            (unitType != UnitType.STAR_COOL || deployedAs != null)
+            (brand != Brand.STAR_COOL || deployedAs != null)
+
+    val showUnitModelNoError: Boolean get() = showValidation && unitModelNo.isBlank()
+    val showUnitSerialNoError: Boolean get() = showValidation && unitSerialNo.isBlank()
+    val showYearOfBuiltError: Boolean get() = showValidation && yearOfBuilt.isBlank()
+    val showPtiError: Boolean get() = showValidation && ptiInstruction == null
 }
 
 sealed interface UnitEntryEvent {
     data class ContainerNoChange(val value: String) : UnitEntryEvent
-    data class UnitModelChange(val value: String) : UnitEntryEvent
+    data class UnitModelNoChange(val value: String) : UnitEntryEvent
     data class UnitSerialNoChange(val value: String) : UnitEntryEvent
     data class YearOfBuiltChange(val value: String) : UnitEntryEvent
     data class StatusChange(val value: InspStatus) : UnitEntryEvent
@@ -56,12 +65,14 @@ sealed interface UnitEntryEvent {
 
 fun UnitEntryUiState.toDomain(technicianId: Long, technicianName: String): ReeferUnit = ReeferUnit(
     containerNo = containerNo.trim().uppercase(),
-    manufacturer = unitType.label,
+    manufacturer = manufacturer.ifBlank { brand.label },
     unitModel = unitModel.trim(),
+    unitModelNo = unitModelNo.trim(),
     unitSerialNo = unitSerialNo.trim().uppercase(),
     yearOfBuilt = yearOfBuilt.trim(),
     status = status,
     ptiInstruction = ptiInstruction,
+    brand = brand,
     unitType = unitType,
     deployedAs = deployedAs,
     technicianId = technicianId,

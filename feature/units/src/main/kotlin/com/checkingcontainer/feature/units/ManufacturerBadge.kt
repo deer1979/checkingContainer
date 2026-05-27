@@ -18,15 +18,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.checkingcontainer.core.designsystem.R
-import com.checkingcontainer.core.model.UnitType
+import com.checkingcontainer.core.model.Brand
 
 @Composable
-internal fun ManufacturerBadge(unitType: UnitType) {
+internal fun ManufacturerBadge(unitType: Brand) {
     val logoRes = when (unitType) {
-        UnitType.CARRIER -> R.drawable.logo_carrier
-        UnitType.STAR_COOL -> R.drawable.logo_starcool
-        UnitType.THERMO_KING -> R.drawable.logo_thermoking
-        UnitType.DAIKIN -> R.drawable.logo_daikin
+        Brand.CARRIER -> R.drawable.logo_carrier
+        Brand.STAR_COOL -> R.drawable.logo_starcool
+        Brand.THERMO_KING -> R.drawable.logo_thermoking
+        Brand.DAIKIN -> R.drawable.logo_daikin
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,

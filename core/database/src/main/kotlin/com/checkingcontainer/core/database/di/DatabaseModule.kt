@@ -12,12 +12,14 @@ import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.database.migrations.MIGRATION_4_5
 import com.checkingcontainer.core.database.migrations.MIGRATION_5_6
+import com.checkingcontainer.core.database.migrations.MIGRATION_6_7
+import com.checkingcontainer.core.database.migrations.MIGRATION_7_8
 import com.checkingcontainer.core.database.migrations.seedAnnouncements
-import com.checkingcontainer.core.database.migrations.seedCatalog
-import com.checkingcontainer.core.database.migrations.seedExtraCatalog
+import com.checkingcontainer.core.database.migrations.seedFullCatalog
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.core.model.generateNick
+import java.util.UUID
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,7 +40,7 @@ object DatabaseModule {
         AppDatabase::class.java,
         "checkingcontainer.db",
     )
-        .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+        .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
         .addCallback(seedOnCreateCallback)
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
@@ -52,7 +54,10 @@ object DatabaseModule {
     @Provides
     fun providesCatalogDao(db: AppDatabase): CatalogDao = db.catalogDao()
 
-    /** Seeds SuperAdmin + catalog data on first install. Login: nick = sadmin, PIN = 000000. */
+    @Provides
+    fun providesAnnouncementDao(db: AppDatabase): AnnouncementDao = db.announcementDao()
+
+    /** Seeds SuperAdmin + full catalog on first install. Login: nick = sadmin, PIN = 000000. */
     private val seedOnCreateCallback = object : RoomDatabase.Callback() {
         override fun onCreate(db: SupportSQLiteDatabase) {
             val firstName = "Super"
@@ -67,14 +72,12 @@ object DatabaseModule {
                 put("company", "CheckingContainer")
                 put("location", "Principal")
                 put("isActive", 1)
+                put("syncId", UUID.randomUUID().toString())
+                put("syncPending", 1)
             }
             db.insert("users", android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE, values)
-            seedCatalog(db)
-            seedExtraCatalog(db)
+            seedFullCatalog(db)
             seedAnnouncements(db)
         }
     }
-
-    @Provides
-    fun providesAnnouncementDao(db: AppDatabase): AnnouncementDao = db.announcementDao()
 }
