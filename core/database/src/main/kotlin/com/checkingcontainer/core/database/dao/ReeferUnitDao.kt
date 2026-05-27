@@ -20,6 +20,10 @@ interface ReeferUnitDao {
     @Query("SELECT * FROM reefer_units WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): ReeferUnitEntity?
 
+    /** One-shot snapshot of all units — used by WorkManager sync. */
+    @Query("SELECT * FROM reefer_units")
+    suspend fun getAllOnce(): List<ReeferUnitEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(unit: ReeferUnitEntity): Long
 

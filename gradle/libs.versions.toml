@@ -4,6 +4,11 @@ agp = "9.2.1"
 kotlin = "2.2.20"
 ksp = "2.2.20-2.0.2"
 
+# Supabase / network
+supabase = "3.2.5"
+ktor = "3.3.1"
+workManager = "2.10.1"
+
 # Android SDK
 compileSdk = "36"
 minSdk = "26"
@@ -100,6 +105,15 @@ androidx-camera-view = { group = "androidx.camera", name = "camera-view", versio
 # ML Kit (unbundled V2 — uses GMS)
 mlkit-text-recognition = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition", version.ref = "mlkitTextRecognition" }
 
+# Supabase  (group = io.github.jan-tennert.supabase, BOM artifact = bom)
+supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
+supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
+ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.8.1" }
+workmanager-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
+hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref = "hiltNavigationCompose" }
+hilt-androidx-compiler = { group = "androidx.hilt", name = "hilt-compiler", version.ref = "hiltNavigationCompose" }
+
 # Build-logic accessors — needed inside convention plugins so they can reference
 # AGP / Kotlin / KSP / Hilt Gradle plugins as runtime dependencies.
 android-gradle-plugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
@@ -124,3 +138,4 @@ checkingcontainer-android-feature = { id = "checkingcontainer.android.feature", 
 checkingcontainer-android-hilt = { id = "checkingcontainer.android.hilt", version = "unspecified" }
 checkingcontainer-android-room = { id = "checkingcontainer.android.room", version = "unspecified" }
 checkingcontainer-jvm-library = { id = "checkingcontainer.jvm.library", version = "unspecified" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

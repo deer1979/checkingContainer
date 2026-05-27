@@ -1,8 +1,23 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.checkingcontainer.android.application)
     alias(libs.plugins.checkingcontainer.android.hilt)
     alias(libs.plugins.kotlin.compose)
 }
+
+// ── Supabase credentials ────────────────────────────────────────────────────
+// Local development: add to local.properties (gitignored):
+//   SUPABASE_URL=https://xxxx.supabase.co
+//   SUPABASE_ANON_KEY=eyJhbGc...
+// CI: add SUPABASE_URL and SUPABASE_ANON_KEY as GitHub Actions secrets,
+// then inject them via the workflow (see .github/workflows/ci.yml).
+val localProps = Properties().also { props ->
+    rootProject.file("local.properties").takeIf { it.exists() }
+        ?.inputStream()?.use { props.load(it) }
+}
+fun localOrEnv(key: String): String =
+    localProps.getProperty(key) ?: System.getenv(key) ?: ""
 
 composeCompiler {
     stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("compose-stability.conf"))
@@ -17,6 +32,10 @@ android {
         versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        // Supabase — injected at build time; empty string = local-only mode
+        buildConfigField("String", "SUPABASE_URL", "\"${localOrEnv("SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localOrEnv("SUPABASE_ANON_KEY")}\"")
     }
 
     signingConfigs {
@@ -57,6 +76,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // Ktor / OkHttp ship duplicate service-loader entries
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
         }
     }
 }
@@ -78,6 +100,12 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:domain"))
     implementation(project(":core:common"))
+    implementation(project(":core:network"))
+
+    // WorkManager + Hilt integration (HiltWorkerFactory used in MyApplication)
+    implementation(libs.hilt.work)
+    implementation(libs.workmanager.ktx)
+    ksp(libs.hilt.androidx.compiler)
 
     // AndroidX
     implementation(libs.androidx.core.ktx)
