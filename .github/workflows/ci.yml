@@ -49,10 +49,24 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Inject Supabase credentials
+        # Writes local.properties so the Gradle build can read SUPABASE_URL /
+        # SUPABASE_ANON_KEY. When the secrets are absent the app builds fine
+        # in local-only mode (empty strings).
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "SUPABASE_URL=${SUPABASE_URL:-}" >> local.properties
+          echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}" >> local.properties
+
       - name: Compile debug
         id: compile
         continue-on-error: true
         shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -o pipefail
           ./gradlew :app:compileDebugKotlin --stacktrace 2>&1 | tee /tmp/compile.log
@@ -156,6 +170,9 @@ jobs:
       - name: Assemble debug APK
         id: assemble
         if: steps.compile.outcome == 'success'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: ./gradlew :app:assembleDebug --stacktrace
 
       - name: Upload debug APK

@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
@@ -17,6 +18,22 @@
         android:theme="@style/Theme.CheckingContainer.Splash"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="36">
+
+        <!--
+          Remove the default WorkManager initializer so our custom
+          Configuration.Provider in MyApplication is used instead.
+          Required by the RemoveWorkManagerInitializer lint rule.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
         <activity
             android:name=".MainActivity"

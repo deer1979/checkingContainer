@@ -26,6 +26,10 @@ interface ReeferUnitDao {
     @Query("SELECT * FROM reefer_units WHERE containerNo = :containerNo ORDER BY createdAt DESC")
     suspend fun getAllByContainerNo(containerNo: String): List<ReeferUnitEntity>
 
+    /** One-shot snapshot of all units — used by WorkManager sync. */
+    @Query("SELECT * FROM reefer_units")
+    suspend fun getAllOnce(): List<ReeferUnitEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(unit: ReeferUnitEntity): Long
 

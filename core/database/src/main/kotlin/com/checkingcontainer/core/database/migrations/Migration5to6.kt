@@ -49,6 +49,9 @@ fun seedAnnouncements(db: SupportSQLiteDatabase) {
 }
 
 fun seedExtraCatalog(db: SupportSQLiteDatabase) {
+    // Star Cool model families
+    // NOTE: use parameterized execSQL (bind args) so description strings with
+    // special characters (single quotes, parentheses, etc.) never break the SQL.
     val starCoolFamilies = listOf(
         "SCI-40" to "Star Cool Integrated 40ft (estándar)",
         "SCI-40-CA" to "Star Cool Integrated 40ft (Atmósfera Controlada)",
@@ -56,7 +59,14 @@ fun seedExtraCatalog(db: SupportSQLiteDatabase) {
     )
     starCoolFamilies.forEach { (family, desc) ->
         db.execSQL(
-            "INSERT OR IGNORE INTO catalog_entries (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd) VALUES ((SELECT id FROM manufacturers WHERE name = 'Star Cool' LIMIT 1), ?, ?, NULL, NULL)",
+            """
+            INSERT OR IGNORE INTO catalog_entries
+                (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd)
+            VALUES (
+                (SELECT id FROM manufacturers WHERE name = 'Star Cool' LIMIT 1),
+                ?, ?, NULL, NULL
+            )
+            """.trimIndent(),
             arrayOf(family, desc),
         )
     }
@@ -71,7 +81,14 @@ fun seedExtraCatalog(db: SupportSQLiteDatabase) {
     )
     thermoKingFamilies.forEach { (family, desc) ->
         db.execSQL(
-            "INSERT OR IGNORE INTO catalog_entries (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd) VALUES ((SELECT id FROM manufacturers WHERE name = 'Thermo King' LIMIT 1), ?, ?, NULL, NULL)",
+            """
+            INSERT OR IGNORE INTO catalog_entries
+                (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd)
+            VALUES (
+                (SELECT id FROM manufacturers WHERE name = 'Thermo King' LIMIT 1),
+                ?, ?, NULL, NULL
+            )
+            """.trimIndent(),
             arrayOf(family, desc),
         )
     }
@@ -83,7 +100,14 @@ fun seedExtraCatalog(db: SupportSQLiteDatabase) {
     )
     daikinFamilies.forEach { (family, desc) ->
         db.execSQL(
-            "INSERT OR IGNORE INTO catalog_entries (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd) VALUES ((SELECT id FROM manufacturers WHERE name = 'Daikin' LIMIT 1), ?, ?, NULL, NULL)",
+            """
+            INSERT OR IGNORE INTO catalog_entries
+                (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd)
+            VALUES (
+                (SELECT id FROM manufacturers WHERE name = 'Daikin' LIMIT 1),
+                ?, ?, NULL, NULL
+            )
+            """.trimIndent(),
             arrayOf(family, desc),
         )
     }

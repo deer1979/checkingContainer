@@ -23,6 +23,10 @@ interface UserDao {
     @Query("SELECT COUNT(*) FROM users")
     suspend fun count(): Int
 
+    /** One-shot snapshot of all users — used by WorkManager sync. */
+    @Query("SELECT * FROM users")
+    suspend fun getAllOnce(): List<UserEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(user: UserEntity): Long
 
