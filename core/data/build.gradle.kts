@@ -15,4 +15,7 @@ dependencies {
     implementation(project(":core:network"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.workmanager.ktx)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.androidx.compiler)
 }

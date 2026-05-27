@@ -102,6 +102,11 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:network"))
 
+    // WorkManager + Hilt integration (HiltWorkerFactory used in MyApplication)
+    implementation(libs.hilt.work)
+    implementation(libs.workmanager.ktx)
+    ksp(libs.hilt.androidx.compiler)
+
     // AndroidX
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)

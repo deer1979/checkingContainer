@@ -17,4 +17,8 @@ interface AnnouncementDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(announcement: AnnouncementEntity)
+
+    /** One-shot snapshot of all announcements — used by WorkManager sync. */
+    @Query("SELECT * FROM announcements")
+    suspend fun getAllOnce(): List<AnnouncementEntity>
 }
