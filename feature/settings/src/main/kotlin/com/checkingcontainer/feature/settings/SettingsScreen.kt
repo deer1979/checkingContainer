@@ -12,6 +12,8 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PrivacyTip
@@ -137,6 +139,26 @@ private fun SettingsScreen(
             item { HorizontalDivider() }
 
             item { SectionHeader("Sincronizacion") }
+
+            item {
+                ListItem(
+                    headlineContent = {
+                        Text(if (state.supabaseConnected) "Supabase: conectado" else "Supabase: sin conexion")
+                    },
+                    supportingContent = { Text(state.supabaseHost) },
+                    leadingContent = {
+                        Icon(
+                            imageVector = if (state.supabaseConnected) Icons.Outlined.Cloud else Icons.Outlined.CloudOff,
+                            contentDescription = null,
+                            tint = if (state.supabaseConnected)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.error,
+                        )
+                    },
+                )
+            }
+            item { HorizontalDivider() }
 
             item {
                 SettingsRow(

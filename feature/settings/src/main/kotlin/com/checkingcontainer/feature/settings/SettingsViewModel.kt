@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.AuthRepository
 import com.checkingcontainer.core.domain.ThemeRepository
 import com.checkingcontainer.core.model.ThemeConfig
+import com.checkingcontainer.core.network.SupabaseClientHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,9 +18,15 @@ import kotlinx.coroutines.launch
 class SettingsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val themeRepository: ThemeRepository,
+    private val supabaseClientHolder: SupabaseClientHolder,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(SettingsUiState())
+    private val _state = MutableStateFlow(
+        SettingsUiState(
+            supabaseConnected = supabaseClientHolder.isConfigured,
+            supabaseHost = supabaseClientHolder.displayHost,
+        )
+    )
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
     init {
