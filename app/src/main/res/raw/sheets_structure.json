@@ -1,0 +1,126 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-05-27",
+  "source": "Room @Entity scan — core/database/entity/",
+  "notes": [
+    "Los campos marcados sync_to_sheets=false son locales de Room y NO deben replicarse en Sheets.",
+    "Los enums se almacenan en Room como String (via @TypeConverter .name / .valueOf).",
+    "Los timestamps (sheets_type=TIMESTAMP) son epoch milisegundos (Long); en Sheets se recomienda guardarlos como NUMBER y formatear la celda como fecha.",
+    "modelPrefixes en manufacturers es una lista serializada como String CSV (ej: 'ARSKL,ARST,SKU').",
+    "La columna marcada unique_key=true es la clave natural recomendada para upsert/deduplicación en Sheets."
+  ],
+  "type_mapping": {
+    "String":  { "sheets_type": "STRING",    "sheets_format": "TEXT" },
+    "Long":    { "sheets_type": "NUMBER",    "sheets_format": "NUMERIC" },
+    "Int":     { "sheets_type": "NUMBER",    "sheets_format": "NUMERIC" },
+    "Boolean": { "sheets_type": "BOOLEAN",   "sheets_format": "TRUE/FALSE" },
+    "Enum":    { "sheets_type": "STRING",    "sheets_format": "TEXT — valor del .name() del enum" },
+    "UUID":    { "sheets_type": "STRING",    "sheets_format": "TEXT — UUID v4" },
+    "TIMESTAMP": { "sheets_type": "NUMBER", "sheets_format": "Epoch ms; formatear celda como fecha en Sheets" }
+  },
+  "tables": {
+    "reefer_units": {
+      "room_entity": "ReeferUnitEntity",
+      "room_table": "reefer_units",
+      "suggested_sheet_name": "ReeferUnits",
+      "unique_key_column": "id",
+      "columns": [
+        { "name": "id",            "kotlin_type": "Long",          "sheets_type": "NUMBER",  "nullable": false, "primary_key": true,  "unique_key": true,  "sync_to_sheets": true,  "notes": "PK autoGenerado por Room. Usar como ID de fila en Sheets." },
+        { "name": "containerNo",   "kotlin_type": "String",        "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Número de contenedor. Ej: MSCU1234567." },
+        { "name": "manufacturer",  "kotlin_type": "String",        "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Nombre del fabricante de la unidad." },
+        { "name": "unitModel",     "kotlin_type": "String",        "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "" },
+        { "name": "unitModelNo",   "kotlin_type": "String",        "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "" },
+        { "name": "unitSerialNo",  "kotlin_type": "String",        "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "" },
+        { "name": "yearOfBuilt",   "kotlin_type": "String",        "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Año de fabricación. String para admitir valores como '2019/2020'." },
+        { "name": "createdAt",     "kotlin_type": "Long",          "sheets_type": "TIMESTAMP","nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Epoch milisegundos. Formatear como fecha/hora en Sheets." },
+        { "name": "status",        "kotlin_type": "InspStatus",    "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Enum: INSP | PTI | REPAIR | CANCELLED. Almacenado como .name()." },
+        { "name": "ptiInstruction","kotlin_type": "PtiInstruction","sheets_type": "STRING",  "nullable": true,  "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Enum nullable: SET_POINT | EMPTY | etc. Celda vacía si null." },
+        { "name": "brand",         "kotlin_type": "Brand",         "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": false, "notes": "LOCAL_ONLY — usado para logo visual en la app. No sincronizar." },
+        { "name": "unitType",      "kotlin_type": "String",        "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Tipo de unidad. Ej: INTEGRAL, CLIP-ON." },
+        { "name": "deployedAs",    "kotlin_type": "String",        "sheets_type": "STRING",  "nullable": true,  "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Nullable. Celda vacía si null." },
+        { "name": "technicianId",  "kotlin_type": "Long",          "sheets_type": "NUMBER",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "FK → users.id." },
+        { "name": "technicianName","kotlin_type": "String",        "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Desnormalizado para lectura rápida en Sheets." },
+        { "name": "observations",  "kotlin_type": "String",        "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Puede ser texto largo. Sheets soporta hasta 50 000 chars por celda." },
+        { "name": "syncId",        "kotlin_type": "String",        "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": false, "notes": "LOCAL_ONLY — UUID interno de Room para tracking de sync. No sincronizar." },
+        { "name": "syncPending",   "kotlin_type": "Boolean",       "sheets_type": "BOOLEAN", "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": false, "notes": "LOCAL_ONLY — flag de cola de escritura offline. No sincronizar." }
+      ]
+    },
+    "users": {
+      "room_entity": "UserEntity",
+      "room_table": "users",
+      "suggested_sheet_name": "Users",
+      "unique_key_column": "nick",
+      "columns": [
+        { "name": "id",        "kotlin_type": "Long",     "sheets_type": "NUMBER",  "nullable": false, "primary_key": true,  "unique_key": false, "sync_to_sheets": true,  "notes": "PK autoGenerado. Preferir 'nick' como clave de upsert en Sheets." },
+        { "name": "firstName", "kotlin_type": "String",   "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "" },
+        { "name": "lastName",  "kotlin_type": "String",   "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "" },
+        { "name": "nick",      "kotlin_type": "String",   "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": true,  "sync_to_sheets": true,  "notes": "UNIQUE en Room. Usar como clave natural de upsert — estable entre dispositivos." },
+        { "name": "pin",       "kotlin_type": "String",   "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "PIN de acceso. Considerar cifrado antes de escribir en Sheets." },
+        { "name": "jobTitle",  "kotlin_type": "JobTitle", "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Enum: Tecnico | Ayudante | Digitador | Operador | JefeDePatio | JefeDeDepartamento | Lider." },
+        { "name": "role",      "kotlin_type": "UserRole", "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Enum: SuperAdmin | Admin | Editor | Viewer." },
+        { "name": "company",   "kotlin_type": "String",   "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "" },
+        { "name": "location",  "kotlin_type": "String",   "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "" },
+        { "name": "isActive",  "kotlin_type": "Boolean",  "sheets_type": "BOOLEAN", "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "TRUE/FALSE. Usar validación de datos en Sheets para restringir valores." },
+        { "name": "syncId",    "kotlin_type": "String",   "sheets_type": "STRING",  "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": false, "notes": "LOCAL_ONLY." },
+        { "name": "syncPending","kotlin_type": "Boolean", "sheets_type": "BOOLEAN", "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": false, "notes": "LOCAL_ONLY." }
+      ]
+    },
+    "announcements": {
+      "room_entity": "AnnouncementEntity",
+      "room_table": "announcements",
+      "suggested_sheet_name": "Announcements",
+      "unique_key_column": "id",
+      "columns": [
+        { "name": "id",          "kotlin_type": "String", "sheets_type": "STRING",   "nullable": false, "primary_key": true,  "unique_key": true,  "sync_to_sheets": true,  "notes": "UUID v4. PK en Room. Clave natural perfecta para Sheets — estable y global." },
+        { "name": "title",       "kotlin_type": "String", "sheets_type": "STRING",   "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "" },
+        { "name": "summary",     "kotlin_type": "String", "sheets_type": "STRING",   "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Resumen corto para lista/preview." },
+        { "name": "body",        "kotlin_type": "String", "sheets_type": "STRING",   "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Texto completo. Puede ser largo — considerar columna de ancho fijo en Sheets." },
+        { "name": "authorName",  "kotlin_type": "String", "sheets_type": "STRING",   "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "" },
+        { "name": "publishedAt", "kotlin_type": "Long",   "sheets_type": "TIMESTAMP","nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true,  "notes": "Epoch ms. Los anuncios son inmutables — solo INSERT, nunca UPDATE." }
+      ]
+    },
+    "catalog_entries": {
+      "room_entity": "CatalogEntryEntity",
+      "room_table": "catalog_entries",
+      "suggested_sheet_name": "CatalogEntries",
+      "unique_key_column": "id",
+      "columns": [
+        { "name": "id",             "kotlin_type": "Long",   "sheets_type": "NUMBER", "nullable": false, "primary_key": true,  "unique_key": true,  "sync_to_sheets": true, "notes": "PK autoGenerado." },
+        { "name": "manufacturerId", "kotlin_type": "Long",   "sheets_type": "NUMBER", "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true, "notes": "FK → manufacturers.id. En Sheets se puede denormalizar con el nombre del fabricante." },
+        { "name": "serie",          "kotlin_type": "String", "sheets_type": "STRING", "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true, "notes": "Prefijo de serie. Ej: 'ARSKL'." },
+        { "name": "rangeStart",     "kotlin_type": "Int",    "sheets_type": "NUMBER", "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true, "notes": "Inicio del rango numérico de modelo." },
+        { "name": "rangeEnd",       "kotlin_type": "Int",    "sheets_type": "NUMBER", "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true, "notes": "Fin del rango numérico de modelo." },
+        { "name": "unitModel",      "kotlin_type": "String", "sheets_type": "STRING", "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true, "notes": "Nombre del modelo resultante. Ej: 'ARSKL 450T'." },
+        { "name": "unitType",       "kotlin_type": "String", "sheets_type": "STRING", "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true, "notes": "Tipo de unidad asociado al modelo." }
+      ]
+    },
+    "manufacturers": {
+      "room_entity": "ManufacturerEntity",
+      "room_table": "manufacturers",
+      "suggested_sheet_name": "Manufacturers",
+      "unique_key_column": "name",
+      "columns": [
+        { "name": "id",            "kotlin_type": "Long",   "sheets_type": "NUMBER", "nullable": false, "primary_key": true,  "unique_key": false, "sync_to_sheets": true, "notes": "PK autoGenerado." },
+        { "name": "name",          "kotlin_type": "String", "sheets_type": "STRING", "nullable": false, "primary_key": false, "unique_key": true,  "sync_to_sheets": true, "notes": "Nombre del fabricante. Usar como clave natural de upsert. Ej: 'Carrier'." },
+        { "name": "modelPrefixes", "kotlin_type": "String", "sheets_type": "STRING", "nullable": false, "primary_key": false, "unique_key": false, "sync_to_sheets": true, "notes": "Lista de prefijos serializada como CSV. Ej: 'ARSKL,ARST,SKU'. Al leer de Sheets, hacer split(',') para reconstruir la lista." }
+      ]
+    }
+  },
+  "sync_summary": {
+    "total_tables": 5,
+    "total_columns": 37,
+    "columns_to_sync": 31,
+    "columns_local_only": 6,
+    "local_only_fields": ["syncId", "syncPending", "brand"],
+    "enum_fields": ["status", "ptiInstruction", "brand", "jobTitle", "role"],
+    "timestamp_fields": ["createdAt", "publishedAt"],
+    "nullable_fields": ["ptiInstruction", "deployedAs"],
+    "recommended_upsert_keys": {
+      "reefer_units": "id",
+      "users": "nick",
+      "announcements": "id",
+      "catalog_entries": "id",
+      "manufacturers": "name"
+    }
+  }
+}

@@ -1,34 +1,38 @@
 package com.checkingcontainer.core.data
 
+import android.content.Context
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
+import com.checkingcontainer.core.data.sync.RemoteSyncWorker
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.entity.ReeferUnitEntity
 import com.checkingcontainer.core.database.entity.toEntity
 import com.checkingcontainer.core.domain.ReeferUnitRepository
 import com.checkingcontainer.core.model.ReeferUnit
-import javax.inject.Inject
-import javax.inject.Singleton
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Repositorio de unidades reefer.
  *
- * Estado actual: **local-only** — Room es la única fuente de verdad.
+ * ## Sincronización
+ * Cada escritura (create / update) guarda la entidad en Room con `syncPending = true`
+ * (valor por defecto en [ReeferUnitEntity]) y luego encola [RemoteSyncWorker] para que
+ * suba la fila a Google Sheets tan pronto como haya conexión.
  *
- * TODO: Inyectar [com.checkingcontainer.core.network.RemoteDataSource]
- *   (Google Sheets/Drive API) y añadir:
- *   - pull inicial al arrancar la app
- *   - push optimista en create/update/delete
- *   - polling/notificaciones de cambios remotos
+ * El Worker recoge **todas** las filas con `syncPending = 1` → permite que varias
+ * escrituras offline se suban en bloque cuando vuelve la red.
  */
 @Singleton
 class ReeferUnitRepositoryImpl @Inject constructor(
     private val dao: ReeferUnitDao,
+    @ApplicationContext private val context: Context,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : ReeferUnitRepository {
 
@@ -58,24 +62,31 @@ class ReeferUnitRepositoryImpl @Inject constructor(
 
     // ── Writes ────────────────────────────────────────────────────────────────
 
+    /**
+     * Inserta [unit] en Room (syncPending = true por defecto en la entidad)
+     * y encola [RemoteSyncWorker] para subirla a Sheets de inmediato.
+     */
     override suspend fun create(unit: ReeferUnit): Result<Long> = withContext(ioDispatcher) {
         runCatching {
-            val id = dao.insert(unit.toEntity())
-            // TODO: pushCreate(unit.copy(id = id)) — Google Sheets API
+            val id = dao.insert(unit.toEntity())   // syncPending = 1 (default)
+            RemoteSyncWorker.enqueueAfterWrite(context)
             id
         }
     }
 
+    /**
+     * Actualiza [unit] en Room (la entidad generada por [toEntity] tiene syncPending = true)
+     * y encola [RemoteSyncWorker] para reflejar el cambio en Sheets.
+     */
     override suspend fun update(unit: ReeferUnit): Result<Unit> = withContext(ioDispatcher) {
         runCatching {
-            dao.update(unit.toEntity())
-            // TODO: pushUpdate(unit) — Google Sheets API
-            Unit
+            dao.update(unit.toEntity())             // syncPending = 1 (default)
+            RemoteSyncWorker.enqueueAfterWrite(context)
         }
     }
 
+    /** Elimina la fila localmente. No se refleja en Sheets (sync es solo INSERT). */
     override suspend fun delete(id: Long): Unit = withContext(ioDispatcher) {
         dao.delete(id)
-        // TODO: pushDelete(id) — Google Sheets API
     }
 }

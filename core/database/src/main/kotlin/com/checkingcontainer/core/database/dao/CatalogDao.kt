@@ -14,6 +14,10 @@ interface CatalogDao {
     @Query("SELECT * FROM manufacturers ORDER BY name ASC")
     suspend fun getAllManufacturers(): List<ManufacturerEntity>
 
+    /** One-shot snapshot de todas las entradas del catálogo — usado por SyncManager. */
+    @Query("SELECT * FROM catalog_entries ORDER BY manufacturerId, serie ASC")
+    suspend fun getAllCatalogEntries(): List<CatalogEntryEntity>
+
     @Query("SELECT * FROM manufacturers WHERE id = :id LIMIT 1")
     suspend fun getManufacturerById(id: Long): ManufacturerEntity?
 

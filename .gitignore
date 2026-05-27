@@ -38,3 +38,6 @@ release.keystore.properties
 # Exception: the debug keystore is committed on purpose so CI builds are
 # signed identically. It is NEVER used for release / Play Store.
 !debug.keystore
+
+# Google Service Account — clave privada RSA. NUNCA commitear.
+app/src/main/res/raw/credentials.json

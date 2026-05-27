@@ -44,4 +44,8 @@ interface ReeferUnitDao {
 
     @Query("UPDATE reefer_units SET syncPending = 0 WHERE id = :id")
     suspend fun markSynced(id: Long)
+
+    /** Marca TODAS las filas como pendientes de sync. Devuelve el número de filas afectadas. */
+    @Query("UPDATE reefer_units SET syncPending = 1")
+    suspend fun markAllPending(): Int
 }

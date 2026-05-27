@@ -33,7 +33,8 @@ interface UserDao {
     @Update
     suspend fun update(user: UserEntity)
 
-    @Query("UPDATE users SET isActive = :isActive WHERE id = :id")
+    /** Actualiza el estado activo y marca la fila como pendiente de sync. */
+    @Query("UPDATE users SET isActive = :isActive, syncPending = 1 WHERE id = :id")
     suspend fun setActive(id: Long, isActive: Boolean)
 
     @Query("DELETE FROM users WHERE id = :id")
@@ -44,4 +45,8 @@ interface UserDao {
 
     @Query("UPDATE users SET syncPending = 0 WHERE id = :id")
     suspend fun markSynced(id: Long)
+
+    /** Marca TODOS los usuarios como pendientes de sync. Devuelve el número de filas afectadas. */
+    @Query("UPDATE users SET syncPending = 1")
+    suspend fun markAllPending(): Int
 }

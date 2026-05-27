@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.checkingcontainer.android.library)
     alias(libs.plugins.checkingcontainer.android.hilt)
+    alias(libs.plugins.kotlin.serialization)   // para @Serializable en DTOs internos
 }
 
 android {
@@ -8,10 +9,10 @@ android {
 }
 
 dependencies {
-    // TODO: Agregar dependencias de Google Sheets / Drive API aquí:
-    //   implementation("com.google.api-client:google-api-client-android:...")
-    //   implementation("com.google.apis:google-api-services-sheets:...")
-    //   implementation("com.google.apis:google-api-services-drive:...")
+    // HTTP — Sheets REST API + token exchange
+    api(libs.okhttp)
 
+    // JSON — serialización de credentials.json y payloads de Sheets
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
 }
