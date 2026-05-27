@@ -13,7 +13,9 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.checkingcontainer.core.database.AppDatabase
+import com.checkingcontainer.core.database.dao.AnnouncementDao
+import com.checkingcontainer.core.database.dao.ReeferUnitDao
+import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.database.entity.AnnouncementEntity
 import com.checkingcontainer.core.database.entity.ReeferUnitEntity
 import com.checkingcontainer.core.database.entity.UserEntity
@@ -39,15 +41,16 @@ private const val WORK_NAME_IMMEDIATE = "supabase_sync_immediate"
  *   has network connectivity, even if that's hours after the app was last used.
  * - Periodically every 15 minutes while network is connected.
  *
- * This is the "offline → reconnect" sync path:
- *   Field work with no internet → data stays in Room → connectivity returns
- *   → WorkManager fires → all pending records are uploaded to Supabase.
+ * Offline flow: Field work with no internet → data stays in Room →
+ * connectivity returns → WorkManager fires → all records uploaded to Supabase.
  */
 @HiltWorker
 class SupabaseSyncWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
-    private val db: AppDatabase,
+    private val userDao: UserDao,
+    private val reeferUnitDao: ReeferUnitDao,
+    private val announcementDao: AnnouncementDao,
     private val supabase: SupabaseClientHolder,
 ) : CoroutineWorker(context, params) {
 
@@ -69,21 +72,21 @@ class SupabaseSyncWorker @AssistedInject constructor(
     }
 
     private suspend fun syncUsers(client: SupabaseClient) {
-        val rows = db.userDao().getAllOnce()
+        val rows = userDao.getAllOnce()
         if (rows.isEmpty()) return
         client.from("users").upsert(rows.map { it.toDto() }) { onConflict = "nick" }
         Log.d(TAG, "Synced ${rows.size} users")
     }
 
     private suspend fun syncReeferUnits(client: SupabaseClient) {
-        val rows = db.reeferUnitDao().getAllOnce()
+        val rows = reeferUnitDao.getAllOnce()
         if (rows.isEmpty()) return
         client.from("reefer_units").upsert(rows.map { it.toDto() }) { onConflict = "local_id" }
         Log.d(TAG, "Synced ${rows.size} reefer units")
     }
 
     private suspend fun syncAnnouncements(client: SupabaseClient) {
-        val rows = db.announcementDao().getAllOnce()
+        val rows = announcementDao.getAllOnce()
         if (rows.isEmpty()) return
         client.from("announcements").upsert(rows.map { it.toDto() }) { onConflict = "id" }
         Log.d(TAG, "Synced ${rows.size} announcements")
@@ -96,7 +99,7 @@ class SupabaseSyncWorker @AssistedInject constructor(
 
         /**
          * Enqueue a one-time sync that runs as soon as the device has network.
-         * Uses [ExistingWorkPolicy.KEEP] so multiple calls don't stack up.
+         * [ExistingWorkPolicy.KEEP] prevents stacking multiple requests.
          */
         fun enqueueImmediate(context: Context) {
             val request = OneTimeWorkRequestBuilder<SupabaseSyncWorker>()
@@ -110,7 +113,7 @@ class SupabaseSyncWorker @AssistedInject constructor(
             )
         }
 
-        /** Schedule a periodic sync every 15 min (WorkManager minimum interval). */
+        /** Periodic sync every 15 min (WorkManager minimum interval) while connected. */
         fun schedulePeriodicSync(context: Context) {
             val request = PeriodicWorkRequestBuilder<SupabaseSyncWorker>(
                 15, TimeUnit.MINUTES,
@@ -127,7 +130,7 @@ class SupabaseSyncWorker @AssistedInject constructor(
     }
 }
 
-// ── Mapping helpers (worker-local) ────────────────────────────────────────────
+// ── Mapping helpers ───────────────────────────────────────────────────────────
 
 private fun UserEntity.toDto() = UserDto(
     firstName = firstName,
