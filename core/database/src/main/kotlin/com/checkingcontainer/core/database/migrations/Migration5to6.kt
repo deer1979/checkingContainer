@@ -52,10 +52,12 @@ fun seedAnnouncements(db: SupportSQLiteDatabase) {
 
 fun seedExtraCatalog(db: SupportSQLiteDatabase) {
     // Star Cool model families
+    // NOTE: use parameterized execSQL (bind args) so description strings with
+    // special characters (single quotes, parentheses, etc.) never break the SQL.
     val starCoolFamilies = listOf(
-        "SCI-40" to "Star Cool Integrated 40' (estándar)",
-        "SCI-40-CA" to "Star Cool Integrated 40' (Atmósfera Controlada)",
-        "SCI-20" to "Star Cool Integrated 20'",
+        "SCI-40" to "Star Cool Integrated 40ft (estándar)",
+        "SCI-40-CA" to "Star Cool Integrated 40ft (Atmósfera Controlada)",
+        "SCI-20" to "Star Cool Integrated 20ft",
     )
     starCoolFamilies.forEach { (family, desc) ->
         db.execSQL(
@@ -64,9 +66,10 @@ fun seedExtraCatalog(db: SupportSQLiteDatabase) {
                 (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd)
             VALUES (
                 (SELECT id FROM manufacturers WHERE name = 'Star Cool' LIMIT 1),
-                '$family', '$desc', NULL, NULL
+                ?, ?, NULL, NULL
             )
             """.trimIndent(),
+            arrayOf(family, desc),
         )
     }
 
@@ -86,15 +89,16 @@ fun seedExtraCatalog(db: SupportSQLiteDatabase) {
                 (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd)
             VALUES (
                 (SELECT id FROM manufacturers WHERE name = 'Thermo King' LIMIT 1),
-                '$family', '$desc', NULL, NULL
+                ?, ?, NULL, NULL
             )
             """.trimIndent(),
+            arrayOf(family, desc),
         )
     }
 
     // Daikin model families
     val daikinFamilies = listOf(
-        "NaturaLINE" to "Daikin NaturaLINE (CO₂ natural refrigerant)",
+        "NaturaLINE" to "Daikin NaturaLINE (CO2 natural refrigerant)",
         "Maverick II" to "Daikin Maverick II",
         "Enviroline" to "Daikin Enviroline",
     )
@@ -105,9 +109,10 @@ fun seedExtraCatalog(db: SupportSQLiteDatabase) {
                 (manufacturerId, modelFamily, description, serialRangeStart, serialRangeEnd)
             VALUES (
                 (SELECT id FROM manufacturers WHERE name = 'Daikin' LIMIT 1),
-                '$family', '$desc', NULL, NULL
+                ?, ?, NULL, NULL
             )
             """.trimIndent(),
+            arrayOf(family, desc),
         )
     }
 }
