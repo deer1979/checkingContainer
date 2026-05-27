@@ -32,6 +32,7 @@ include(":core:designsystem")
 include(":core:database")
 include(":core:data")
 include(":core:domain")
+include(":core:network")
 
 // Feature modules
 include(":feature:login")
