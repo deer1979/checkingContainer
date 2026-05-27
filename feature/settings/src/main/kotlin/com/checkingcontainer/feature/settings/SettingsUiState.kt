@@ -9,8 +9,8 @@ data class SettingsUiState(
     val dynamicColor: Boolean = true,
     val notifications: Boolean = true,
     val autoSync: Boolean = true,
-    /** true si el cliente Supabase se creó correctamente con credenciales válidas */
-    val supabaseConnected: Boolean = false,
-    /** Host de Supabase (sin key) para mostrar en UI */
-    val supabaseHost: String = "no configurado",
+    /** true si el backend remoto está configurado y conectado. */
+    val remoteConnected: Boolean = false,
+    /** Descripción del backend remoto para mostrar en la UI. */
+    val remoteBackendDescription: String = "Sin backend remoto configurado",
 )

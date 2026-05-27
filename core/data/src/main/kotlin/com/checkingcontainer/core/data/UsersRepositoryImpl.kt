@@ -1,53 +1,33 @@
 package com.checkingcontainer.core.data
 
-import android.util.Log
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.database.entity.UserEntity
 import com.checkingcontainer.core.database.entity.toEntity
 import com.checkingcontainer.core.domain.UsersRepository
-import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.User
-import com.checkingcontainer.core.model.UserRole
-import com.checkingcontainer.core.network.SupabaseClientHolder
-import com.checkingcontainer.core.network.dto.UserDto
-import io.github.jan.supabase.postgrest.from
-import io.github.jan.supabase.realtime.PostgresAction
-import io.github.jan.supabase.realtime.channel
-import io.github.jan.supabase.realtime.postgresChangeFlow
 import javax.inject.Inject
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val TAG = "UsersRepo"
-private const val TABLE = "users"
-
+/**
+ * Repositorio de usuarios.
+ *
+ * Estado actual: **local-only** — Room es la única fuente de verdad.
+ *
+ * TODO: Inyectar [com.checkingcontainer.core.network.RemoteDataSource]
+ *   (Google Sheets) y sincronizar con una hoja "Usuarios" via Sheets v4 API.
+ */
 @Singleton
 class UsersRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
-    private val supabase: SupabaseClientHolder,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : UsersRepository {
-
-    private val syncScope = CoroutineScope(SupervisorJob() + ioDispatcher)
-
-    init {
-        syncScope.launch { pullFromSupabase() }
-        supabase.client?.let { setupRealtime(it) }
-    }
 
     // ── Reads ─────────────────────────────────────────────────────────────────
 
@@ -67,7 +47,7 @@ class UsersRepositoryImpl @Inject constructor(
     override suspend fun create(user: User): Result<Long> = withContext(ioDispatcher) {
         runCatching {
             val id = userDao.insert(user.toEntity())
-            syncScope.launch { pushCreate(user.copy(id = id)) }
+            // TODO: pushCreate — Google Sheets API
             id
         }
     }
@@ -75,164 +55,18 @@ class UsersRepositoryImpl @Inject constructor(
     override suspend fun update(user: User): Result<Unit> = withContext(ioDispatcher) {
         runCatching {
             userDao.update(user.toEntity())
-            syncScope.launch { pushUpdate(user) }
+            // TODO: pushUpdate — Google Sheets API
             Unit
         }
     }
 
     override suspend fun setActive(id: Long, isActive: Boolean): Unit = withContext(ioDispatcher) {
         userDao.setActive(id, isActive)
-        syncScope.launch { pushSetActive(id, isActive) }
-        Unit
+        // TODO: pushSetActive — Google Sheets API
     }
 
     override suspend fun delete(id: Long): Unit = withContext(ioDispatcher) {
         userDao.delete(id)
-        syncScope.launch { pushDelete(id) }
-        Unit
-    }
-
-    // ── Supabase helpers ─────────────────────────────────────────────────────
-
-    /**
-     * INSERT → skip if already local (same nick); otherwise insert.
-     * UPDATE → update preserving local id and sync fields.
-     * DELETE → delete by local_id (requires REPLICA IDENTITY FULL).
-     */
-    private fun setupRealtime(client: io.github.jan.supabase.SupabaseClient) {
-        val json = Json { ignoreUnknownKeys = true }
-        val channel = client.channel("realtime:users")
-        channel.postgresChangeFlow<PostgresAction>(schema = "public") {
-            table = TABLE
-        }.onEach { action ->
-            when (action) {
-                is PostgresAction.Insert -> runCatching {
-                    val dto = json.decodeFromJsonElement<UserDto>(action.record)
-                    if (userDao.findByNick(dto.nick) != null) return@runCatching
-                    userDao.insert(dto.toEntity().copy(syncPending = false))
-                    Log.d(TAG, "Realtime INSERT — nick=${dto.nick}")
-                }.onFailure { Log.w(TAG, "Realtime INSERT error", it) }
-
-                is PostgresAction.Update -> runCatching {
-                    val dto = json.decodeFromJsonElement<UserDto>(action.record)
-                    val existing = userDao.findByNick(dto.nick) ?: return@runCatching
-                    userDao.update(dto.toEntity().copy(
-                        id          = existing.id,
-                        syncId      = existing.syncId,
-                        syncPending = false,
-                    ))
-                    Log.d(TAG, "Realtime UPDATE — nick=${dto.nick}")
-                }.onFailure { Log.w(TAG, "Realtime UPDATE error", it) }
-
-                is PostgresAction.Delete -> runCatching {
-                    val nick = action.oldRecord["nick"]?.jsonPrimitive?.content
-                        ?: return@runCatching
-                    val existing = userDao.findByNick(nick) ?: return@runCatching
-                    userDao.delete(existing.id)
-                    Log.d(TAG, "Realtime DELETE — nick=$nick")
-                }.onFailure { Log.w(TAG, "Realtime DELETE error", it) }
-
-                else -> Unit
-            }
-        }.launchIn(syncScope)
-        syncScope.launch { channel.subscribe() }
-    }
-
-    private suspend fun pullFromSupabase() {
-        val client = supabase.client ?: return
-        runCatching {
-            val remote = client.from(TABLE).select().decodeList<UserDto>()
-            // Upsert by nick (the unique business key) — skip if already local
-            remote.forEach { dto ->
-                if (userDao.findByNick(dto.nick) == null) {
-                    userDao.insert(dto.toEntity())
-                }
-            }
-            Log.d(TAG, "Pulled ${remote.size} users from Supabase")
-        }.onFailure { e ->
-            Log.w(TAG, "Supabase pull failed — running in local-only mode", e)
-        }
-    }
-
-    private suspend fun pushCreate(user: User) {
-        val client = supabase.client ?: return
-        runCatching {
-            client.from(TABLE).insert(user.toDto())
-            Log.d(TAG, "Pushed new user ${user.nick} to Supabase")
-        }.onFailure { e ->
-            Log.w(TAG, "Supabase push (create) failed for ${user.nick}", e)
-        }
-    }
-
-    private suspend fun pushUpdate(user: User) {
-        val client = supabase.client ?: return
-        runCatching {
-            client.from(TABLE).update({
-                set("first_name", user.firstName)
-                set("last_name", user.lastName)
-                set("pin", user.pin)
-                set("job_title", user.jobTitle.name)
-                set("role", user.role.name)
-                set("company", user.company)
-                set("location", user.location)
-                set("is_active", user.isActive)
-            }) {
-                filter { eq("nick", user.nick) }
-            }
-            Log.d(TAG, "Updated user ${user.nick} on Supabase")
-        }.onFailure { e ->
-            Log.w(TAG, "Supabase push (update) failed for ${user.nick}", e)
-        }
-    }
-
-    private suspend fun pushSetActive(id: Long, isActive: Boolean) {
-        val client = supabase.client ?: return
-        runCatching {
-            client.from(TABLE).update({
-                set("is_active", isActive)
-            }) {
-                filter { eq("local_id", id) }
-            }
-        }.onFailure { e ->
-            Log.w(TAG, "Supabase push (setActive) failed for id=$id", e)
-        }
-    }
-
-    private suspend fun pushDelete(id: Long) {
-        val client = supabase.client ?: return
-        runCatching {
-            client.from(TABLE).delete { filter { eq("local_id", id) } }
-            Log.d(TAG, "Deleted user id=$id from Supabase")
-        }.onFailure { e ->
-            Log.w(TAG, "Supabase push (delete) failed for id=$id", e)
-        }
+        // TODO: pushDelete — Google Sheets API
     }
 }
-
-// ── Mapping helpers ───────────────────────────────────────────────────────────
-
-private fun User.toDto() = UserDto(
-    firstName = firstName,
-    lastName = lastName,
-    nick = nick,
-    pin = pin,
-    jobTitle = jobTitle.name,
-    role = role.name,
-    company = company,
-    location = location,
-    isActive = isActive,
-    localId = id.takeIf { it != 0L },
-)
-
-private fun UserDto.toEntity() = UserEntity(
-    id = localId ?: 0L,
-    firstName = firstName,
-    lastName = lastName,
-    nick = nick,
-    pin = pin,
-    jobTitle = runCatching { JobTitle.valueOf(jobTitle) }.getOrDefault(JobTitle.Tecnico),
-    role = runCatching { UserRole.valueOf(role) }.getOrDefault(UserRole.Viewer),
-    company = company,
-    location = location,
-    isActive = isActive,
-)

@@ -1,50 +1,33 @@
 package com.checkingcontainer.core.data
 
-import android.util.Log
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
 import com.checkingcontainer.core.database.dao.AnnouncementDao
 import com.checkingcontainer.core.database.entity.AnnouncementEntity
 import com.checkingcontainer.core.domain.AnnouncementsRepository
 import com.checkingcontainer.core.model.Announcement
-import com.checkingcontainer.core.network.SupabaseClientHolder
-import com.checkingcontainer.core.network.dto.AnnouncementDto
-import io.github.jan.supabase.postgrest.from
-import io.github.jan.supabase.realtime.PostgresAction
-import io.github.jan.supabase.realtime.channel
-import io.github.jan.supabase.realtime.postgresChangeFlow
 import java.util.UUID
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromJsonElement
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val TAG = "AnnouncementsRepo"
-private const val TABLE = "announcements"
-
+/**
+ * Repositorio de anuncios.
+ *
+ * Estado actual: **local-only** — Room es la única fuente de verdad.
+ *
+ * TODO: Inyectar [RemoteDataSource] (Google Sheets) y sincronizar con
+ *   una hoja "Anuncios" de solo lectura para distribución de comunicados.
+ */
 @Singleton
 class AnnouncementsRepositoryImpl @Inject constructor(
     private val dao: AnnouncementDao,
-    private val supabase: SupabaseClientHolder,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : AnnouncementsRepository {
-
-    private val syncScope = CoroutineScope(SupervisorJob() + ioDispatcher)
-
-    init {
-        syncScope.launch { pullFromSupabase() }
-        supabase.client?.let { setupRealtime(it) }
-    }
 
     // ── Reads ─────────────────────────────────────────────────────────────────
 
@@ -65,85 +48,30 @@ class AnnouncementsRepositoryImpl @Inject constructor(
         authorName: String,
     ) = withContext(ioDispatcher) {
         val entity = AnnouncementEntity(
-            id = UUID.randomUUID().toString(),
-            title = title,
-            summary = summary.ifBlank { title },
-            body = body,
-            authorName = authorName,
+            id          = UUID.randomUUID().toString(),
+            title       = title,
+            summary     = summary.ifBlank { title },
+            body        = body,
+            authorName  = authorName,
             publishedAt = System.currentTimeMillis(),
         )
         dao.insert(entity)
-        // UUID id is shared between Room and Supabase — perfect dedup key
-        syncScope.launch { pushCreate(entity) }
+        // TODO: pushCreate(entity) con Google Sheets API
         Unit
     }
 
-    // ── Supabase helpers ─────────────────────────────────────────────────────
-
-    /**
-     * INSERT → inserts with REPLACE (UUID PK deduplicates naturally).
-     * announcements are immutable by design; UPDATE/DELETE are ignored.
-     */
-    private fun setupRealtime(client: io.github.jan.supabase.SupabaseClient) {
-        val json = Json { ignoreUnknownKeys = true }
-        val channel = client.channel("realtime:announcements")
-        channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
-            table = TABLE
-        }.onEach { action ->
-            runCatching {
-                val dto = json.decodeFromJsonElement<AnnouncementDto>(action.record)
-                dao.insert(dto.toEntity())
-                Log.d(TAG, "Realtime INSERT — title='${dto.title}'")
-            }.onFailure { Log.w(TAG, "Realtime INSERT error", it) }
-        }.launchIn(syncScope)
-        syncScope.launch { channel.subscribe() }
-    }
-
-    private suspend fun pullFromSupabase() {
-        val client = supabase.client ?: return
-        runCatching {
-            val remote = client.from(TABLE).select().decodeList<AnnouncementDto>()
-            // AnnouncementEntity already uses UUID string PKs — safe to upsert by id
-            remote.forEach { dto ->
-                dao.insert(dto.toEntity()) // OnConflictStrategy.REPLACE handles duplicates
-            }
-            Log.d(TAG, "Pulled ${remote.size} announcements from Supabase")
-        }.onFailure { e ->
-            Log.w(TAG, "Supabase pull failed (local-only mode)", e)
-        }
-    }
-
-    private suspend fun pushCreate(entity: AnnouncementEntity) {
-        val client = supabase.client ?: return
-        runCatching {
-            client.from(TABLE).insert(entity.toDto())
-            Log.d(TAG, "Pushed announcement '${entity.title}' to Supabase")
-        }.onFailure { e ->
-            Log.w(TAG, "Supabase push (create) failed for '${entity.title}'", e)
-        }
-    }
-
     override suspend fun refreshFromRemote() {
-        pullFromSupabase()
+        // TODO: pull desde Google Sheets API y hacer upsert en Room
     }
 }
 
 // ── Mapping helpers ───────────────────────────────────────────────────────────
 
-private fun AnnouncementEntity.toDto() = AnnouncementDto(
-    id = id,
-    title = title,
-    summary = summary,
-    body = body,
-    authorName = authorName,
-    publishedAtMs = publishedAt,
-)
-
-private fun AnnouncementDto.toEntity() = AnnouncementEntity(
-    id = id,
-    title = title,
-    summary = summary,
-    body = body,
-    authorName = authorName,
-    publishedAt = publishedAtMs,
+private fun AnnouncementEntity.toDomain() = Announcement(
+    id          = id,
+    title       = title,
+    summary     = summary,
+    body        = body,
+    authorName  = authorName,
+    publishedAt = publishedAt,
 )

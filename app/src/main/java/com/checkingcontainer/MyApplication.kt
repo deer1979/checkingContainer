@@ -3,7 +3,7 @@ package com.checkingcontainer
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import com.checkingcontainer.core.data.sync.SupabaseSyncWorker
+import com.checkingcontainer.core.data.sync.RemoteSyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -19,10 +19,9 @@ class MyApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        // Enqueue an immediate sync (runs when network is available) and a
-        // periodic sync every 15 min. Both are no-ops when Supabase is not
-        // configured (empty URL / key).
-        SupabaseSyncWorker.enqueueImmediate(this)
-        SupabaseSyncWorker.schedulePeriodicSync(this)
+        // Encola sincronización inmediata y periódica con el backend remoto.
+        // Actualmente es un no-op hasta que se implemente Google Sheets/Drive API.
+        RemoteSyncWorker.enqueueImmediate(this)
+        RemoteSyncWorker.schedulePeriodicSync(this)
     }
 }

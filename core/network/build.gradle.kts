@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.checkingcontainer.android.library)
     alias(libs.plugins.checkingcontainer.android.hilt)
-    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -9,12 +8,10 @@ android {
 }
 
 dependencies {
-    // Supabase BOM pins all supabase-kt sub-module versions
-    api(platform(libs.supabase.bom))
-    api(libs.supabase.postgrest)
-    api(libs.supabase.realtime)
-    // Ktor HTTP engine (OkHttp-backed) required by the Supabase SDK
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.kotlinx.serialization.json)
+    // TODO: Agregar dependencias de Google Sheets / Drive API aquí:
+    //   implementation("com.google.api-client:google-api-client-android:...")
+    //   implementation("com.google.apis:google-api-services-sheets:...")
+    //   implementation("com.google.apis:google-api-services-drive:...")
+
     implementation(libs.kotlinx.coroutines.android)
 }

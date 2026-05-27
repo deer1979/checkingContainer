@@ -143,14 +143,14 @@ private fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = {
-                        Text(if (state.supabaseConnected) "Supabase: conectado" else "Supabase: sin conexion")
+                        Text(if (state.remoteConnected) "Nube: conectada" else "Nube: sin conexion")
                     },
-                    supportingContent = { Text(state.supabaseHost) },
+                    supportingContent = { Text(state.remoteBackendDescription) },
                     leadingContent = {
                         Icon(
-                            imageVector = if (state.supabaseConnected) Icons.Outlined.Cloud else Icons.Outlined.CloudOff,
+                            imageVector = if (state.remoteConnected) Icons.Outlined.Cloud else Icons.Outlined.CloudOff,
                             contentDescription = null,
-                            tint = if (state.supabaseConnected)
+                            tint = if (state.remoteConnected)
                                 MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.error,

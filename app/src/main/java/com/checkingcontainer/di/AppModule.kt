@@ -1,29 +1,31 @@
 package com.checkingcontainer.di
 
-import com.checkingcontainer.BuildConfig
+import com.checkingcontainer.core.network.NoOpRemoteDataSource
+import com.checkingcontainer.core.network.RemoteDataSource
+import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import javax.inject.Named
+import javax.inject.Singleton
 
 /**
- * Provides app-level singletons that require access to [BuildConfig].
+ * Módulo de DI de nivel de aplicación.
  *
- * Supabase credentials are read from BuildConfig fields that are injected
- * at build time from `local.properties` (local dev) or GitHub Actions secrets
- * (CI).  When both strings are blank the app silently operates in local-only
- * mode — see [SupabaseClientHolder].
+ * ## Estado actual
+ * Enlaza [RemoteDataSource] con [NoOpRemoteDataSource] (sin backend remoto).
+ *
+ * ## Al implementar Google Sheets/Drive API
+ * Reemplazar [NoOpRemoteDataSource] por `GoogleSheetsDataSource`:
+ * ```kotlin
+ * @Binds @Singleton
+ * abstract fun bindRemoteDataSource(impl: GoogleSheetsDataSource): RemoteDataSource
+ * ```
  */
 @Module
 @InstallIn(SingletonComponent::class)
-object AppModule {
+abstract class AppModule {
 
-    @Provides
-    @Named("supabase_url")
-    fun provideSupabaseUrl(): String = BuildConfig.SUPABASE_URL
-
-    @Provides
-    @Named("supabase_anon_key")
-    fun provideSupabaseAnonKey(): String = BuildConfig.SUPABASE_ANON_KEY
+    @Binds
+    @Singleton
+    abstract fun bindRemoteDataSource(impl: NoOpRemoteDataSource): RemoteDataSource
 }

@@ -4,10 +4,10 @@ agp = "9.2.1"
 kotlin = "2.2.20"
 ksp = "2.2.20-2.0.2"
 
-# Supabase / network
-supabase = "3.2.5"
-ktor = "3.3.1"
+# Network / sync
 workManager = "2.10.1"
+# supabase = "3.2.5"   -- REMOVIDO: migrando a Google Sheets/Drive API
+# ktor = "3.3.1"       -- REMOVIDO: dependencia de Supabase SDK
 
 # Android SDK
 compileSdk = "36"
@@ -111,10 +111,15 @@ androidx-camera-view = { group = "androidx.camera", name = "camera-view", versio
 mlkit-text-recognition = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition", version.ref = "mlkitTextRecognition" }
 
 # Supabase  (group = io.github.jan-tennert.supabase, BOM artifact = bom)
-supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
-supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
-supabase-realtime  = { group = "io.github.jan-tennert.supabase", name = "realtime-kt" }
-ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
+# Supabase — REMOVIDO (migrando a Google Sheets/Drive API)
+# supabase-bom      = { group = "io.github.jan-tennert.supabase", name = "bom" }
+# supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
+# supabase-realtime  = { group = "io.github.jan-tennert.supabase", name = "realtime-kt" }
+# supabase-storage   = { group = "io.github.jan-tennert.supabase", name = "storage-kt" }
+# ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp" }
+# Coil — REMOVIDO (sin Storage de Supabase no hay imágenes remotas por ahora)
+# coil-compose        = { group = "io.coil-kt.coil3", name = "coil-compose" }
+# coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.8.1" }
 workmanager-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
 hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref = "hiltNavigationCompose" }
