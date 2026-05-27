@@ -76,12 +76,14 @@ class ReeferUnitRepositoryImpl @Inject constructor(
         runCatching {
             dao.update(unit.toEntity())
             syncScope.launch { pushUpdate(unit) }
+            Unit
         }
     }
 
-    override suspend fun delete(id: Long) = withContext(ioDispatcher) {
+    override suspend fun delete(id: Long): Unit = withContext(ioDispatcher) {
         dao.delete(id)
         syncScope.launch { pushDelete(id) }
+        Unit
     }
 
     // ── Supabase helpers ─────────────────────────────────────────────────────

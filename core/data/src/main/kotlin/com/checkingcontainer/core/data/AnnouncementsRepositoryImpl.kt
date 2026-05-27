@@ -67,6 +67,7 @@ class AnnouncementsRepositoryImpl @Inject constructor(
         dao.insert(entity)
         // UUID id is shared between Room and Supabase — perfect dedup key
         syncScope.launch { pushCreate(entity) }
+        Unit
     }
 
     // ── Supabase helpers ─────────────────────────────────────────────────────

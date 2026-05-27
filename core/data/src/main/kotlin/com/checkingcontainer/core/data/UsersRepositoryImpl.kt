@@ -67,17 +67,20 @@ class UsersRepositoryImpl @Inject constructor(
         runCatching {
             userDao.update(user.toEntity())
             syncScope.launch { pushUpdate(user) }
+            Unit
         }
     }
 
-    override suspend fun setActive(id: Long, isActive: Boolean) = withContext(ioDispatcher) {
+    override suspend fun setActive(id: Long, isActive: Boolean): Unit = withContext(ioDispatcher) {
         userDao.setActive(id, isActive)
         syncScope.launch { pushSetActive(id, isActive) }
+        Unit
     }
 
-    override suspend fun delete(id: Long) = withContext(ioDispatcher) {
+    override suspend fun delete(id: Long): Unit = withContext(ioDispatcher) {
         userDao.delete(id)
         syncScope.launch { pushDelete(id) }
+        Unit
     }
 
     // ── Supabase helpers ─────────────────────────────────────────────────────

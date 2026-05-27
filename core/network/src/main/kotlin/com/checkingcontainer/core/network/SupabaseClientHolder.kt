@@ -17,8 +17,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class SupabaseClientHolder @Inject constructor(
-    @Named("supabase_url") private val supabaseUrl: String,
-    @Named("supabase_anon_key") private val anonKey: String,
+    @param:Named("supabase_url") private val supabaseUrl: String,
+    @param:Named("supabase_anon_key") private val anonKey: String,
 ) {
     val client: SupabaseClient? by lazy {
         if (supabaseUrl.isBlank() || anonKey.isBlank()) {
