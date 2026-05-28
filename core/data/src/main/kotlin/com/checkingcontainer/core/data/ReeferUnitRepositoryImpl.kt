@@ -1,6 +1,7 @@
 package com.checkingcontainer.core.data
 
 import android.content.Context
+import android.util.Log
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
 import com.checkingcontainer.core.data.sync.RemoteSyncWorker
@@ -9,11 +10,15 @@ import com.checkingcontainer.core.database.entity.ReeferUnitEntity
 import com.checkingcontainer.core.database.entity.toEntity
 import com.checkingcontainer.core.domain.ReeferUnitRepository
 import com.checkingcontainer.core.model.ReeferUnit
+import com.checkingcontainer.core.network.RemoteDataSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,8 +38,11 @@ import javax.inject.Singleton
 class ReeferUnitRepositoryImpl @Inject constructor(
     private val dao: ReeferUnitDao,
     @ApplicationContext private val context: Context,
+    private val remoteDataSource: RemoteDataSource,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : ReeferUnitRepository {
+
+    private val syncScope = CoroutineScope(ioDispatcher + SupervisorJob())
 
     // ── Reads ─────────────────────────────────────────────────────────────────
 

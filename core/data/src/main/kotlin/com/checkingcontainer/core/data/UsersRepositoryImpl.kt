@@ -1,6 +1,7 @@
 package com.checkingcontainer.core.data
 
 import android.content.Context
+import android.util.Log
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
 import com.checkingcontainer.core.data.sync.RemoteSyncWorker
@@ -9,11 +10,15 @@ import com.checkingcontainer.core.database.entity.UserEntity
 import com.checkingcontainer.core.database.entity.toEntity
 import com.checkingcontainer.core.domain.UsersRepository
 import com.checkingcontainer.core.model.User
+import com.checkingcontainer.core.network.RemoteDataSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,8 +37,11 @@ import javax.inject.Singleton
 class UsersRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
     @ApplicationContext private val context: Context,
+    private val remoteDataSource: RemoteDataSource,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : UsersRepository {
+
+    private val syncScope = CoroutineScope(ioDispatcher + SupervisorJob())
 
     // ── Reads ─────────────────────────────────────────────────────────────────
 
@@ -70,8 +78,15 @@ class UsersRepositoryImpl @Inject constructor(
         RemoteSyncWorker.enqueueAfterWrite(context)
     }
 
-    /** Elimina el usuario localmente. No se refleja en Sheets (sync es solo INSERT). */
     override suspend fun delete(id: Long): Unit = withContext(ioDispatcher) {
+        val nick = userDao.findById(id)?.nick
         userDao.delete(id)
+        if (nick != null) {
+            syncScope.launch {
+                remoteDataSource.deleteRow("users", nick)
+                    .onFailure { Log.w("UsersRepo", "deleteRow Sheets falló", it) }
+            }
+        }
+        Unit
     }
 }

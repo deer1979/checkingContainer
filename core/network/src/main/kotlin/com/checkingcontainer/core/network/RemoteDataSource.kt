@@ -29,6 +29,8 @@ interface RemoteDataSource {
 
     /** Nombre legible del backend para mostrar en la UI de ajustes. */
     val backendDescription: String
+
+    suspend fun deleteRow(tableName: String, keyValue: String): Result<Unit>
 }
 
 /**
@@ -39,4 +41,5 @@ interface RemoteDataSource {
 class NoOpRemoteDataSource @Inject constructor() : RemoteDataSource {
     override val isConnected: Boolean = false
     override val backendDescription: String = "Sin backend remoto configurado"
+    override suspend fun deleteRow(tableName: String, keyValue: String): Result<Unit> = Result.success(Unit)
 }

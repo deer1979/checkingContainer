@@ -1,18 +1,23 @@
 package com.checkingcontainer.core.data
 
+import android.util.Log
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
 import com.checkingcontainer.core.database.dao.AnnouncementDao
 import com.checkingcontainer.core.database.entity.AnnouncementEntity
 import com.checkingcontainer.core.domain.AnnouncementsRepository
 import com.checkingcontainer.core.model.Announcement
+import com.checkingcontainer.core.network.RemoteDataSource
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -26,8 +31,11 @@ import kotlinx.coroutines.withContext
 @Singleton
 class AnnouncementsRepositoryImpl @Inject constructor(
     private val dao: AnnouncementDao,
+    private val remoteDataSource: RemoteDataSource,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : AnnouncementsRepository {
+
+    private val syncScope = CoroutineScope(ioDispatcher + SupervisorJob())
 
     // ── Reads ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +70,15 @@ class AnnouncementsRepositoryImpl @Inject constructor(
 
     override suspend fun refreshFromRemote() {
         // TODO: pull desde Google Sheets API y hacer upsert en Room
+    }
+
+    override suspend fun delete(id: String): Unit = withContext(ioDispatcher) {
+        dao.deleteById(id)
+        syncScope.launch {
+            remoteDataSource.deleteRow("announcements", id)
+                .onFailure { Log.w("AnnouncementsRepo", "deleteRow Sheets falló", it) }
+        }
+        Unit
     }
 }
 
