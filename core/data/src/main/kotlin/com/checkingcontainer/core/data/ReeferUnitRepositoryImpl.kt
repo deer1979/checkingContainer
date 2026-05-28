@@ -93,8 +93,12 @@ class ReeferUnitRepositoryImpl @Inject constructor(
         }
     }
 
-    /** Elimina la fila localmente. No se refleja en Sheets (sync es solo INSERT). */
     override suspend fun delete(id: Long): Unit = withContext(ioDispatcher) {
         dao.delete(id)
+        syncScope.launch {
+            remoteDataSource.deleteRow("reefer_units", id.toString())
+                .onFailure { Log.w("ReeferUnitRepo", "deleteRow Sheets falló", it) }
+        }
+        Unit
     }
 }

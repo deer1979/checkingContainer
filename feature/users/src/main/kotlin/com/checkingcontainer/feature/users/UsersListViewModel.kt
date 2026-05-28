@@ -28,4 +28,8 @@ class UsersListViewModel @Inject constructor(
     fun onToggleActive(id: Long, isActive: Boolean) {
         viewModelScope.launch { repository.setActive(id, isActive) }
     }
+
+    fun onDelete(id: Long) {
+        viewModelScope.launch { repository.delete(id) }
+    }
 }

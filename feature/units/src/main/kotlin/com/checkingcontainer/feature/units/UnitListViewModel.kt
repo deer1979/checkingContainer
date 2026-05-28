@@ -27,4 +27,8 @@ class UnitListViewModel @Inject constructor(
             }
         }
     }
+
+    fun onDelete(id: Long) {
+        viewModelScope.launch { repository.delete(id) }
+    }
 }
