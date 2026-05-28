@@ -41,4 +41,8 @@ class AnnouncementsViewModel @Inject constructor(
             _detail.update { repository.getById(id) }
         }
     }
+
+    fun onDelete(id: String) {
+        viewModelScope.launch { repository.delete(id) }
+    }
 }

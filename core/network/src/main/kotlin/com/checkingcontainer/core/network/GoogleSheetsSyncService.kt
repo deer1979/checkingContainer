@@ -179,6 +179,60 @@ class GoogleSheetsSyncService @Inject constructor(
         }
     }
 
+    // ── Delete ───────────────────────────────────────────────────────────────
+
+    override suspend fun deleteRow(tableName: String, keyValue: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val mapping = requireNotNull(mappingConfig.getTableMapping(tableName)) {
+                "Tabla '$tableName' no encontrada en sheets_structure.json"
+            }
+            val rows = pullSheetData(tableName).getOrThrow()
+            val rowIndex = rows.indexOfFirst { it[mapping.upsertKey] == keyValue }
+            if (rowIndex == -1) {
+                Log.w(TAG, "deleteRow: clave '$keyValue' no encontrada en ${mapping.sheetTabName} — se ignora")
+                return@runCatching
+            }
+            val sheetRowIndex = rowIndex + 1  // +1 por la fila de encabezados (0-indexed)
+            val numericId = getNumericSheetId(mapping.sheetTabName)
+            val token = authManager.getAccessToken()
+            val body = """{"requests":[{"deleteDimension":{"range":{"sheetId":$numericId,"dimension":"ROWS","startIndex":$sheetRowIndex,"endIndex":${sheetRowIndex + 1}}}}]}"""
+            val request = Request.Builder()
+                .url("$baseUrl/$spreadsheetId:batchUpdate")
+                .addHeader("Authorization", "Bearer $token")
+                .post(body.toRequestBody(jsonMedia))
+                .build()
+            httpClient.newCall(request).execute().use { resp ->
+                check(resp.isSuccessful) {
+                    "deleteRow FAILED [${resp.code}] ${mapping.sheetTabName}: ${resp.body?.string()}"
+                }
+            }
+            Log.d(TAG, "deleteRow OK → ${mapping.sheetTabName} (key=$keyValue)")
+        }
+    }
+
+    private val sheetIdCache = mutableMapOf<String, Int>()
+
+    private suspend fun getNumericSheetId(tabName: String): Int {
+        sheetIdCache[tabName]?.let { return it }
+        val token = authManager.getAccessToken()
+        val request = Request.Builder()
+            .url("$baseUrl/$spreadsheetId?fields=sheets.properties")
+            .addHeader("Authorization", "Bearer $token")
+            .get()
+            .build()
+        val body = httpClient.newCall(request).execute().use { resp ->
+            check(resp.isSuccessful) { "getSheetProperties FAILED [${resp.code}]: ${resp.body?.string()}" }
+            resp.body!!.string()
+        }
+        json.parseToJsonElement(body).jsonObject["sheets"]?.jsonArray?.forEach { el ->
+            val props = el.jsonObject["properties"]?.jsonObject ?: return@forEach
+            val title = props["title"]?.jsonPrimitive?.content ?: return@forEach
+            val id = props["sheetId"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@forEach
+            sheetIdCache[title] = id
+        }
+        return sheetIdCache[tabName] ?: error("Tab '$tabName' no encontrado en la hoja")
+    }
+
     private companion object {
         const val TAG = "GoogleSheetsSyncSvc"
     }

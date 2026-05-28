@@ -55,9 +55,12 @@ abstract class AppModule {
         @Provides
         @Singleton
         @Named("google_credentials_json")
-        fun provideCredentialsJson(@ApplicationContext ctx: Context): String =
-            ctx.resources.openRawResource(R.raw.credentials)
+        fun provideCredentialsJson(@ApplicationContext ctx: Context): String {
+            val resId = ctx.resources.getIdentifier("credentials", "raw", ctx.packageName)
+            if (resId == 0) return "{}"
+            return ctx.resources.openRawResource(resId)
                 .bufferedReader(Charsets.UTF_8).use { it.readText() }
+        }
 
         /**
          * Contenido de `app/src/main/res/raw/sheets_structure.json`.
