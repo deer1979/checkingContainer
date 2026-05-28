@@ -2,6 +2,7 @@ package com.checkingcontainer.di
 
 import android.content.Context
 import com.checkingcontainer.BuildConfig
+import com.checkingcontainer.R
 import com.checkingcontainer.core.network.GoogleAuthManager
 import com.checkingcontainer.core.network.GoogleSheetsSyncService
 import com.checkingcontainer.core.network.RemoteDataSource
