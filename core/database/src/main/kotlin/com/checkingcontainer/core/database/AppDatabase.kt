@@ -22,7 +22,7 @@ import com.checkingcontainer.core.database.entity.UserEntity
         CatalogEntryEntity::class,
         AnnouncementEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 @TypeConverters(EnumConverters::class)

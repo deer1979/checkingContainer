@@ -11,6 +11,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -34,10 +36,9 @@ class UnitDetailViewModel @Inject constructor(
     val state: StateFlow<UnitDetailUiState> = _state.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            val latest = repository.getLatestByContainerNo(containerNo)
-            _state.update { it.copy(latest = latest, isLoading = false) }
-        }
+        repository.observeLatestByContainerNo(containerNo)
+            .onEach { latest -> _state.update { it.copy(latest = latest, isLoading = false) } }
+            .launchIn(viewModelScope)
     }
 
     fun loadAll() {

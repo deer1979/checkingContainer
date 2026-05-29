@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "340428671931",
+    "project_id": "checking-container",
+    "storage_bucket": "checking-container.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:340428671931:android:806e7139e1ee5b19c1529e",
+        "android_client_info": {
+          "package_name": "com.checkingcontainer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8RY5WmPYCIlnRVvGwDVTe33CMt-vk6D4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

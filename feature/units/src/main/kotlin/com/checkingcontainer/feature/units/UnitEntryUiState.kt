@@ -8,8 +8,11 @@ import com.checkingcontainer.core.model.ReeferUnit
 
 enum class ScannerMode { CONTAINER, DATA_PLATE }
 
+data class DuplicateWarning(val time: String, val technicianName: String)
+
 @Immutable
 data class UnitEntryUiState(
+    val unitId: Long? = null,
     val containerNo: String = "",
     val unitModelNo: String = "",
     val unitModel: String = "",
@@ -29,6 +32,11 @@ data class UnitEntryUiState(
     val scannerMode: ScannerMode = ScannerMode.CONTAINER,
     val isLookingUpCatalog: Boolean = false,
     val showValidation: Boolean = false,
+    val showDeleteConfirm: Boolean = false,
+    val isDeleting: Boolean = false,
+    val deletedSuccessfully: Boolean = false,
+    val catalogError: String? = null,
+    val duplicateWarning: DuplicateWarning? = null,
 ) {
     val isContainerValid: Boolean get() = Iso6346.isValid(containerNo)
 
@@ -61,6 +69,10 @@ sealed interface UnitEntryEvent {
     data class OpenScanner(val mode: ScannerMode) : UnitEntryEvent
     data object CloseScanner : UnitEntryEvent
     data class OcrResult(val fields: Map<String, String>) : UnitEntryEvent
+    data object ShowDeleteConfirm : UnitEntryEvent
+    data object DismissDeleteConfirm : UnitEntryEvent
+    data object TriggerManualLookup : UnitEntryEvent
+    data object DismissDuplicateWarning : UnitEntryEvent
 }
 
 fun UnitEntryUiState.toDomain(technicianId: Long, technicianName: String): ReeferUnit = ReeferUnit(

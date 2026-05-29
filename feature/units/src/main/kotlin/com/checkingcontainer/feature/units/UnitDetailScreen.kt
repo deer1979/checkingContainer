@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,10 +29,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun UnitDetailRoute(
     onBack: () -> Unit,
+    onEdit: (Long) -> Unit = {},
     viewModel: UnitDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    UnitDetailScreen(state = state, onBack = onBack, onLoadAll = viewModel::loadAll)
+    UnitDetailScreen(state = state, onBack = onBack, onLoadAll = viewModel::loadAll, onEdit = onEdit)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,6 +42,7 @@ private fun UnitDetailScreen(
     state: UnitDetailUiState,
     onBack: () -> Unit,
     onLoadAll: () -> Unit,
+    onEdit: (Long) -> Unit = {},
 ) {
     val unit = state.latest
 
@@ -50,6 +53,13 @@ private fun UnitDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    if (unit != null) {
+                        IconButton(onClick = { onEdit(unit.id) }) {
+                            Icon(Icons.Outlined.Edit, contentDescription = "Editar unidad")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

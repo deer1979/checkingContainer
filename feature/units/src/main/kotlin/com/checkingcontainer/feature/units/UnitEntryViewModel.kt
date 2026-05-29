@@ -1,5 +1,6 @@
 package com.checkingcontainer.feature.units
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.AuthRepository
@@ -7,6 +8,10 @@ import com.checkingcontainer.core.domain.AuthState
 import com.checkingcontainer.core.domain.ReeferUnitRepository
 import com.checkingcontainer.core.domain.usecase.CatalogLookupUseCase
 import com.checkingcontainer.core.model.Brand
+import com.checkingcontainer.feature.units.navigation.UNIT_ENTRY_ID_ARG
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,21 +24,59 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class UnitEntryViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val repository: ReeferUnitRepository,
     private val authRepository: AuthRepository,
     private val catalogLookupUseCase: CatalogLookupUseCase,
 ) : ViewModel() {
 
+    private val editId: Long? = savedStateHandle.get<Long>(UNIT_ENTRY_ID_ARG)?.takeIf { it != -1L }
+
     private val _state = MutableStateFlow(UnitEntryUiState())
     val state: StateFlow<UnitEntryUiState> = _state.asStateFlow()
 
+    // Evita re-disparar el lookup automático para el mismo modelo
+    private var lastAutoTriggeredModel = ""
+
+    init {
+        editId?.let { loadUnit(it) }
+    }
+
+    private fun loadUnit(id: Long) {
+        viewModelScope.launch {
+            val unit = repository.getById(id) ?: return@launch
+            _state.update {
+                it.copy(
+                    unitId = id,
+                    containerNo = unit.containerNo,
+                    unitModelNo = unit.unitModelNo,
+                    unitModel = unit.unitModel,
+                    unitType = unit.unitType,
+                    manufacturer = unit.manufacturer,
+                    unitSerialNo = unit.unitSerialNo,
+                    yearOfBuilt = unit.yearOfBuilt,
+                    status = unit.status,
+                    ptiInstruction = unit.ptiInstruction,
+                    brand = unit.brand,
+                    deployedAs = unit.deployedAs,
+                    observations = unit.observations,
+                )
+            }
+        }
+    }
+
     fun onEvent(event: UnitEntryEvent) {
+        if (event == UnitEntryEvent.TriggerManualLookup) {
+            val modelNo = _state.value.unitModelNo
+            if (modelNo.isNotBlank()) triggerCatalogLookup(modelNo)
+            return
+        }
         _state.update { s ->
             when (event) {
                 is UnitEntryEvent.ContainerNoChange ->
-                    s.copy(containerNo = event.value.uppercase(), errorMessage = null)
+                    s.copy(containerNo = event.value.uppercase(), errorMessage = null, duplicateWarning = null)
                 is UnitEntryEvent.UnitModelNoChange ->
-                    s.copy(unitModelNo = event.value, errorMessage = null)
+                    s.copy(unitModelNo = event.value, errorMessage = null, catalogError = null)
                 is UnitEntryEvent.UnitSerialNoChange ->
                     s.copy(unitSerialNo = event.value.uppercase(), errorMessage = null)
                 is UnitEntryEvent.YearOfBuiltChange ->
@@ -52,7 +95,43 @@ class UnitEntryViewModel @Inject constructor(
                     s.copy(showScanner = false)
                 is UnitEntryEvent.OcrResult ->
                     applyOcrResult(s, event.fields)
+                UnitEntryEvent.ShowDeleteConfirm ->
+                    s.copy(showDeleteConfirm = true)
+                UnitEntryEvent.DismissDeleteConfirm ->
+                    s.copy(showDeleteConfirm = false)
+                UnitEntryEvent.TriggerManualLookup -> s  // handled before this block
+                UnitEntryEvent.DismissDuplicateWarning ->
+                    s.copy(duplicateWarning = null)
             }
+        }
+        if (event is UnitEntryEvent.ContainerNoChange && editId == null) {
+            val containerNo = event.value.uppercase()
+            if (Iso6346.isValid(containerNo)) checkDuplicate(containerNo)
+        }
+        if (event is UnitEntryEvent.UnitModelNoChange) {
+            val model = event.value
+            if (isCompleteCarrierModel(model) && model != lastAutoTriggeredModel) {
+                lastAutoTriggeredModel = model
+                triggerCatalogLookup(model)
+            }
+        }
+    }
+
+    private fun isCompleteCarrierModel(model: String): Boolean {
+        val parts = model.split("-")
+        if (parts.size != 3) return false
+        val prefix = parts[0].uppercase()
+        return (prefix == "69NT40" || prefix == "69NT20") &&
+            parts[1].length == 3 && parts[1].all(Char::isDigit) &&
+            parts[2].length == 3 && parts[2].all(Char::isDigit)
+    }
+
+    fun deleteUnit() {
+        val id = _state.value.unitId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(isDeleting = true, showDeleteConfirm = false) }
+            repository.delete(id)
+            _state.update { it.copy(isDeleting = false, deletedSuccessfully = true) }
         }
     }
 
@@ -68,7 +147,13 @@ class UnitEntryViewModel @Inject constructor(
                 .filterIsInstance<AuthState.Authenticated>()
                 .first()
                 .user
-            repository.create(current.toDomain(authUser.id, authUser.fullName))
+            val domain = current.toDomain(authUser.id, authUser.fullName)
+            val result = if (current.unitId != null) {
+                repository.update(domain.copy(id = current.unitId))
+            } else {
+                repository.create(domain).map {}
+            }
+            result
                 .onSuccess {
                     _state.update { it.copy(isSaving = false, savedSuccessfully = true) }
                 }
@@ -101,23 +186,38 @@ class UnitEntryViewModel @Inject constructor(
         return updated
     }
 
+    private fun checkDuplicate(containerNo: String) {
+        viewModelScope.launch {
+            val existing = repository.findTodayByContainerNo(containerNo) ?: return@launch
+            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(existing.createdAt))
+            _state.update { it.copy(duplicateWarning = DuplicateWarning(timeStr, existing.technicianName)) }
+        }
+    }
+
     private fun triggerCatalogLookup(unitModelNo: String) {
         viewModelScope.launch {
-            _state.update { it.copy(isLookingUpCatalog = true) }
-            val result = runCatching { catalogLookupUseCase(unitModelNo) }.getOrNull()
+            _state.update { it.copy(isLookingUpCatalog = true, catalogError = null) }
+            val lookup = runCatching { catalogLookupUseCase(unitModelNo) }
             _state.update { current ->
-                if (result != null) {
-                    current.copy(
-                        isLookingUpCatalog = false,
-                        brand = result.brand,
-                        manufacturer = result.manufacturer,
-                        unitModel = result.unitModel,
-                        unitType = result.unitType,
-                        deployedAs = if (result.brand == Brand.STAR_COOL) result.deployedAs else null,
-                    )
-                } else {
-                    current.copy(isLookingUpCatalog = false)
-                }
+                lookup.fold(
+                    onSuccess = { result ->
+                        current.copy(
+                            isLookingUpCatalog = false,
+                            brand = result.brand,
+                            manufacturer = result.manufacturer,
+                            unitModel = result.unitModel,
+                            unitType = result.unitType,
+                            deployedAs = if (result.brand == Brand.STAR_COOL) result.deployedAs else null,
+                            catalogError = null,
+                        )
+                    },
+                    onFailure = { ex ->
+                        current.copy(
+                            isLookingUpCatalog = false,
+                            catalogError = ex.message,
+                        )
+                    },
+                )
             }
         }
     }

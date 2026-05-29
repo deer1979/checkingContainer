@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -24,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -31,6 +35,8 @@ internal fun EquipmentDataCard(
     state: UnitEntryUiState,
     onEvent: (UnitEntryEvent) -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
+
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -70,14 +76,41 @@ internal fun EquipmentDataCard(
                 onValueChange = { onEvent(UnitEntryEvent.UnitModelNoChange(it)) },
                 label = { Text("Unit model No.") },
                 singleLine = true,
-                isError = state.showUnitModelNoError,
-                supportingText = if (state.showUnitModelNoError) {
-                    { Text("Campo obligatorio") }
-                } else null,
+                isError = state.showUnitModelNoError || state.catalogError != null,
+                supportingText = when {
+                    state.showUnitModelNoError -> { { Text("Campo obligatorio") } }
+                    state.catalogError != null -> {
+                        { Text(state.catalogError.orEmpty()) }
+                    }
+                    else -> null
+                },
+                trailingIcon = {
+                    if (!state.isLookingUpCatalog && state.unitModelNo.isNotBlank()) {
+                        IconButton(onClick = {
+                            focusManager.clearFocus()
+                            onEvent(UnitEntryEvent.TriggerManualLookup)
+                        }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Search,
+                                contentDescription = "Buscar en catálogo",
+                                tint = if (state.catalogError != null)
+                                    MaterialTheme.colorScheme.error
+                                else
+                                    MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Characters,
-                    imeAction = ImeAction.Next,
+                    imeAction = ImeAction.Search,
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        focusManager.clearFocus()
+                        onEvent(UnitEntryEvent.TriggerManualLookup)
+                    },
                 ),
             )
             if (state.unitModel.isNotBlank()) {

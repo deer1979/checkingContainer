@@ -6,7 +6,6 @@ import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.PtiInstruction
 import com.checkingcontainer.core.model.ReeferUnit
-import java.util.UUID
 
 @Entity(tableName = "reefer_units")
 data class ReeferUnitEntity(
@@ -26,8 +25,6 @@ data class ReeferUnitEntity(
     val technicianId: Long = 0,
     val technicianName: String = "",
     val observations: String = "",
-    val syncId: String = UUID.randomUUID().toString(),
-    val syncPending: Boolean = true,
 ) {
     fun toDomain(): ReeferUnit = ReeferUnit(
         id = id,

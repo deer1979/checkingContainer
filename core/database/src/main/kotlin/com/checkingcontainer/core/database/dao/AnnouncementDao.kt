@@ -34,7 +34,4 @@ interface AnnouncementDao {
         insertAll(announcements)
     }
 
-    /** One-shot snapshot of all announcements — used by WorkManager sync. */
-    @Query("SELECT * FROM announcements")
-    suspend fun getAllOnce(): List<AnnouncementEntity>
 }

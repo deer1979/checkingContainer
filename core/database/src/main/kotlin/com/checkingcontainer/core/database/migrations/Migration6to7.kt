@@ -72,6 +72,13 @@ private fun migrateCatalogEntries(db: SupportSQLiteDatabase) {
     )
 }
 
+fun seedManufacturers(db: SupportSQLiteDatabase) {
+    db.execSQL("INSERT OR IGNORE INTO manufacturers (name, modelPrefixes) VALUES ('Carrier Transicold', '69NT40,69NT20,X2')")
+    db.execSQL("INSERT OR IGNORE INTO manufacturers (name, modelPrefixes) VALUES ('Star Cool', 'SCI-')")
+    db.execSQL("INSERT OR IGNORE INTO manufacturers (name, modelPrefixes) VALUES ('Thermo King', 'SL-,T-,SLX,Mag')")
+    db.execSQL("INSERT OR IGNORE INTO manufacturers (name, modelPrefixes) VALUES ('Daikin', 'NaturaLINE,Maverick')")
+}
+
 fun seedFullCatalog(db: SupportSQLiteDatabase) {
     // Carrier ThinLINE — series 489, 511, 521, 541
     val carrierEntries = listOf(
@@ -133,7 +140,7 @@ fun seedFullCatalog(db: SupportSQLiteDatabase) {
         val (serie, start, end) = serieRange
         val (unitModel, unitType) = familyCode
         db.execSQL(
-            "INSERT INTO catalog_entries (manufacturerId, serie, rangeStart, rangeEnd, unitModel, unitType) VALUES ((SELECT id FROM manufacturers WHERE name = 'Carrier' LIMIT 1), ?, ?, ?, ?, ?)",
+            "INSERT INTO catalog_entries (manufacturerId, serie, rangeStart, rangeEnd, unitModel, unitType) VALUES ((SELECT id FROM manufacturers WHERE name = 'Carrier Transicold' LIMIT 1), ?, ?, ?, ?, ?)",
             arrayOf(serie, start, end, unitModel, unitType),
         )
     }

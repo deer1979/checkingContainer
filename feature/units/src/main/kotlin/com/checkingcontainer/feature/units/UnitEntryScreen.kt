@@ -10,7 +10,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -18,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -33,6 +39,7 @@ import com.checkingcontainer.core.designsystem.theme.AppTheme
 @Composable
 fun UnitEntryRoute(
     onBack: () -> Unit,
+    onDeleted: () -> Unit = onBack,
     viewModel: UnitEntryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -40,12 +47,16 @@ fun UnitEntryRoute(
     LaunchedEffect(state.savedSuccessfully) {
         if (state.savedSuccessfully) onBack()
     }
+    LaunchedEffect(state.deletedSuccessfully) {
+        if (state.deletedSuccessfully) onDeleted()
+    }
 
     UnitEntryScreen(
         state = state,
         onBack = onBack,
         onEvent = viewModel::onEvent,
         onSave = viewModel::saveUnit,
+        onConfirmDelete = viewModel::deleteUnit,
     )
 }
 
@@ -56,7 +67,72 @@ fun UnitEntryScreen(
     onBack: () -> Unit,
     onEvent: (UnitEntryEvent) -> Unit,
     onSave: () -> Unit,
+    onConfirmDelete: () -> Unit = {},
 ) {
+    state.duplicateWarning?.let { warning ->
+        AlertDialog(
+            onDismissRequest = { onEvent(UnitEntryEvent.DismissDuplicateWarning) },
+            icon = {
+                Icon(
+                    imageVector = Icons.Outlined.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                )
+            },
+            title = { Text("Unidad ya ingresada hoy") },
+            text = {
+                Text(
+                    "Esta unidad fue registrada hoy a las ${warning.time} por ${warning.technicianName}. " +
+                        "Si no estás seguro, consultá con ${warning.technicianName} antes de continuar.",
+                )
+            },
+            confirmButton = {
+                Button(onClick = { onEvent(UnitEntryEvent.DismissDuplicateWarning) }) {
+                    Text("Continuar de todos modos")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onEvent(UnitEntryEvent.DismissDuplicateWarning) }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+
+    if (state.showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { onEvent(UnitEntryEvent.DismissDeleteConfirm) },
+            icon = {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            },
+            title = { Text("Eliminar unidad") },
+            text = {
+                Text("¿Confirmás la eliminación de ${state.containerNo}? Esta acción solo afecta la base de datos local y no puede deshacerse.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = onConfirmDelete,
+                    enabled = !state.isDeleting,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
+                ) {
+                    Text(if (state.isDeleting) "Eliminando…" else "Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onEvent(UnitEntryEvent.DismissDeleteConfirm) }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+
     if (state.showScanner) {
         OcrScannerBottomSheet(
             mode = state.scannerMode,
@@ -68,10 +144,21 @@ fun UnitEntryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ingreso de Unidad") },
+                title = { Text(if (state.unitId != null) "Editar Unidad" else "Ingreso de Unidad") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Atrás")
+                    }
+                },
+                actions = {
+                    if (state.unitId != null) {
+                        IconButton(onClick = { onEvent(UnitEntryEvent.ShowDeleteConfirm) }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = "Eliminar unidad",
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

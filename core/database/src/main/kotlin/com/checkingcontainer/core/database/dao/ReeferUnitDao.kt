@@ -23,12 +23,14 @@ interface ReeferUnitDao {
     @Query("SELECT * FROM reefer_units WHERE containerNo = :containerNo ORDER BY createdAt DESC LIMIT 1")
     suspend fun getLatestByContainerNo(containerNo: String): ReeferUnitEntity?
 
+    @Query("SELECT * FROM reefer_units WHERE containerNo = :containerNo ORDER BY createdAt DESC LIMIT 1")
+    fun observeLatestByContainerNo(containerNo: String): Flow<ReeferUnitEntity?>
+
+    @Query("SELECT * FROM reefer_units WHERE containerNo = :containerNo AND createdAt >= :startOfDay ORDER BY createdAt DESC LIMIT 1")
+    suspend fun findTodayByContainerNo(containerNo: String, startOfDay: Long): ReeferUnitEntity?
+
     @Query("SELECT * FROM reefer_units WHERE containerNo = :containerNo ORDER BY createdAt DESC")
     suspend fun getAllByContainerNo(containerNo: String): List<ReeferUnitEntity>
-
-    /** One-shot snapshot of all units — used by WorkManager sync. */
-    @Query("SELECT * FROM reefer_units")
-    suspend fun getAllOnce(): List<ReeferUnitEntity>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(unit: ReeferUnitEntity): Long
@@ -38,14 +40,4 @@ interface ReeferUnitDao {
 
     @Query("DELETE FROM reefer_units WHERE id = :id")
     suspend fun delete(id: Long)
-
-    @Query("SELECT * FROM reefer_units WHERE syncPending = 1")
-    suspend fun getPending(): List<ReeferUnitEntity>
-
-    @Query("UPDATE reefer_units SET syncPending = 0 WHERE id = :id")
-    suspend fun markSynced(id: Long)
-
-    /** Marca TODAS las filas como pendientes de sync. Devuelve el número de filas afectadas. */
-    @Query("UPDATE reefer_units SET syncPending = 1")
-    suspend fun markAllPending(): Int
 }

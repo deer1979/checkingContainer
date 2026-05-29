@@ -1,22 +1,9 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.checkingcontainer.android.application)
     alias(libs.plugins.checkingcontainer.android.hilt)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.google.services)
 }
-
-// ── Credenciales / IDs de Google Sheets ────────────────────────────────────
-// Agrega en local.properties (gitignoreado):
-//   SHEETS_SPREADSHEET_ID=tu_id_de_hoja_aqui
-// En CI: agrega SHEETS_SPREADSHEET_ID como secret de GitHub Actions.
-val localProps = Properties().also { props ->
-    rootProject.file("local.properties").takeIf { it.exists() }
-        ?.inputStream()?.use { props.load(it) }
-}
-fun localOrEnv(key: String): String =
-    localProps.getProperty(key) ?: System.getenv(key) ?: ""
 
 composeCompiler {
     stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("compose-stability.conf"))
@@ -31,9 +18,6 @@ android {
         versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
-        // Google Sheets — ID de la hoja de cálculo (sin exponer credenciales privadas)
-        buildConfigField("String", "SHEETS_SPREADSHEET_ID",
-            "\"${localOrEnv("SHEETS_SPREADSHEET_ID")}\"")
     }
 
     signingConfigs {
@@ -60,7 +44,6 @@ android {
             )
         }
         debug {
-            applicationIdSuffix = ".debug"
             isDebuggable = true
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -75,11 +58,7 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/INDEX.LIST"
-            excludes += "META-INF/io.netty.versions.properties"
-            // OkHttp / Kotlin duplicates
             excludes += "META-INF/DEPENDENCIES"
-            excludes += "META-INF/LICENSE.md"
-            excludes += "META-INF/NOTICE.md"
         }
     }
 }
@@ -102,13 +81,6 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:common"))
     implementation(project(":core:network"))
-    // kotlinx.serialization.json — usado en AppModule para parsear credentials.json
-    implementation(libs.kotlinx.serialization.json)
-
-    // WorkManager + Hilt integration (HiltWorkerFactory used in MyApplication)
-    implementation(libs.hilt.work)
-    implementation(libs.workmanager.ktx)
-    ksp(libs.hilt.androidx.compiler)
 
     // AndroidX
     implementation(libs.androidx.core.ktx)

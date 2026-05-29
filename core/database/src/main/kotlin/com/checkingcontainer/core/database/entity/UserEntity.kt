@@ -6,8 +6,6 @@ import androidx.room.PrimaryKey
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.core.model.UserRole
-import java.util.UUID
-
 @Entity(
     tableName = "users",
     indices = [Index(value = ["nick"], unique = true)],
@@ -23,8 +21,6 @@ data class UserEntity(
     val company: String,
     val location: String,
     val isActive: Boolean = true,
-    val syncId: String = UUID.randomUUID().toString(),
-    val syncPending: Boolean = true,
 ) {
     fun toDomain(): User = User(
         id = id,
