@@ -1,11 +1,13 @@
 package com.checkingcontainer.feature.units
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
@@ -18,10 +20,18 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.checkingcontainer.core.designsystem.theme.chipColors
 import com.checkingcontainer.core.model.InspStatus
 
@@ -32,21 +42,40 @@ internal fun IdentificationCard(
 ) {
     val isDark = isSystemInDarkTheme()
     val validColor = InspStatus.OP.chipColors(isDark).container
+    val focusManager = LocalFocusManager.current
+
+    var containerFocused by remember { mutableStateOf(false) }
+    val containerFontSize by animateFloatAsState(
+        targetValue = if (containerFocused) 20f else 16f,
+        label = "containerFontSize",
+    )
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SectionTitle("Identificación")
+            SectionTitle(
+                text = "Identificación",
+                isComplete = if (state.containerNo.isNotEmpty()) state.isContainerValid else null,
+            )
             OutlinedTextField(
                 value = state.containerNo,
                 onValueChange = { v ->
-                    if (v.length <= 11) onEvent(UnitEntryEvent.ContainerNoChange(v))
+                    val upper = v.uppercase()
+                    if (upper.length <= 11) {
+                        onEvent(UnitEntryEvent.ContainerNoChange(upper))
+                        if (upper.length == 11 && Iso6346.isValid(upper)) {
+                            focusManager.moveFocus(FocusDirection.Down)
+                        }
+                    }
                 },
                 label = { Text("Container No.") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = containerFontSize.sp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { containerFocused = it.isFocused },
                 isError = state.showContainerError,
                 supportingText = {
                     Row(
@@ -83,6 +112,9 @@ internal fun IdentificationCard(
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Characters,
                     imeAction = ImeAction.Next,
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) },
                 ),
                 trailingIcon = {
                     if (state.containerNo.isNotEmpty()) {

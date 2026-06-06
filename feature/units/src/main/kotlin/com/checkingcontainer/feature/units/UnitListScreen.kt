@@ -11,10 +11,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -31,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.checkingcontainer.core.model.ReeferUnit
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -41,6 +42,7 @@ import java.util.Locale
 fun UnitListRoute(
     onNewInspection: () -> Unit,
     onUnitClick: (String) -> Unit,
+    onSearch: () -> Unit = {},
     viewModel: UnitListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -50,6 +52,11 @@ fun UnitListRoute(
         topBar = {
             TopAppBar(
                 title = { Text("Inspecciones — Últimas 24 h") },
+                actions = {
+                    IconButton(onClick = onSearch) {
+                        Icon(Icons.Outlined.Search, contentDescription = "Buscar equipo")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
@@ -73,11 +80,11 @@ fun UnitListRoute(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(state.units, key = { it.id }) { unit ->
+                    items(state.units, key = { it.inspection.id }) { item ->
                         InspectionListItem(
-                            unit = unit,
-                            onClick = { onUnitClick(unit.containerNo) },
-                            onDelete = { pendingDeleteId = unit.id },
+                            item = item,
+                            onClick = { onUnitClick(item.inspection.containerNo) },
+                            onDelete = { pendingDeleteId = item.inspection.id },
                         )
                     }
                 }

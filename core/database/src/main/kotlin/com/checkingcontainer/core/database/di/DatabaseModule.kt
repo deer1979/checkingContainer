@@ -8,6 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.checkingcontainer.core.database.AppDatabase
 import com.checkingcontainer.core.database.dao.AnnouncementDao
 import com.checkingcontainer.core.database.dao.CatalogDao
+import com.checkingcontainer.core.database.dao.InspectionDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.database.migrations.MIGRATION_4_5
@@ -15,6 +16,8 @@ import com.checkingcontainer.core.database.migrations.MIGRATION_5_6
 import com.checkingcontainer.core.database.migrations.MIGRATION_6_7
 import com.checkingcontainer.core.database.migrations.MIGRATION_7_8
 import com.checkingcontainer.core.database.migrations.MIGRATION_8_9
+import com.checkingcontainer.core.database.migrations.MIGRATION_9_10
+import com.checkingcontainer.core.database.migrations.MIGRATION_10_11
 import com.checkingcontainer.core.database.migrations.seedAnnouncements
 import com.checkingcontainer.core.database.migrations.seedFullCatalog
 import com.checkingcontainer.core.database.migrations.seedManufacturers
@@ -41,7 +44,7 @@ object DatabaseModule {
         AppDatabase::class.java,
         "checkingcontainer.db",
     )
-        .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+        .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
         .addCallback(seedOnCreateCallback)
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
@@ -51,6 +54,9 @@ object DatabaseModule {
 
     @Provides
     fun providesReeferUnitDao(db: AppDatabase): ReeferUnitDao = db.reeferUnitDao()
+
+    @Provides
+    fun providesInspectionDao(db: AppDatabase): InspectionDao = db.inspectionDao()
 
     @Provides
     fun providesCatalogDao(db: AppDatabase): CatalogDao = db.catalogDao()

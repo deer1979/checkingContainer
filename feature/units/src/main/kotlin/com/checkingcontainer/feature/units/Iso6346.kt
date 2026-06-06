@@ -27,6 +27,15 @@ object Iso6346 {
         return (sum % 11) % 10
     }
 
+    internal fun isCompleteCarrierModel(model: String): Boolean {
+        val parts = model.split("-")
+        if (parts.size != 3) return false
+        val prefix = parts[0].uppercase()
+        return (prefix == "69NT40" || prefix == "69NT20") &&
+            parts[1].length == 3 && parts[1].all(Char::isDigit) &&
+            parts[2].length == 3 && parts[2].all(Char::isDigit)
+    }
+
     fun isValid(input: String): Boolean {
         val s = input.trim().uppercase()
         if (s.length != 11) return false

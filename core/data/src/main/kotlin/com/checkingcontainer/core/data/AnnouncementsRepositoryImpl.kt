@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 @Singleton
 class AnnouncementsRepositoryImpl @Inject constructor(
     private val dao: AnnouncementDao,
+    private val firestoreService: FirestoreService,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : AnnouncementsRepository {
 
@@ -46,15 +47,16 @@ class AnnouncementsRepositoryImpl @Inject constructor(
             publishedAt = System.currentTimeMillis(),
         )
         dao.insert(entity)
-        // TODO: pushCreate(entity) con Google Sheets API
-        Unit
+        firestoreService.upsertAnnouncement(entity)
     }
 
-    override suspend fun refreshFromRemote() {
-        // TODO: pull desde Google Sheets API y hacer upsert en Room
+    override suspend fun refreshFromRemote() = withContext(ioDispatcher) {
+        val remote = firestoreService.fetchAllAnnouncements()
+        if (remote.isNotEmpty()) dao.replaceAll(remote)
     }
 
     override suspend fun delete(id: String): Unit = withContext(ioDispatcher) {
         dao.deleteById(id)
+        firestoreService.deleteAnnouncement(id)
     }
 }

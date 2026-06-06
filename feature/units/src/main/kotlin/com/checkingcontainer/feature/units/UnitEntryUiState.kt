@@ -2,9 +2,10 @@ package com.checkingcontainer.feature.units
 
 import androidx.compose.runtime.Immutable
 import com.checkingcontainer.core.model.Brand
+import com.checkingcontainer.core.model.Inspection
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.PtiInstruction
-import com.checkingcontainer.core.model.ReeferUnit
+import com.checkingcontainer.core.model.ReeferEquipment
 
 enum class ScannerMode { CONTAINER, DATA_PLATE }
 
@@ -12,7 +13,7 @@ data class DuplicateWarning(val time: String, val technicianName: String)
 
 @Immutable
 data class UnitEntryUiState(
-    val unitId: Long? = null,
+    val inspectionId: Long? = null,
     val containerNo: String = "",
     val unitModelNo: String = "",
     val unitModel: String = "",
@@ -42,19 +43,21 @@ data class UnitEntryUiState(
 
     val showContainerError: Boolean get() = containerNo.length >= 4 && !isContainerValid
 
-    val canSave: Boolean
-        get() = !isSaving &&
-            isContainerValid &&
+    val showSaveFab: Boolean
+        get() = isContainerValid &&
             unitModelNo.isNotBlank() &&
             unitSerialNo.isNotBlank() &&
             yearOfBuilt.isNotBlank() &&
             ptiInstruction != null &&
             (brand != Brand.STAR_COOL || deployedAs != null)
 
-    val showUnitModelNoError: Boolean get() = showValidation && unitModelNo.isBlank()
-    val showUnitSerialNoError: Boolean get() = showValidation && unitSerialNo.isBlank()
-    val showYearOfBuiltError: Boolean get() = showValidation && yearOfBuilt.isBlank()
-    val showPtiError: Boolean get() = showValidation && ptiInstruction == null
+    val canSave: Boolean
+        get() = showSaveFab && !isSaving
+
+    val showUnitModelNoError: Boolean get() = (showValidation || isContainerValid) && unitModelNo.isBlank()
+    val showUnitSerialNoError: Boolean get() = (showValidation || isContainerValid) && unitSerialNo.isBlank()
+    val showYearOfBuiltError: Boolean get() = (showValidation || isContainerValid) && yearOfBuilt.isBlank()
+    val showPtiError: Boolean get() = (showValidation || isContainerValid) && ptiInstruction == null
 }
 
 sealed interface UnitEntryEvent {
@@ -75,19 +78,42 @@ sealed interface UnitEntryEvent {
     data object DismissDuplicateWarning : UnitEntryEvent
 }
 
-fun UnitEntryUiState.toDomain(technicianId: Long, technicianName: String): ReeferUnit = ReeferUnit(
+internal fun UnitEntryUiState.applyOcrFields(fields: Map<String, String>): UnitEntryUiState {
+    var updated = copy(showScanner = false, errorMessage = null)
+    fields.forEach { (key, value) ->
+        updated = when (key) {
+            "Container No." -> updated.copy(containerNo = value.uppercase())
+            "Unit Model" -> updated.copy(unitModelNo = value)
+            "Unit Serial No." -> updated.copy(unitSerialNo = value.uppercase())
+            "Year of Built" -> updated.copy(yearOfBuilt = value)
+            else -> updated
+        }
+    }
+    return updated
+}
+
+fun UnitEntryUiState.toEquipment(): ReeferEquipment = ReeferEquipment(
     containerNo = containerNo.trim().uppercase(),
     manufacturer = manufacturer.ifBlank { brand.label },
     unitModel = unitModel.trim(),
     unitModelNo = unitModelNo.trim(),
     unitSerialNo = unitSerialNo.trim().uppercase(),
     yearOfBuilt = yearOfBuilt.trim(),
-    status = status,
-    ptiInstruction = ptiInstruction,
     brand = brand,
     unitType = unitType,
+)
+
+fun UnitEntryUiState.toInspection(
+    technicianId: Long,
+    technicianName: String,
+    location: String,
+): Inspection = Inspection(
+    containerNo = containerNo.trim().uppercase(),
+    status = status,
+    ptiInstruction = ptiInstruction,
     deployedAs = deployedAs,
     technicianId = technicianId,
     technicianName = technicianName,
+    location = location,
     observations = observations.trim(),
 )

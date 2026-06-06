@@ -22,32 +22,44 @@ import com.checkingcontainer.core.model.Brand
 
 @Composable
 internal fun ManufacturerBadge(unitType: Brand) {
-    val logoRes = when (unitType) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ManufacturerLogo(
+            brand = unitType,
+            modifier = Modifier.width(56.dp).height(28.dp),
+        )
+        Text(
+            text = unitType.label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Solo el logo del fabricante sobre fondo blanco, sin la etiqueta de texto. */
+@Composable
+internal fun ManufacturerLogo(
+    brand: Brand,
+    modifier: Modifier = Modifier,
+) {
+    val logoRes = when (brand) {
         Brand.CARRIER -> R.drawable.logo_carrier
         Brand.STAR_COOL -> R.drawable.logo_starcool
         Brand.THERMO_KING -> R.drawable.logo_thermoking
         Brand.DAIKIN -> R.drawable.logo_daikin
     }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    Surface(
+        color = Color.White,
+        shape = RoundedCornerShape(4.dp),
+        modifier = modifier,
     ) {
-        Surface(
-            color = Color.White,
-            shape = RoundedCornerShape(4.dp),
-            modifier = Modifier.width(56.dp).height(28.dp),
-        ) {
-            Image(
-                painter = painterResource(id = logoRes),
-                contentDescription = unitType.label,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.padding(3.dp),
-            )
-        }
-        Text(
-            text = unitType.label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Image(
+            painter = painterResource(id = logoRes),
+            contentDescription = brand.label,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.padding(4.dp),
         )
     }
 }

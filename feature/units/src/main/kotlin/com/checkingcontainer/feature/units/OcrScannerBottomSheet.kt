@@ -47,12 +47,25 @@ fun OcrScannerBottomSheet(
         if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
+    var verticalMode by remember { mutableStateOf(false) }
+    var trackedItems by remember { mutableStateOf(emptyList<DetectedCharacter>()) }
+
     val controller = remember { LifecycleCameraController(context) }
+
     val analyzer = remember(mode) {
-        TextRecognitionAnalyzer(mode = mode) { fields ->
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onSuccess(fields)
-        }
+        TextRecognitionAnalyzer(
+            mode = mode,
+            isVerticalMode = { verticalMode },
+            onTrackingUpdated = { trackedItems = it },
+            onValidContainerIdFound = { containerId ->
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onSuccess(mapOf("Container No." to containerId))
+            },
+            onSuccess = { fields ->
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onSuccess(fields)
+            },
+        )
     }
 
     DisposableEffect(Unit) {
@@ -89,6 +102,9 @@ fun OcrScannerBottomSheet(
                 controller = controller,
                 analyzer = analyzer,
                 mode = mode,
+                verticalMode = verticalMode,
+                trackedItems = trackedItems,
+                onVerticalModeToggle = { verticalMode = !verticalMode },
                 onGalleryClick = { galleryLauncher.launch("image/*") },
             )
         } else {

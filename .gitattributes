@@ -1,0 +1,12 @@
+# Normalize line endings: Git stores LF, checks out native on each platform.
+# Silences the constant "LF will be replaced by CRLF" warnings on Windows.
+* text=auto eol=lf
+
+# Binary assets — never normalize or diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.tflite binary
+*.keystore binary
+*.jks binary

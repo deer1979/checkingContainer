@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.checkingcontainer.feature.units.ReeferSearchRoute
 import com.checkingcontainer.feature.units.UnitDetailRoute
 import com.checkingcontainer.feature.units.UnitEntryRoute
 import com.checkingcontainer.feature.units.UnitListRoute
@@ -12,6 +13,7 @@ import com.checkingcontainer.feature.units.UnitListRoute
 const val UNITS_ROUTE = "units"
 private const val UNITS_ENTRY_BASE = "units/entry"
 private const val UNITS_ENTRY_ROUTE = "$UNITS_ENTRY_BASE?unitId={unitId}"
+private const val UNITS_SEARCH_ROUTE = "units/search"
 internal const val UNIT_ENTRY_ID_ARG = "unitId"
 const val UNIT_DETAIL_ROUTE_PATTERN = "units/detail/{containerNo}"
 internal const val UNIT_DETAIL_ARG = "containerNo"
@@ -24,6 +26,7 @@ fun NavGraphBuilder.unitsGraph(navController: NavHostController) {
         UnitListRoute(
             onNewInspection = { navController.navigate(UNITS_ENTRY_BASE) },
             onUnitClick = { containerNo -> navController.navigate(unitDetailRoute(containerNo)) },
+            onSearch = { navController.navigate(UNITS_SEARCH_ROUTE) },
         )
     }
     composable(
@@ -47,6 +50,12 @@ fun NavGraphBuilder.unitsGraph(navController: NavHostController) {
         UnitDetailRoute(
             onBack = { navController.popBackStack() },
             onEdit = { unitId -> navController.navigate(unitEntryEditRoute(unitId)) },
+        )
+    }
+    composable(route = UNITS_SEARCH_ROUTE) {
+        ReeferSearchRoute(
+            onBack = { navController.popBackStack() },
+            onResultClick = { containerNo -> navController.navigate(unitDetailRoute(containerNo)) },
         )
     }
 }

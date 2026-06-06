@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 @Singleton
 class CatalogRepositoryImpl @Inject constructor(
     private val dao: CatalogDao,
-    @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
+    @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : CatalogRepository {
 
     override suspend fun getManufacturers(): List<Manufacturer> = withContext(ioDispatcher) {

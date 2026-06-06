@@ -8,7 +8,7 @@ dependencies {
     // javax.inject annotations only — Hilt at the :app level wires the
     // @Inject-annotated constructors. Keeps this module pure Kotlin
     // and fast to compile.
-    implementation("javax.inject:javax.inject:1")
+    implementation(libs.javax.inject)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

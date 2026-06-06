@@ -8,12 +8,9 @@ import com.checkingcontainer.core.database.entity.toEntity
 import com.checkingcontainer.core.domain.UsersRepository
 import com.checkingcontainer.core.model.User
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -60,7 +57,6 @@ class UsersRepositoryImpl @Inject constructor(
     }
 
     override suspend fun delete(id: Long): Unit = withContext(ioDispatcher) {
-        val nick = userDao.findById(id)?.nick
         userDao.delete(id)
         firestoreService.deleteUser(id)
     }

@@ -1,5 +1,9 @@
 package com.checkingcontainer.feature.units
 
+import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.graphics.Rect
+import android.graphics.RectF
 import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -8,52 +12,214 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.abs
+
+data class DetectedCharacter(
+    val text: String,
+    val boundingBox: RectF, // relativo al frame completo (0f..1f)
+)
 
 class TextRecognitionAnalyzer(
     private val mode: ScannerMode,
+    private val isVerticalMode: () -> Boolean = { false },
+    private val onTrackingUpdated: (List<DetectedCharacter>) -> Unit = {},
+    // NOTA: el ID de contenedor es referencial — la PK para historial de reparaciones
+    // es el Número de Estimativo, no este ID.
+    private val onValidContainerIdFound: (String) -> Unit = {},
     private val onSuccess: (Map<String, String>) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val captureRequested = AtomicBoolean(false)
     private val done = AtomicBoolean(false)
+    private val lastFrameTimestamp = AtomicLong(0L)
 
-    fun triggerCapture() {
-        captureRequested.set(true)
-    }
+    fun triggerCapture() { captureRequested.set(true) }
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        if (done.get() || !captureRequested.get()) {
+        if (done.get()) { imageProxy.close(); return }
+
+        val now = System.currentTimeMillis()
+        if (now - lastFrameTimestamp.get() < FRAME_INTERVAL_MS) {
             imageProxy.close()
             return
         }
-        val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
-        val input = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-        recognizer.process(input)
+        lastFrameTimestamp.set(now)
+
+        val rawBitmap = imageProxy.toBitmap()
+        val rotation  = imageProxy.imageInfo.rotationDegrees
+        imageProxy.close()
+
+        val bitmap   = rawBitmap.rotate(rotation)
+        val vertical = isVerticalMode()
+        val crop     = bitmap.cropRoi(vertical)
+
+        val roiLeft = (bitmap.width  - crop.width)  / 2f
+        val roiTop  = (bitmap.height - crop.height) / 2f
+        val frameW  = bitmap.width.toFloat()
+        val frameH  = bitmap.height.toFloat()
+        val cropW   = crop.width.toFloat()
+
+        // ── DETECCIÓN (WHERE) ────────────────────────────────────────────────────
+        // Projection analysis: encuentra las Y de cada carácter de forma independiente
+        // a cómo ML Kit agrupa el texto. Análogo a face-detection encontrando caras
+        // antes de identificarlas. Se ejecuta sincrónicamente aquí (rápido, ~3ms).
+        val projSegments: List<ProjectionCharDetector.Segment> =
+            if (vertical) ProjectionCharDetector.detect(crop) else emptyList()
+
+        // ── RECONOCIMIENTO (WHAT) ────────────────────────────────────────────────
+        // ML Kit lee qué dice el texto. Es confiable para el contenido aunque falla
+        // en las posiciones cuando el texto es vertical.
+        recognizer.process(InputImage.fromBitmap(crop, 0))
             .addOnSuccessListener { visionText ->
+
+                if (vertical) {
+                    // Texto de ML Kit: correcto en contenido aunque incorrecto en posiciones
+                    val allChars = visionText.textBlocks
+                        .flatMap { it.lines }
+                        .sortedBy { it.boundingBox?.top ?: 0 }
+                        .joinToString("") { line ->
+                            line.text.filter { c -> c.isUpperCase() || c.isDigit() }
+                        }
+
+                    // Posiciones de proyección: correctas en Y, independientes del texto
+                    val segs = projSegments
+
+                    if (allChars.isNotEmpty() && segs.isNotEmpty()) {
+                        // Parear: texto[i] → posición segs[i]
+                        val count = minOf(allChars.length, segs.size)
+                        val tracked = (0 until count).map { i ->
+                            val seg = segs[i]
+                            DetectedCharacter(
+                                text = allChars[i].toString(),
+                                boundingBox = RectF(
+                                    roiLeft            / frameW,
+                                    (roiTop + seg.top) / frameH,
+                                    (roiLeft + cropW)  / frameW,
+                                    (roiTop + seg.bottom) / frameH,
+                                ),
+                            )
+                        }
+                        onTrackingUpdated(tracked)
+
+                        // Auto-detect: el texto viene de ML Kit (confiable)
+                        if (allChars.length == 11 && CONTAINER_REGEX.matches(allChars) &&
+                            done.compareAndSet(false, true)
+                        ) {
+                            onValidContainerIdFound(allChars)
+                            return@addOnSuccessListener
+                        }
+                    } else {
+                        onTrackingUpdated(emptyList())
+                    }
+
+                } else {
+                    // ─── MODO HORIZONTAL ─────────────────────────────────────────
+                    // Para texto horizontal los Symbol.boundingBox son correctos.
+                    val candidates: List<Pair<String, Rect>> = visionText.textBlocks
+                        .flatMap { it.lines }
+                        .flatMap { it.elements }
+                        .flatMap { element ->
+                            val syms = element.symbols
+                            when {
+                                syms.isNotEmpty() ->
+                                    syms.mapNotNull { sym ->
+                                        sym.boundingBox?.let { sym.text to it }
+                                    }
+                                element.text.length == 1 ->
+                                    element.boundingBox?.let {
+                                        listOf(element.text to it)
+                                    } ?: emptyList()
+                                else -> emptyList()
+                            }
+                        }
+                        .filter { (text, _) -> text.matches(CHAR_REGEX) }
+
+                    val column = groupByColumn(candidates).sortedBy { it.second.top }
+
+                    val tracked = column.map { (text, box) ->
+                        DetectedCharacter(
+                            text = text,
+                            boundingBox = RectF(
+                                (roiLeft + box.left)   / frameW,
+                                (roiTop  + box.top)    / frameH,
+                                (roiLeft + box.right)  / frameW,
+                                (roiTop  + box.bottom) / frameH,
+                            ),
+                        )
+                    }
+                    onTrackingUpdated(tracked)
+                }
+
+                // Captura manual (botón disparador, ambos modos)
+                if (!captureRequested.get()) return@addOnSuccessListener
                 val result = when (mode) {
-                    ScannerMode.CONTAINER -> parseContainer(visionText.text)
+                    ScannerMode.CONTAINER  -> parseContainer(visionText.text)
                     ScannerMode.DATA_PLATE -> parseDataPlate(visionText.text)
                 }
                 if (result != null && done.compareAndSet(false, true)) {
                     onSuccess(result)
                 } else {
-                    captureRequested.set(false) // nothing found — allow retry
+                    captureRequested.set(false)
                 }
             }
-            .addOnCompleteListener { imageProxy.close() }
+    }
+
+    private fun groupByColumn(candidates: List<Pair<String, Rect>>): List<Pair<String, Rect>> {
+        if (candidates.isEmpty()) return emptyList()
+        val groups = mutableListOf<MutableList<Pair<String, Rect>>>()
+        for (candidate in candidates) {
+            val cx = candidate.second.exactCenterX()
+            val match = groups.find { group ->
+                val groupCx = group.sumOf { it.second.exactCenterX().toDouble() } / group.size
+                abs(groupCx - cx) <= COLUMN_TOLERANCE_PX
+            }
+            if (match != null) match.add(candidate) else groups.add(mutableListOf(candidate))
+        }
+        return groups.maxByOrNull { it.size } ?: emptyList()
     }
 
     companion object {
+
+        private const val FRAME_INTERVAL_MS   = 250L
+        private const val COLUMN_TOLERANCE_PX = 35f
+        private val CHAR_REGEX                = Regex("[A-Z0-9]")
+        private val CONTAINER_REGEX           = Regex("^[A-Z]{4}\\d{7}$")
+
+        private const val ROI_VERTICAL_WIDTH  = 0.15f
+        private const val ROI_VERTICAL_HEIGHT = 0.80f
+        private const val ROI_HORIZ_WIDTH     = 0.80f
+        private const val ROI_HORIZ_HEIGHT    = 0.35f
+
+        private fun Bitmap.rotate(degrees: Int): Bitmap {
+            if (degrees == 0) return this
+            val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+            return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
+                .also { if (it !== this) recycle() }
+        }
+
+        private fun Bitmap.cropRoi(vertical: Boolean): Bitmap {
+            val roiW: Int
+            val roiH: Int
+            if (vertical) {
+                roiW = (width  * ROI_VERTICAL_WIDTH).toInt().coerceIn(1, width)
+                roiH = (height * ROI_VERTICAL_HEIGHT).toInt().coerceIn(1, height)
+            } else {
+                roiW = (width  * ROI_HORIZ_WIDTH).toInt().coerceIn(1, width)
+                roiH = (height * ROI_HORIZ_HEIGHT).toInt().coerceIn(1, height)
+            }
+            val x = (width  - roiW) / 2
+            val y = (height - roiH) / 2
+            return Bitmap.createBitmap(this, x, y, roiW, roiH)
+        }
+
         fun parseContainer(text: String): Map<String, String>? {
-            // Pass 1: strip all whitespace — handles single-line and space-separated formats
             val noSpaces = text.replace(Regex("\\s+"), "")
             Regex("[A-Z]{4}[0-9]{7}").find(noSpaces)?.let { m ->
                 return mapOf("Container No." to m.value)
             }
-            // Pass 2: owner code and serial on separate physical lines
-            // Strip non-alphanumeric per line so "901290 9" → "9012909"
             val lines = text.lines()
                 .map { it.replace(Regex("[^A-Z0-9]"), "") }
                 .filter { it.isNotEmpty() }
@@ -66,8 +232,6 @@ class TextRecognitionAnalyzer(
                     }
                 }
             }
-            // Pass 3: check digit printed in a separate box may be missed by OCR.
-            // If we find 4 letters + 6 digits, compute the ISO 6346 check digit algorithmically.
             Regex("[A-Z]{4}[0-9]{6}").find(noSpaces)?.let { m ->
                 val first10 = m.value
                 val check = Iso6346.computeCheckDigit(first10)

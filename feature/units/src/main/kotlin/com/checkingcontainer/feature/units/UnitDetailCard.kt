@@ -13,30 +13,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.checkingcontainer.core.model.Brand
-import com.checkingcontainer.core.model.ReeferUnit
+import com.checkingcontainer.core.model.ReeferEquipment
 
 @Composable
-internal fun UnitDetailCard(unit: ReeferUnit) {
+internal fun UnitDetailCard(equipment: ReeferEquipment, deployedAs: String? = null) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SectionTitle("Ficha Técnica")
-            ManufacturerBadge(unit.brand)
+            ManufacturerBadge(equipment.brand)
             HorizontalDivider()
-            DetailField("Container No.", unit.containerNo)
-            DetailField("Machinery Manufacturer", unit.manufacturer.ifBlank { unit.brand.label })
-            DetailField("Unit Model", unit.unitModel.ifBlank { "—" })
-            DetailField("Unit model No.", unit.unitModelNo)
-            DetailField("Unit Type", unit.unitType.ifBlank { "—" })
-            DetailField("Unit Serial No.", unit.unitSerialNo)
-            DetailField("Year of Built", unit.yearOfBuilt)
-            if (unit.brand == Brand.STAR_COOL) {
+            DetailField("Container No.", equipment.containerNo)
+            DetailField("Machinery Manufacturer", equipment.manufacturer.ifBlank { equipment.brand.label })
+            DetailField("Unit Model", equipment.unitModel.ifBlank { "—" })
+            DetailField("Unit model No.", equipment.unitModelNo)
+            DetailField("Unit Type", equipment.unitType.ifBlank { "—" })
+            DetailField("Unit Serial No.", equipment.unitSerialNo)
+            DetailField("Year of Built", equipment.yearOfBuilt)
+            if (equipment.brand == Brand.STAR_COOL) {
                 HorizontalDivider()
                 DetailField(
                     label = "Deployment",
-                    value = unit.deployedAs ?: "—",
+                    value = deployedAs ?: "—",
                     highlight = true,
                 )
             }

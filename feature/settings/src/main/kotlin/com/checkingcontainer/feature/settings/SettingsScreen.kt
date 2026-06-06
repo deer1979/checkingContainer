@@ -1,25 +1,18 @@
 package com.checkingcontainer.feature.settings
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,14 +20,13 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -81,10 +73,7 @@ private fun SettingsScreen(
                 title = { Text("Ajustes") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Volver",
-                        )
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Volver")
                     }
                 },
             )
@@ -96,37 +85,8 @@ private fun SettingsScreen(
                 .padding(innerPadding),
         ) {
             item { SectionHeader("Apariencia") }
-
-            item {
-                ListItem(
-                    headlineContent = { Text("Tema") },
-                    supportingContent = {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(top = 4.dp),
-                        ) {
-                            ThemeConfig.entries.forEach { config ->
-                                FilterChip(
-                                    selected = state.theme == config,
-                                    onClick = { onThemeChange(config) },
-                                    label = {
-                                        Text(
-                                            when (config) {
-                                                ThemeConfig.FOLLOW_SYSTEM -> "Sistema"
-                                                ThemeConfig.LIGHT -> "Claro"
-                                                ThemeConfig.DARK -> "Oscuro"
-                                            },
-                                        )
-                                    },
-                                )
-                            }
-                        }
-                    },
-                    leadingContent = { Icon(Icons.Outlined.DarkMode, contentDescription = null) },
-                )
-            }
+            item { ThemeItem(state.theme, onThemeChange) }
             item { HorizontalDivider() }
-
             item {
                 SettingsRow(
                     title = "Color dinamico",
@@ -139,27 +99,8 @@ private fun SettingsScreen(
             item { HorizontalDivider() }
 
             item { SectionHeader("Sincronizacion") }
-
-            item {
-                ListItem(
-                    headlineContent = {
-                        Text(if (state.remoteConnected) "Nube: conectada" else "Nube: sin conexion")
-                    },
-                    supportingContent = { Text(state.remoteBackendDescription) },
-                    leadingContent = {
-                        Icon(
-                            imageVector = if (state.remoteConnected) Icons.Outlined.Cloud else Icons.Outlined.CloudOff,
-                            contentDescription = null,
-                            tint = if (state.remoteConnected)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.error,
-                        )
-                    },
-                )
-            }
+            item { CloudStatusItem(state.remoteConnected, state.remoteBackendDescription) }
             item { HorizontalDivider() }
-
             item {
                 SettingsRow(
                     title = "Notificaciones",
@@ -170,7 +111,6 @@ private fun SettingsScreen(
                 )
             }
             item { HorizontalDivider() }
-
             item {
                 SettingsRow(
                     title = "Sincronizacion automatica",
@@ -183,7 +123,6 @@ private fun SettingsScreen(
             item { HorizontalDivider() }
 
             item { SectionHeader("Acerca de") }
-
             item {
                 ListItem(
                     headlineContent = { Text("Privacidad") },
@@ -192,7 +131,6 @@ private fun SettingsScreen(
                 )
             }
             item { HorizontalDivider() }
-
             item {
                 ListItem(
                     headlineContent = { Text("Version") },
@@ -203,7 +141,6 @@ private fun SettingsScreen(
             item { HorizontalDivider() }
 
             item { SectionHeader("Sesion") }
-
             item {
                 ListItem(
                     headlineContent = { Text("Cerrar sesion") },
@@ -221,30 +158,4 @@ private fun SettingsScreen(
             }
         }
     }
-}
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
-    )
-}
-
-@Composable
-private fun SettingsRow(
-    title: String,
-    description: String,
-    icon: ImageVector,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(description) },
-        leadingContent = { Icon(icon, contentDescription = null) },
-        trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
-    )
 }

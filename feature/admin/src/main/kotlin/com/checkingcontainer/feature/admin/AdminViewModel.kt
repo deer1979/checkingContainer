@@ -34,14 +34,18 @@ class AdminViewModel @Inject constructor(
             _state.update { it.copy(isPublishing = true) }
             val author = (authRepository.state.first() as? AuthState.Authenticated)
                 ?.user?.fullName ?: "Admin"
-            announcements.publish(
-                title = current.draftTitle,
-                summary = current.draftSummary.ifBlank { current.draftTitle },
-                body = current.draftBody,
-                authorName = author,
-            )
-            _state.update {
-                AdminUiState(publishedCount = it.publishedCount + 1)
+            val result = runCatching {
+                announcements.publish(
+                    title = current.draftTitle,
+                    summary = current.draftSummary.ifBlank { current.draftTitle },
+                    body = current.draftBody,
+                    authorName = author,
+                )
+            }
+            if (result.isSuccess) {
+                _state.update { AdminUiState(publishedCount = it.publishedCount + 1) }
+            } else {
+                _state.update { it.copy(isPublishing = false) }
             }
         }
     }

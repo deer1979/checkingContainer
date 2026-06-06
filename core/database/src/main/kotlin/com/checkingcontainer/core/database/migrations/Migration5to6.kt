@@ -43,7 +43,7 @@ fun seedAnnouncements(db: SupportSQLiteDatabase) {
         val publishedAt = now - (announcements.size - index) * 3_600_000L
         db.execSQL(
             "INSERT OR IGNORE INTO announcements (id, title, summary, body, authorName, publishedAt) VALUES (?, ?, ?, ?, 'Equipo CheckingContainer', ?)",
-            arrayOf(id, title, summary, body, publishedAt),
+            arrayOf<Any>(id, title, summary, body, publishedAt),
         )
     }
 }

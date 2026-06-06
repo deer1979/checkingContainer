@@ -30,6 +30,13 @@ Thumbs.db
 
 # Logs
 *.log
+# Build log dumps accidentally saved to the repo root
+/build_*.txt
+/*_build.txt
+
+# Android Studio / IntelliJ inspection profiles dumped to the repo root by mistake
+# (these belong under .idea/inspectionProfiles/, which is already ignored)
+/*.xml
 
 # Keystore (NEVER commit secrets)
 *.jks

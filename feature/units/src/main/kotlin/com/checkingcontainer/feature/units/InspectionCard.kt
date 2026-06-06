@@ -37,7 +37,12 @@ internal fun InspectionCard(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SectionTitle("Inspección")
+            val inspectionComplete = state.ptiInstruction != null &&
+                (state.brand != Brand.STAR_COOL || state.deployedAs != null)
+            SectionTitle(
+                text = "Inspección",
+                isComplete = if (state.isContainerValid) inspectionComplete else null,
+            )
 
             FieldLabel("Estado")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

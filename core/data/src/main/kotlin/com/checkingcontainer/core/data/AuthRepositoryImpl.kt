@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
-    @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
+    @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : AuthRepository {
 
     private val _state = MutableStateFlow<AuthState>(AuthState.Unauthenticated)

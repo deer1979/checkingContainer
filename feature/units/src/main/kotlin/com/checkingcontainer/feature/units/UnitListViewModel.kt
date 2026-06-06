@@ -2,7 +2,7 @@ package com.checkingcontainer.feature.units
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.checkingcontainer.core.domain.ReeferUnitRepository
+import com.checkingcontainer.core.domain.InspectionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.collections.immutable.toImmutableList
@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class UnitListViewModel @Inject constructor(
-    private val repository: ReeferUnitRepository,
+    private val inspectionRepo: InspectionRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(UnitListUiState())
@@ -22,13 +22,13 @@ class UnitListViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            repository.observeLast24h().collect { units ->
-                _state.update { UnitListUiState(units = units.toImmutableList(), isLoading = false) }
+            inspectionRepo.observeLast24h().collect { items ->
+                _state.update { UnitListUiState(units = items.toImmutableList(), isLoading = false) }
             }
         }
     }
 
     fun onDelete(id: Long) {
-        viewModelScope.launch { repository.delete(id) }
+        viewModelScope.launch { inspectionRepo.delete(id) }
     }
 }

@@ -39,12 +39,18 @@ import com.checkingcontainer.core.designsystem.R
 import com.checkingcontainer.core.designsystem.theme.chipColors
 import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.InspStatus
+import com.checkingcontainer.core.model.InspectionWithEquipment
 import com.checkingcontainer.core.model.PtiInstruction
-import com.checkingcontainer.core.model.ReeferUnit
 
 @Composable
-internal fun InspectionListItem(unit: ReeferUnit, onClick: () -> Unit, onDelete: () -> Unit) {
+internal fun InspectionListItem(
+    item: InspectionWithEquipment,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val inspection = item.inspection
+    val equipment = item.equipment
 
     ElevatedCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(
@@ -58,14 +64,14 @@ internal fun InspectionListItem(unit: ReeferUnit, onClick: () -> Unit, onDelete:
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ManufacturerLogo(unit.brand)
+                ManufacturerLogo(equipment.brand)
                 Text(
-                    text = unit.containerNo,
+                    text = inspection.containerNo,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
-                StatusBadge(unit.status)
+                StatusBadge(inspection.status)
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(
@@ -92,12 +98,12 @@ internal fun InspectionListItem(unit: ReeferUnit, onClick: () -> Unit, onDelete:
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = formatDateTime(unit.createdAt),
+                    text = formatDateTime(inspection.createdAt),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = unit.technicianName.ifBlank { "—" },
+                    text = inspection.technicianName.ifBlank { "—" },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -108,20 +114,37 @@ internal fun InspectionListItem(unit: ReeferUnit, onClick: () -> Unit, onDelete:
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = unit.unitModel.ifBlank { "—" },
+                    text = equipment.unitModel.ifBlank { "—" },
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    unit.ptiInstruction?.let { pti ->
+                    inspection.ptiInstruction?.let { pti ->
                         OutlineBadge(
                             text = if (pti == PtiInstruction.FULL_PTI) "Full PTI" else "Visual PTI",
                         )
                     }
-                    if (unit.brand == Brand.STAR_COOL && unit.deployedAs != null) {
+                    if (equipment.brand == Brand.STAR_COOL && inspection.deployedAs != null) {
                         OutlineBadge(
-                            text = if (unit.deployedAs == "Atmósfera Controlada") "CA" else "STD",
+                            text = if (inspection.deployedAs == "Atmósfera Controlada") "CA" else "STD",
                         )
+                    }
+                }
+            }
+            if (inspection.idDigitador != null || inspection.statusDigitacion != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    inspection.idDigitador?.let {
+                        Text(
+                            text = "Digitador: $it",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    inspection.statusDigitacion?.let {
+                        OutlineBadge(text = it)
                     }
                 }
             }
@@ -130,8 +153,8 @@ internal fun InspectionListItem(unit: ReeferUnit, onClick: () -> Unit, onDelete:
 }
 
 @Composable
-private fun ManufacturerLogo(unitType: Brand) {
-    val logoRes = when (unitType) {
+private fun ManufacturerLogo(brand: Brand) {
+    val logoRes = when (brand) {
         Brand.CARRIER -> R.drawable.logo_carrier
         Brand.STAR_COOL -> R.drawable.logo_starcool
         Brand.THERMO_KING -> R.drawable.logo_thermoking
@@ -144,7 +167,7 @@ private fun ManufacturerLogo(unitType: Brand) {
     ) {
         Image(
             painter = painterResource(id = logoRes),
-            contentDescription = unitType.label,
+            contentDescription = brand.label,
             contentScale = ContentScale.Fit,
             modifier = Modifier.padding(3.dp),
         )
@@ -170,7 +193,7 @@ private fun StatusBadge(status: InspStatus) {
 }
 
 @Composable
-private fun OutlineBadge(text: String) {
+internal fun OutlineBadge(text: String) {
     Surface(
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,

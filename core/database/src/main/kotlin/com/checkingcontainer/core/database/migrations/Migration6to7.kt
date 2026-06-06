@@ -141,7 +141,7 @@ fun seedFullCatalog(db: SupportSQLiteDatabase) {
         val (unitModel, unitType) = familyCode
         db.execSQL(
             "INSERT INTO catalog_entries (manufacturerId, serie, rangeStart, rangeEnd, unitModel, unitType) VALUES ((SELECT id FROM manufacturers WHERE name = 'Carrier Transicold' LIMIT 1), ?, ?, ?, ?, ?)",
-            arrayOf(serie, start, end, unitModel, unitType),
+            arrayOf<Any>(serie, start, end, unitModel, unitType),
         )
     }
 }
