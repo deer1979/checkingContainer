@@ -49,16 +49,17 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Inject Supabase credentials
+      - name: Inject credentials
         # Writes local.properties so the Gradle build can read SUPABASE_URL /
-        # SUPABASE_ANON_KEY. When the secrets are absent the app builds fine
-        # in local-only mode (empty strings).
+        # SUPABASE_ANON_KEY / SHEETS_SPREADSHEET_ID. When the secrets are absent
+        # the app builds fine in local-only mode (empty strings).
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           echo "SUPABASE_URL=${SUPABASE_URL:-}" >> local.properties
           echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}" >> local.properties
+          echo "SHEETS_SPREADSHEET_ID=1xt9nqPOJHEoWxu-GAb_pJ74TU-u6rF5sjJ77RvZyx0Y" >> local.properties
 
       - name: Compile debug
         id: compile
