@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
@@ -66,6 +67,7 @@ private fun SettingsScreen(
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "—"
         }.getOrDefault("—")
     }
+    val aiCore = remember(context) { aiCoreInfo(context) }
 
     Scaffold(
         topBar = {
@@ -123,6 +125,24 @@ private fun SettingsScreen(
             item { HorizontalDivider() }
 
             item { SectionHeader("Acerca de") }
+            item {
+                ListItem(
+                    headlineContent = { Text("IA local (Gemini Nano)") },
+                    supportingContent = { Text(aiCore.description) },
+                    leadingContent = { Icon(Icons.Outlined.AutoAwesome, contentDescription = null) },
+                    trailingContent = {
+                        Text(
+                            text = aiCore.statusLabel,
+                            color = if (aiCore.available) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    },
+                )
+            }
+            item { HorizontalDivider() }
             item {
                 ListItem(
                     headlineContent = { Text("Privacidad") },
