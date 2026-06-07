@@ -101,7 +101,6 @@ class UnitEntryViewModel @Inject constructor(
                 UnitEntryEvent.DismissDeleteConfirm -> s.copy(showDeleteConfirm = false)
                 UnitEntryEvent.TriggerManualLookup -> s
                 UnitEntryEvent.DismissDuplicateWarning -> s.copy(duplicateWarning = null)
-                UnitEntryEvent.ScanFocusConsumed -> s.copy(justScanned = false)
             }
         }
         if (event is UnitEntryEvent.OcrResult) {

@@ -40,7 +40,6 @@ data class UnitEntryUiState(
     val deletedSuccessfully: Boolean = false,
     val catalogError: String? = null,
     val duplicateWarning: DuplicateWarning? = null,
-    val justScanned: Boolean = false, // OCR acaba de rellenar → enfocar el campo para corregir
 ) {
     val isContainerValid: Boolean get() = Iso6346.isValid(containerNo)
 
@@ -81,16 +80,10 @@ sealed interface UnitEntryEvent {
     data object DismissDeleteConfirm : UnitEntryEvent
     data object TriggerManualLookup : UnitEntryEvent
     data object DismissDuplicateWarning : UnitEntryEvent
-    data object ScanFocusConsumed : UnitEntryEvent
 }
 
 internal fun UnitEntryUiState.applyOcrFields(fields: Map<String, String>): UnitEntryUiState {
-    var updated = copy(
-        showScanner = false,
-        showOrientationPicker = false,
-        errorMessage = null,
-        justScanned = fields.containsKey("Container No."),
-    )
+    var updated = copy(showScanner = false, showOrientationPicker = false, errorMessage = null)
     fields.forEach { (key, value) ->
         updated = when (key) {
             "Container No." -> updated.copy(containerNo = value.uppercase())

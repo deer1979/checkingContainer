@@ -20,15 +20,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
@@ -52,15 +49,6 @@ internal fun IdentificationCard(
         targetValue = if (containerFocused) 20f else 16f,
         label = "containerFontSize",
     )
-
-    // Tras un escaneo, enfoca el campo (abre el teclado) para corregir el resultado.
-    val containerFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(state.justScanned) {
-        if (state.justScanned) {
-            containerFocusRequester.requestFocus()
-            onEvent(UnitEntryEvent.ScanFocusConsumed)
-        }
-    }
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -87,7 +75,6 @@ internal fun IdentificationCard(
                 textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = containerFontSize.sp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .focusRequester(containerFocusRequester)
                     .onFocusChanged { containerFocused = it.isFocused },
                 isError = state.showContainerError,
                 supportingText = {
