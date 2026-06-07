@@ -130,11 +130,13 @@ internal object ProjectionCharDetector {
     }
 
     /**
-     * Devuelve un bitmap del glifo binarizado (negro sobre blanco) usando un umbral de
-     * Otsu LOCAL de ese glifo. Local = robusto al glare: cada carácter se umbraliza con
-     * su propia iluminación, en vez de un umbral global que se rompe con franjas de sol.
+     * Devuelve el glifo binarizado (negro sobre blanco) con un Otsu LOCAL — robusto al
+     * glare. Devuelve **null** si la región tiene poco contraste o el resultado sale
+     * degenerado (casi todo un color): en ese caso el llamador usa el recorte original,
+     * que es lo que demostró funcionar en campo. Evita "blanquear" glifos de bajo
+     * contraste (pantallas, códigos desgastados) y dejar a ML Kit sin nada que leer.
      */
-    fun binarizedGlyph(crop: Bitmap, g: Glyph): Bitmap {
+    fun binarizedGlyph(crop: Bitmap, g: Glyph): Bitmap? {
         val gw = g.width.coerceAtLeast(1)
         val gh = g.height.coerceAtLeast(1)
         val px = IntArray(gw * gh)
@@ -145,7 +147,17 @@ internal object ProjectionCharDetector {
                 (p shr 8 and 0xFF) * 150 +
                 (p and 0xFF) * 29) ushr 8
         }
+        var mn = 255
+        var mx = 0
+        for (v in lum) { if (v < mn) mn = v; if (v > mx) mx = v }
+        if (mx - mn < MIN_GLYPH_CONTRAST) return null // sin contraste claro → no binarizar
+
         val t = otsuThreshold(lum)
+        var fg = 0
+        for (v in lum) if (v < t) fg++
+        val frac = fg.toFloat() / lum.size
+        if (frac < 0.03f || frac > 0.97f) return null // degenerado → no binarizar
+
         val out = IntArray(gw * gh) { i ->
             if (lum[i] < t) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
         }
@@ -192,6 +204,7 @@ internal object ProjectionCharDetector {
         return thresh
     }
 
-    private const val MIN_GLYPH_HEIGHT = 10 // ignora componentes más bajos que esto (px)
-    private const val MIN_GLYPH_AREA   = 20 // ignora manchas con menos píxeles que esto
+    private const val MIN_GLYPH_HEIGHT  = 10 // ignora componentes más bajos que esto (px)
+    private const val MIN_GLYPH_AREA    = 20 // ignora manchas con menos píxeles que esto
+    private const val MIN_GLYPH_CONTRAST = 40 // rango de luminancia mínimo para binarizar
 }

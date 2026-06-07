@@ -318,11 +318,16 @@ class TextRecognitionAnalyzer(
             var x = STRIP_PADDING
             for (i in glyphs.indices) {
                 val g = glyphs[i]
-                // Cada glifo binarizado (negro sobre blanco, umbral local) → ML Kit limpio
-                val glyphBmp = ProjectionCharDetector.binarizedGlyph(crop, g)
                 val dst = Rect(x, STRIP_PADDING, x + widths[i], STRIP_PADDING + targetH)
-                canvas.drawBitmap(glyphBmp, null, dst, paint)
-                glyphBmp.recycle()
+                // Binariza con Otsu local (negro sobre blanco). Si la región tiene poco
+                // contraste devuelve null → usamos el recorte original (camino probado).
+                val glyphBmp = ProjectionCharDetector.binarizedGlyph(crop, g)
+                if (glyphBmp != null) {
+                    canvas.drawBitmap(glyphBmp, null, dst, paint)
+                    glyphBmp.recycle()
+                } else {
+                    canvas.drawBitmap(crop, Rect(g.left, g.top, g.right, g.bottom), dst, paint)
+                }
                 x += widths[i] + STRIP_GAP
             }
             return strip
