@@ -1,10 +1,14 @@
 package com.checkingcontainer.feature.units
 
+import androidx.camera.core.Camera
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
-import androidx.camera.view.CameraController
-import androidx.camera.view.LifecycleCameraController
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -15,12 +19,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FlashOff
 import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.PhotoLibrary
@@ -42,12 +46,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.util.concurrent.Executor
 
 @Composable
 internal fun ScannerViewfinder(
-    controller: LifecycleCameraController,
     analyzer: TextRecognitionAnalyzer,
     analysisExecutor: Executor,
     mode: ScannerMode,
@@ -55,17 +59,30 @@ internal fun ScannerViewfinder(
     trackedItems: List<DetectedCharacter>,
     onVerticalModeToggle: () -> Unit,
     onGalleryClick: () -> Unit,
+    onClose: () -> Unit,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var isTorchOn by remember { mutableStateOf(false) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
-    Box(modifier = Modifier.fillMaxWidth().height(480.dp)) {
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
             factory = { ctx ->
-                PreviewView(ctx).also { previewView ->
-                    controller.setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
-                    controller.setImageAnalysisResolutionSelector(
-                        ResolutionSelector.Builder()
+                val previewView = PreviewView(ctx).apply {
+                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                }
+                val providerFuture = ProcessCameraProvider.getInstance(ctx)
+                providerFuture.addListener({
+                    val provider = providerFuture.get()
+                    cameraProvider = provider
+                    // viewPort necesita la vista ya medida → post.
+                    previewView.post {
+                        val viewPort = previewView.viewPort ?: return@post
+                        val preview = Preview.Builder().build().also {
+                            it.setSurfaceProvider(previewView.surfaceProvider)
+                        }
+                        val resolutionSelector = ResolutionSelector.Builder()
                             .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
                             .setResolutionStrategy(
                                 ResolutionStrategy(
@@ -73,44 +90,52 @@ internal fun ScannerViewfinder(
                                     ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
                                 ),
                             )
-                            .build(),
-                    )
-                    controller.setImageAnalysisAnalyzer(analysisExecutor, analyzer)
-                    previewView.controller = controller
-                    controller.bindToLifecycle(lifecycleOwner)
-                }
+                            .build()
+                        val analysis = ImageAnalysis.Builder()
+                            .setResolutionSelector(resolutionSelector)
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+                            .also { it.setAnalyzer(analysisExecutor, analyzer) }
+                        // UseCaseGroup + ViewPort: preview y análisis comparten el mismo
+                        // recorte (cropRect), así las coordenadas mapean 1:1 a la vista.
+                        val group = UseCaseGroup.Builder()
+                            .addUseCase(preview)
+                            .addUseCase(analysis)
+                            .setViewPort(viewPort)
+                            .build()
+                        provider.unbindAll()
+                        camera = provider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            group,
+                        )
+                        camera?.cameraControl?.enableTorch(isTorchOn)
+                    }
+                }, ContextCompat.getMainExecutor(ctx))
+                previewView
             },
             modifier = Modifier.fillMaxSize(),
         )
 
+        // Overlay del ROI + tracking. Como el ViewPort recorta el análisis al mismo
+        // FOV que el preview, las coordenadas relativas (0..1) mapean directo a la
+        // vista: basta multiplicar por el tamaño. Sin matemática FILL_CENTER manual.
         Canvas(modifier = Modifier.fillMaxSize()) {
-            // PreviewView usa FILL_CENTER: el frame 9:16 se escala para llenar el ancho,
-            // luego recorta arriba/abajo si la vista es más corta que 9:16.
-            // Hay que aplicar este transform al dibujar el ROI y las cajas de tracking,
-            // o los recuadros no coinciden con los caracteres visibles en la imagen.
-            val frameAspect = 16f / 9f                               // frame portrait: alto/ancho
-            val scaledFrameH = size.width * frameAspect              // alto del frame escalado al ancho de la vista
-            val topCropPx = ((scaledFrameH - size.height) / 2f).coerceAtLeast(0f)
-
-            // Convierte coordenada Y relativa al frame (0..1) → píxeles en el Canvas
-            fun fy(rel: Float): Float = rel * scaledFrameH - topCropPx
-
             val stroke = 4.dp.toPx()
             val corner = 36.dp.toPx()
             val white = Color.White
             val accent = Color(0xFF00E676)
 
             if (verticalMode) {
-                // ROI vertical: 15% ancho × 80% alto, centrado en el frame
-                val roiW    = size.width * 0.15f
+                val roiW = size.width * 0.15f
                 val roiLeft = (size.width - roiW) / 2f
-                val roiRight  = roiLeft + roiW
-                val roiTop    = fy(0.10f)
-                val roiBottom = fy(0.90f)
-                val roiH      = roiBottom - roiTop
+                val roiRight = roiLeft + roiW
+                val roiTop = size.height * 0.10f
+                val roiBottom = size.height * 0.90f
+                val roiH = roiBottom - roiTop
 
                 drawRect(
-                    color = Color.White.copy(alpha = 0.06f),
+                    color = white.copy(alpha = 0.06f),
                     topLeft = Offset(roiLeft, roiTop),
                     size = Size(roiW, roiH),
                 )
@@ -122,48 +147,64 @@ internal fun ScannerViewfinder(
                 )
                 val c = corner * 0.7f
                 val s = stroke * 1.5f
-                drawLine(accent, Offset(roiLeft,  roiTop),    Offset(roiLeft + c,  roiTop),    s)
-                drawLine(accent, Offset(roiLeft,  roiTop),    Offset(roiLeft,      roiTop + c), s)
-                drawLine(accent, Offset(roiRight, roiTop),    Offset(roiRight - c, roiTop),    s)
-                drawLine(accent, Offset(roiRight, roiTop),    Offset(roiRight,     roiTop + c), s)
-                drawLine(accent, Offset(roiLeft,  roiBottom), Offset(roiLeft + c,  roiBottom), s)
-                drawLine(accent, Offset(roiLeft,  roiBottom), Offset(roiLeft,      roiBottom - c), s)
+                drawLine(accent, Offset(roiLeft, roiTop), Offset(roiLeft + c, roiTop), s)
+                drawLine(accent, Offset(roiLeft, roiTop), Offset(roiLeft, roiTop + c), s)
+                drawLine(accent, Offset(roiRight, roiTop), Offset(roiRight - c, roiTop), s)
+                drawLine(accent, Offset(roiRight, roiTop), Offset(roiRight, roiTop + c), s)
+                drawLine(accent, Offset(roiLeft, roiBottom), Offset(roiLeft + c, roiBottom), s)
+                drawLine(accent, Offset(roiLeft, roiBottom), Offset(roiLeft, roiBottom - c), s)
                 drawLine(accent, Offset(roiRight, roiBottom), Offset(roiRight - c, roiBottom), s)
-                drawLine(accent, Offset(roiRight, roiBottom), Offset(roiRight,     roiBottom - c), s)
+                drawLine(accent, Offset(roiRight, roiBottom), Offset(roiRight, roiBottom - c), s)
             } else {
-                // ROI horizontal: marcas de esquina en los bordes de la vista
-                val pad = 48.dp.toPx()
-                drawLine(white, Offset(pad, pad), Offset(pad + corner, pad), stroke)
-                drawLine(white, Offset(pad, pad), Offset(pad, pad + corner), stroke)
-                drawLine(white, Offset(size.width - pad, pad), Offset(size.width - pad - corner, pad), stroke)
-                drawLine(white, Offset(size.width - pad, pad), Offset(size.width - pad, pad + corner), stroke)
-                drawLine(white, Offset(pad, size.height - pad), Offset(pad + corner, size.height - pad), stroke)
-                drawLine(white, Offset(pad, size.height - pad), Offset(pad, size.height - pad - corner), stroke)
-                drawLine(white, Offset(size.width - pad, size.height - pad), Offset(size.width - pad - corner, size.height - pad), stroke)
-                drawLine(white, Offset(size.width - pad, size.height - pad), Offset(size.width - pad, size.height - pad - corner), stroke)
+                // ROI horizontal: 80% ancho × 35% alto centrado, con marcas de esquina.
+                val roiW = size.width * 0.80f
+                val roiH = size.height * 0.35f
+                val roiLeft = (size.width - roiW) / 2f
+                val roiTop = (size.height - roiH) / 2f
+                val roiRight = roiLeft + roiW
+                val roiBottom = roiTop + roiH
+                drawLine(white, Offset(roiLeft, roiTop), Offset(roiLeft + corner, roiTop), stroke)
+                drawLine(white, Offset(roiLeft, roiTop), Offset(roiLeft, roiTop + corner), stroke)
+                drawLine(white, Offset(roiRight, roiTop), Offset(roiRight - corner, roiTop), stroke)
+                drawLine(white, Offset(roiRight, roiTop), Offset(roiRight, roiTop + corner), stroke)
+                drawLine(white, Offset(roiLeft, roiBottom), Offset(roiLeft + corner, roiBottom), stroke)
+                drawLine(white, Offset(roiLeft, roiBottom), Offset(roiLeft, roiBottom - corner), stroke)
+                drawLine(white, Offset(roiRight, roiBottom), Offset(roiRight - corner, roiBottom), stroke)
+                drawLine(white, Offset(roiRight, roiBottom), Offset(roiRight, roiBottom - corner), stroke)
             }
 
-            // Overlay de tracking: recuadro verde por cada carácter detectado por ML Kit.
-            // Coordenadas corregidas con el transform FILL_CENTER.
+            // Tracking: un recuadro verde por carácter detectado por ML Kit.
             for (item in trackedItems) {
-                val left   = item.boundingBox.left   * size.width
-                val top    = fy(item.boundingBox.top)
-                val right  = item.boundingBox.right  * size.width
-                val bottom = fy(item.boundingBox.bottom)
-                val bw = right - left
-                val bh = bottom - top
+                val left = item.boundingBox.left * size.width
+                val top = item.boundingBox.top * size.height
+                val right = item.boundingBox.right * size.width
+                val bottom = item.boundingBox.bottom * size.height
                 drawRect(
                     color = Color(0x3300E676),
                     topLeft = Offset(left, top),
-                    size = Size(bw, bh),
+                    size = Size(right - left, bottom - top),
                 )
                 drawRect(
                     color = Color(0xFF00E676),
                     topLeft = Offset(left, top),
-                    size = Size(bw, bh),
+                    size = Size(right - left, bottom - top),
                     style = Stroke(width = 2.dp.toPx()),
                 )
             }
+        }
+
+        // Cerrar (pantalla completa: no hay swipe-down como en el bottom sheet)
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.55f))
+                .clickable(onClick = onClose),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Outlined.Close, contentDescription = "Cerrar", tint = Color.White, modifier = Modifier.size(24.dp))
         }
 
         Text(
@@ -175,7 +216,7 @@ internal fun ScannerViewfinder(
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 16.dp)
+                .padding(top = 20.dp)
                 .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                 .padding(horizontal = 12.dp, vertical = 4.dp),
         )
@@ -184,7 +225,7 @@ internal fun ScannerViewfinder(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .padding(horizontal = 24.dp, vertical = 28.dp),
+                .padding(horizontal = 24.dp, vertical = 36.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -240,7 +281,7 @@ internal fun ScannerViewfinder(
                     )
                     .clickable {
                         isTorchOn = !isTorchOn
-                        controller.cameraControl?.enableTorch(isTorchOn)
+                        camera?.cameraControl?.enableTorch(isTorchOn)
                     },
                 contentAlignment = Alignment.Center,
             ) {
@@ -252,5 +293,9 @@ internal fun ScannerViewfinder(
                 )
             }
         }
+    }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { cameraProvider?.unbindAll() }
     }
 }

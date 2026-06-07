@@ -50,9 +50,13 @@ class TextRecognitionAnalyzer(
 
         val rawBitmap = imageProxy.toBitmap()
         val rotation  = imageProxy.imageInfo.rotationDegrees
+        val cropRect  = imageProxy.cropRect
         imageProxy.close()
 
-        val bitmap   = rawBitmap.rotate(rotation)
+        // ViewPort recorta el frame al mismo FOV que el preview (cropRect). Recortamos
+        // ANTES de rotar para que el bitmap quede alineado 1:1 con lo que ve el usuario,
+        // eliminando la corrección FILL_CENTER manual del overlay.
+        val bitmap   = rawBitmap.cropTo(cropRect).rotate(rotation)
         val vertical = isVerticalMode()
         val crop     = bitmap.cropRoi(vertical)
 
@@ -240,6 +244,15 @@ class TextRecognitionAnalyzer(
         private const val ROI_VERTICAL_HEIGHT = 0.80f
         private const val ROI_HORIZ_WIDTH     = 0.80f
         private const val ROI_HORIZ_HEIGHT    = 0.35f
+
+        private fun Bitmap.cropTo(rect: Rect): Bitmap {
+            val x = rect.left.coerceIn(0, width - 1)
+            val y = rect.top.coerceIn(0, height - 1)
+            val w = rect.width().coerceIn(1, width - x)
+            val h = rect.height().coerceIn(1, height - y)
+            if (x == 0 && y == 0 && w == width && h == height) return this
+            return Bitmap.createBitmap(this, x, y, w, h)
+        }
 
         private fun Bitmap.rotate(degrees: Int): Bitmap {
             if (degrees == 0) return this

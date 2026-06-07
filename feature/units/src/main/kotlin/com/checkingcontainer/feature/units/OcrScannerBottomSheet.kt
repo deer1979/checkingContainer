@@ -4,10 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.view.LifecycleCameraController
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -15,16 +14,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.Executors
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Escáner OCR a pantalla completa (Dialog). Antes era un ModalBottomSheet de altura
+ * fija; ahora ocupa toda la pantalla, como las apps grandes de escaneo.
+ */
 @Composable
 fun OcrScannerBottomSheet(
     mode: ScannerMode,
@@ -52,7 +58,6 @@ fun OcrScannerBottomSheet(
     var verticalMode by remember { mutableStateOf(initialVertical) }
     var trackedItems by remember { mutableStateOf(emptyList<DetectedCharacter>()) }
 
-    val controller = remember { LifecycleCameraController(context) }
     // Executor de fondo: el análisis OCR (toBitmap/rotate/crop/projection/ML Kit) NO
     // debe correr en el hilo principal o produce jank. Los callbacks de ML Kit siguen
     // disparándose en el hilo principal, así que actualizar estado Compose es seguro.
@@ -75,10 +80,7 @@ fun OcrScannerBottomSheet(
     }
 
     DisposableEffect(Unit) {
-        onDispose {
-            controller.unbind()
-            analysisExecutor.shutdown()
-        }
+        onDispose { analysisExecutor.shutdown() }
     }
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -102,25 +104,30 @@ fun OcrScannerBottomSheet(
         } catch (_: Exception) { }
     }
 
-    ModalBottomSheet(
+    Dialog(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnClickOutside = false,
+        ),
     ) {
-        if (hasCameraPermission) {
-            ScannerViewfinder(
-                controller = controller,
-                analyzer = analyzer,
-                analysisExecutor = analysisExecutor,
-                mode = mode,
-                verticalMode = verticalMode,
-                trackedItems = trackedItems,
-                onVerticalModeToggle = { verticalMode = !verticalMode },
-                onGalleryClick = { galleryLauncher.launch("image/*") },
-            )
-        } else {
-            CameraPermissionRequest(
-                onRequest = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-            )
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            if (hasCameraPermission) {
+                ScannerViewfinder(
+                    analyzer = analyzer,
+                    analysisExecutor = analysisExecutor,
+                    mode = mode,
+                    verticalMode = verticalMode,
+                    trackedItems = trackedItems,
+                    onVerticalModeToggle = { verticalMode = !verticalMode },
+                    onGalleryClick = { galleryLauncher.launch("image/*") },
+                    onClose = onDismiss,
+                )
+            } else {
+                CameraPermissionRequest(
+                    onRequest = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                )
+            }
         }
     }
 }
