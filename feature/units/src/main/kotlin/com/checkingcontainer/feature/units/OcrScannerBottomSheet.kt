@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import java.util.concurrent.Executors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +53,10 @@ fun OcrScannerBottomSheet(
     var trackedItems by remember { mutableStateOf(emptyList<DetectedCharacter>()) }
 
     val controller = remember { LifecycleCameraController(context) }
+    // Executor de fondo: el análisis OCR (toBitmap/rotate/crop/projection/ML Kit) NO
+    // debe correr en el hilo principal o produce jank. Los callbacks de ML Kit siguen
+    // disparándose en el hilo principal, así que actualizar estado Compose es seguro.
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
 
     val analyzer = remember(mode) {
         TextRecognitionAnalyzer(
@@ -70,7 +75,10 @@ fun OcrScannerBottomSheet(
     }
 
     DisposableEffect(Unit) {
-        onDispose { controller.unbind() }
+        onDispose {
+            controller.unbind()
+            analysisExecutor.shutdown()
+        }
     }
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -102,6 +110,7 @@ fun OcrScannerBottomSheet(
             ScannerViewfinder(
                 controller = controller,
                 analyzer = analyzer,
+                analysisExecutor = analysisExecutor,
                 mode = mode,
                 verticalMode = verticalMode,
                 trackedItems = trackedItems,

@@ -42,13 +42,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import java.util.concurrent.Executor
 
 @Composable
 internal fun ScannerViewfinder(
     controller: LifecycleCameraController,
     analyzer: TextRecognitionAnalyzer,
+    analysisExecutor: Executor,
     mode: ScannerMode,
     verticalMode: Boolean,
     trackedItems: List<DetectedCharacter>,
@@ -74,7 +75,7 @@ internal fun ScannerViewfinder(
                             )
                             .build(),
                     )
-                    controller.setImageAnalysisAnalyzer(ContextCompat.getMainExecutor(ctx), analyzer)
+                    controller.setImageAnalysisAnalyzer(analysisExecutor, analyzer)
                     previewView.controller = controller
                     controller.bindToLifecycle(lifecycleOwner)
                 }
