@@ -21,8 +21,11 @@ Set-Location $repo
 
 $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 $log   = Join-Path $repo '.sync.log'
+$utf8  = New-Object System.Text.UTF8Encoding($false)  # UTF-8 sin BOM, log legible
 function Note($msg) {
-    "$stamp  $msg" | Tee-Object -FilePath $log -Append
+    $line = "$stamp  $msg"
+    Write-Output $line
+    [System.IO.File]::AppendAllText($log, $line + [Environment]::NewLine, $utf8)
 }
 
 try {
