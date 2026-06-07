@@ -3,19 +3,24 @@ package com.checkingcontainer.feature.units
 import android.graphics.Bitmap
 
 /**
- * Detecta el recuadro de cada carácter mediante Projection Profile.
+ * Detecta el recuadro de cada carácter mediante **componentes conectados** (CCA).
  *
  * Arquitectura: la DETECCIÓN (¿dónde están los caracteres?) se separa del
- * RECONOCIMIENTO (¿qué dicen?). ML Kit hace el reconocimiento; esto la detección
- * — como un detector de caras localiza caras antes de identificarlas.
+ * RECONOCIMIENTO (¿qué dicen?). ML Kit hace el reconocimiento; esto la detección.
+ *
+ * Por qué CCA y no projection profile: en el poste real hay bordes verticales, juntas
+ * y sombras que rellenan TODAS las filas → la proyección horizontal fusionaba los
+ * caracteres en uno o dos bloques. Los componentes conectados son robustos a eso:
+ * cada carácter es una mancha; los bordes/juntas verticales salen como un componente
+ * altísimo que se filtra por tamaño.
  *
  * Cómo funciona:
- *  1. Luminancia por píxel
- *  2. Umbral de Otsu → binariza (maneja oscuro-sobre-claro Y claro-sobre-oscuro)
- *  3. Proyección horizontal (píxeles de carácter por FILA) → rangos Y de cada glifo
- *  4. Para cada rango Y, proyección vertical (por COLUMNA) → extent X del glifo
- *  5. Fusiona segmentos muy cercanos (letras con huecos internos: '8','B','i')
- *  6. Filtra por altura para descartar agujeros/pernos de la esquina
+ *  1. Luminancia + umbral de Otsu.
+ *  2. Polaridad FIJA: texto oscuro sobre fondo claro (caso de los contenedores).
+ *  3. Flood-fill (8-conexión) → un componente por mancha, con su bounding box.
+ *  4. Filtra: bordes/juntas (casi toda la altura), líneas horizontales (casi todo el
+ *     ancho), ruido pequeño y outliers por altura mediana (agujeros/pernos).
+ *  5. Fusiona fragmentos de un mismo carácter (misma banda vertical).
  */
 internal object ProjectionCharDetector {
 
@@ -43,81 +48,94 @@ internal object ProjectionCharDetector {
         }
 
         val threshold = otsuThreshold(lum)
-        // ¿Los caracteres son los píxeles oscuros o los claros? La clase minoritaria.
-        val darkCount = lum.count { it < threshold }
-        val charIsDark = darkCount <= (lum.size - darkCount)
+        // Polaridad FIJA: texto OSCURO sobre fondo CLARO. Auto-detectar la polaridad
+        // causaba que, con mucho fondo oscuro (junta/sombra), se tomara todo el poste
+        // como "carácter" → una sola caja gigante ("todo verde").
+        val fg = BooleanArray(w * h) { i -> lum[i] < threshold }
 
-        fun isFg(idx: Int): Boolean {
-            val dark = lum[idx] < threshold
-            return if (charIsDark) dark else !dark
-        }
-
-        // Proyección horizontal: píxeles de carácter por fila
-        val rowProj = IntArray(h) { y ->
-            var count = 0
-            for (x in 0 until w) if (isFg(y * w + x)) count++
-            count
-        }
-        val avgActivity = rowProj.average().toFloat()
-        val rowThreshold = (avgActivity * 0.4f).toInt().coerceAtLeast(1)
-
-        // Rangos Y de cada carácter
-        val rawSegs = mutableListOf<Pair<Int, Int>>()
-        var inChar = false
-        var startY = 0
-        for (y in 0 until h) {
-            val active = rowProj[y] >= rowThreshold
-            if (!inChar && active) {
-                inChar = true
-                startY = y
-            } else if (inChar && !active) {
-                inChar = false
-                if (y - startY >= MIN_SEG_HEIGHT) rawSegs.add(startY to y)
-            }
-        }
-        if (inChar && h - startY >= MIN_SEG_HEIGHT) rawSegs.add(startY to h)
-        if (rawSegs.isEmpty()) return emptyList()
-
-        // Fusiona segmentos cercanos (huecos internos de letras)
-        val expectedCharH = h / EXPECTED_CHARS
-        val mergeGap = (expectedCharH / 3).coerceAtLeast(MIN_MERGE_GAP)
-        val merged = mutableListOf(rawSegs[0])
-        for (i in 1 until rawSegs.size) {
-            val prev = merged.last()
-            val curr = rawSegs[i]
-            if (curr.first - prev.second < mergeGap) {
-                merged[merged.lastIndex] = prev.first to curr.second
-            } else {
-                merged.add(curr)
-            }
-        }
-
-        // Para cada rango Y, extent en X (proyección vertical dentro del segmento)
-        val glyphs = merged.mapNotNull { (top, bottom) ->
-            val segH = bottom - top
-            val colThreshold = (segH * 0.08f).toInt().coerceAtLeast(1)
-            var left = w
-            var right = -1
-            for (x in 0 until w) {
-                var count = 0
-                for (y in top until bottom) if (isFg(y * w + x)) count++
-                if (count >= colThreshold) {
-                    if (x < left) left = x
-                    if (x > right) right = x
+        // ── Componentes conectados (flood-fill 8-conexión) ───────────────────────
+        val visited = BooleanArray(w * h)
+        val stack = IntArray(w * h)
+        val comps = mutableListOf<Glyph>()
+        for (start in 0 until w * h) {
+            if (!fg[start] || visited[start]) continue
+            var sp = 0
+            stack[sp++] = start
+            visited[start] = true
+            var minX = w; var minY = h; var maxX = 0; var maxY = 0; var area = 0
+            while (sp > 0) {
+                val idx = stack[--sp]
+                val x = idx % w
+                val y = idx / w
+                if (x < minX) minX = x
+                if (x > maxX) maxX = x
+                if (y < minY) minY = y
+                if (y > maxY) maxY = y
+                area++
+                var dy = -1
+                while (dy <= 1) {
+                    var dx = -1
+                    while (dx <= 1) {
+                        if (!(dx == 0 && dy == 0)) {
+                            val nx = x + dx
+                            val ny = y + dy
+                            if (nx in 0 until w && ny in 0 until h) {
+                                val nidx = ny * w + nx
+                                if (fg[nidx] && !visited[nidx]) {
+                                    visited[nidx] = true
+                                    stack[sp++] = nidx
+                                }
+                            }
+                        }
+                        dx++
+                    }
+                    dy++
                 }
             }
-            if (right < left) return@mapNotNull null
-            Glyph(top, bottom, (left - 2).coerceAtLeast(0), (right + 3).coerceAtMost(w))
+            // Filtros de forma/tamaño
+            val cw = maxX - minX + 1
+            val ch = maxY - minY + 1
+            if (ch > h * 0.5f) continue          // borde/junta vertical del poste
+            if (cw > w * 0.9f) continue           // línea horizontal
+            if (ch < MIN_GLYPH_HEIGHT) continue   // ruido bajo
+            if (area < MIN_GLYPH_AREA) continue   // ruido pequeño
+            comps.add(Glyph(minY, maxY + 1, minX, maxX + 1))
         }
-        if (glyphs.isEmpty()) return emptyList()
+        if (comps.isEmpty()) return emptyList()
 
-        // Filtra por altura: descarta agujeros/pernos del cangrejo (outliers)
-        val sortedH = glyphs.map { it.height }.sorted()
+        // Descarta outliers por altura mediana (agujeros/pernos atípicos)
+        val sortedH = comps.map { it.height }.sorted()
         val median = sortedH[sortedH.size / 2]
-        val lo = (median * 0.4f).toInt()
-        val hi = (median * 2.5f).toInt()
-        val filtered = glyphs.filter { it.height in lo..hi }
-        return filtered.ifEmpty { glyphs }
+        val lo = (median * 0.5f).toInt()
+        val hi = (median * 1.8f).toInt()
+        val kept = comps.filter { it.height in lo..hi }.ifEmpty { comps }
+
+        // Fusiona componentes en la misma banda vertical (fragmentos del mismo carácter)
+        val sorted = kept.sortedBy { it.top }
+        val merged = mutableListOf<Glyph>()
+        for (g in sorted) {
+            val last = merged.lastOrNull()
+            if (last != null && overlapY(last, g) > 0.5f) {
+                merged[merged.lastIndex] = Glyph(
+                    minOf(last.top, g.top),
+                    maxOf(last.bottom, g.bottom),
+                    minOf(last.left, g.left),
+                    maxOf(last.right, g.right),
+                )
+            } else {
+                merged.add(g)
+            }
+        }
+        return merged
+    }
+
+    /** Fracción de solapamiento vertical respecto al glifo más bajo (0..1). */
+    private fun overlapY(a: Glyph, b: Glyph): Float {
+        val top = maxOf(a.top, b.top)
+        val bottom = minOf(a.bottom, b.bottom)
+        val inter = (bottom - top).coerceAtLeast(0)
+        val minH = minOf(a.height, b.height).coerceAtLeast(1)
+        return inter.toFloat() / minH
     }
 
     // Método de Otsu: maximiza la varianza entre clases para el umbral óptimo
@@ -151,7 +169,6 @@ internal object ProjectionCharDetector {
         return thresh
     }
 
-    private const val EXPECTED_CHARS = 11 // longitud del ID ISO 6346
-    private const val MIN_SEG_HEIGHT = 6  // ignora ruido más bajo que esto (px)
-    private const val MIN_MERGE_GAP  = 4  // nunca fusiona segmentos más lejos que esto (px)
+    private const val MIN_GLYPH_HEIGHT = 10 // ignora componentes más bajos que esto (px)
+    private const val MIN_GLYPH_AREA   = 20 // ignora manchas con menos píxeles que esto
 }
