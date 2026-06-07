@@ -257,13 +257,13 @@ class TextRecognitionAnalyzer(
         // Fracción del frame (0..1). El recorte del OCR (cropRoi) y el recuadro que
         // dibuja ScannerViewfinder usan ESTOS mismos valores, así que ajusta aquí y
         // ambos cambian juntos. Todos los ROI están centrados.
-        internal const val ROI_VERTICAL_WIDTH  = 0.15f
-        internal const val ROI_VERTICAL_HEIGHT = 0.60f
+        internal const val ROI_VERTICAL_WIDTH  = 0.18f
+        internal const val ROI_VERTICAL_HEIGHT = 0.85f
         internal const val ROI_HORIZ_WIDTH     = 0.80f
         internal const val ROI_HORIZ_HEIGHT    = 0.20f
 
         // Tira sintética: cada glifo se normaliza a esta altura y se pegan en fila.
-        private const val STRIP_GLYPH_HEIGHT = 64
+        private const val STRIP_GLYPH_HEIGHT = 96
         private const val STRIP_PADDING      = 16
         private const val STRIP_GAP          = 16
 

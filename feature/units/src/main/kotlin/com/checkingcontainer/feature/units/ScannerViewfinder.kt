@@ -103,8 +103,11 @@ internal fun ScannerViewfinder(
                         val resolutionSelector = ResolutionSelector.Builder()
                             .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
                             .setResolutionStrategy(
+                                // 1080p: más píxeles por carácter (ML Kit necesita ≥16-24px
+                                // por char). 720p quedaba corto al alejarse del poste. No 4K
+                                // (ralentiza el modelo sin mejorar).
                                 ResolutionStrategy(
-                                    android.util.Size(1280, 720),
+                                    android.util.Size(1920, 1080),
                                     ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
                                 ),
                             )
