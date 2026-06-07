@@ -10,6 +10,12 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -66,6 +72,18 @@ internal fun ScannerViewfinder(
     var camera by remember { mutableStateOf<Camera?>(null) }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
+    // Línea de escaneo: barrido vertical continuo dentro del ROI (feedback de actividad).
+    val scanTransition = rememberInfiniteTransition(label = "scan")
+    val scanFraction by scanTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "scanLine",
+    )
+
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
             factory = { ctx ->
@@ -117,61 +135,58 @@ internal fun ScannerViewfinder(
             modifier = Modifier.fillMaxSize(),
         )
 
-        // Overlay del ROI + tracking. Como el ViewPort recorta el análisis al mismo
-        // FOV que el preview, las coordenadas relativas (0..1) mapean directo a la
-        // vista: basta multiplicar por el tamaño. Sin matemática FILL_CENTER manual.
+        // Overlay: scrim + ROI + línea de escaneo + tracking. Con ViewPort el análisis
+        // comparte FOV con el preview, así las coordenadas relativas (0..1) mapean
+        // directo a la vista (multiplicar por el tamaño). Sin matemática FILL_CENTER.
+        val detecting = trackedItems.isNotEmpty()
         Canvas(modifier = Modifier.fillMaxSize()) {
             val stroke = 4.dp.toPx()
-            val corner = 36.dp.toPx()
             val white = Color.White
             val accent = Color(0xFF00E676)
+            val borderColor = if (detecting) accent else white.copy(alpha = 0.85f)
 
-            if (verticalMode) {
-                val roiW = size.width * 0.15f
-                val roiLeft = (size.width - roiW) / 2f
-                val roiRight = roiLeft + roiW
-                val roiTop = size.height * 0.10f
-                val roiBottom = size.height * 0.90f
-                val roiH = roiBottom - roiTop
+            // ROI centrado según el modo
+            val roiW = if (verticalMode) size.width * 0.15f else size.width * 0.80f
+            val roiH = if (verticalMode) size.height * 0.80f else size.height * 0.35f
+            val roiLeft = (size.width - roiW) / 2f
+            val roiTop = (size.height - roiH) / 2f
+            val roiRight = roiLeft + roiW
+            val roiBottom = roiTop + roiH
 
-                drawRect(
-                    color = white.copy(alpha = 0.06f),
-                    topLeft = Offset(roiLeft, roiTop),
-                    size = Size(roiW, roiH),
-                )
-                drawRect(
-                    color = white.copy(alpha = 0.7f),
-                    topLeft = Offset(roiLeft, roiTop),
-                    size = Size(roiW, roiH),
-                    style = Stroke(width = stroke),
-                )
-                val c = corner * 0.7f
-                val s = stroke * 1.5f
-                drawLine(accent, Offset(roiLeft, roiTop), Offset(roiLeft + c, roiTop), s)
-                drawLine(accent, Offset(roiLeft, roiTop), Offset(roiLeft, roiTop + c), s)
-                drawLine(accent, Offset(roiRight, roiTop), Offset(roiRight - c, roiTop), s)
-                drawLine(accent, Offset(roiRight, roiTop), Offset(roiRight, roiTop + c), s)
-                drawLine(accent, Offset(roiLeft, roiBottom), Offset(roiLeft + c, roiBottom), s)
-                drawLine(accent, Offset(roiLeft, roiBottom), Offset(roiLeft, roiBottom - c), s)
-                drawLine(accent, Offset(roiRight, roiBottom), Offset(roiRight - c, roiBottom), s)
-                drawLine(accent, Offset(roiRight, roiBottom), Offset(roiRight, roiBottom - c), s)
-            } else {
-                // ROI horizontal: 80% ancho × 35% alto centrado, con marcas de esquina.
-                val roiW = size.width * 0.80f
-                val roiH = size.height * 0.35f
-                val roiLeft = (size.width - roiW) / 2f
-                val roiTop = (size.height - roiH) / 2f
-                val roiRight = roiLeft + roiW
-                val roiBottom = roiTop + roiH
-                drawLine(white, Offset(roiLeft, roiTop), Offset(roiLeft + corner, roiTop), stroke)
-                drawLine(white, Offset(roiLeft, roiTop), Offset(roiLeft, roiTop + corner), stroke)
-                drawLine(white, Offset(roiRight, roiTop), Offset(roiRight - corner, roiTop), stroke)
-                drawLine(white, Offset(roiRight, roiTop), Offset(roiRight, roiTop + corner), stroke)
-                drawLine(white, Offset(roiLeft, roiBottom), Offset(roiLeft + corner, roiBottom), stroke)
-                drawLine(white, Offset(roiLeft, roiBottom), Offset(roiLeft, roiBottom - corner), stroke)
-                drawLine(white, Offset(roiRight, roiBottom), Offset(roiRight - corner, roiBottom), stroke)
-                drawLine(white, Offset(roiRight, roiBottom), Offset(roiRight, roiBottom - corner), stroke)
-            }
+            // Scrim: oscurece todo menos el ROI (4 rectángulos alrededor)
+            val scrim = Color.Black.copy(alpha = 0.5f)
+            drawRect(scrim, Offset(0f, 0f), Size(size.width, roiTop))
+            drawRect(scrim, Offset(0f, roiBottom), Size(size.width, size.height - roiBottom))
+            drawRect(scrim, Offset(0f, roiTop), Size(roiLeft, roiH))
+            drawRect(scrim, Offset(roiRight, roiTop), Size(size.width - roiRight, roiH))
+
+            // Borde del ROI (verde cuando detecta texto)
+            drawRect(
+                color = borderColor,
+                topLeft = Offset(roiLeft, roiTop),
+                size = Size(roiW, roiH),
+                style = Stroke(width = stroke),
+            )
+            // Marcas de esquina en acento
+            val c = 28.dp.toPx()
+            val cs = stroke * 1.4f
+            drawLine(accent, Offset(roiLeft, roiTop), Offset(roiLeft + c, roiTop), cs)
+            drawLine(accent, Offset(roiLeft, roiTop), Offset(roiLeft, roiTop + c), cs)
+            drawLine(accent, Offset(roiRight, roiTop), Offset(roiRight - c, roiTop), cs)
+            drawLine(accent, Offset(roiRight, roiTop), Offset(roiRight, roiTop + c), cs)
+            drawLine(accent, Offset(roiLeft, roiBottom), Offset(roiLeft + c, roiBottom), cs)
+            drawLine(accent, Offset(roiLeft, roiBottom), Offset(roiLeft, roiBottom - c), cs)
+            drawLine(accent, Offset(roiRight, roiBottom), Offset(roiRight - c, roiBottom), cs)
+            drawLine(accent, Offset(roiRight, roiBottom), Offset(roiRight, roiBottom - c), cs)
+
+            // Línea de escaneo: barrido continuo dentro del ROI
+            val scanY = roiTop + scanFraction * roiH
+            drawLine(
+                color = accent.copy(alpha = 0.85f),
+                start = Offset(roiLeft + stroke, scanY),
+                end = Offset(roiRight - stroke, scanY),
+                strokeWidth = 2.dp.toPx(),
+            )
 
             // Tracking: un recuadro verde por carácter detectado por ML Kit.
             for (item in trackedItems) {
@@ -208,9 +223,11 @@ internal fun ScannerViewfinder(
         }
 
         Text(
-            text = when (mode) {
-                ScannerMode.CONTAINER -> if (verticalMode) "Modo vertical — apunte a la columna" else "Encuadre el número de contenedor"
-                ScannerMode.DATA_PLATE -> "Encuadre la placa de datos"
+            text = when {
+                detecting -> "Detectando… mantenga firme"
+                mode == ScannerMode.DATA_PLATE -> "Encuadre la placa de datos"
+                verticalMode -> "Modo vertical — apunte a la columna"
+                else -> "Encuadre el número de contenedor"
             },
             color = Color.White,
             style = MaterialTheme.typography.titleSmall,
