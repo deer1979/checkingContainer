@@ -226,15 +226,23 @@ class TextRecognitionAnalyzer(
          * - Posiciones 0-3: deben ser letras (O→0, I→1, B→8 en sentido contrario)
          * - Posiciones 4-10: deben ser dígitos (0→O, 1→I, 8→B en sentido contrario)
          */
+        private val CATEGORY_LETTERS = setOf('U', 'J', 'Z')
+
         internal fun correctContainerChars(raw: String): String {
             if (raw.length != 11) return raw
             return buildString(11) {
                 for (i in raw.indices) {
                     val c = raw[i].uppercaseChar()
-                    if (i < 4) {
-                        append(when (c) { '0' -> 'O'; '1' -> 'I'; '8' -> 'B'; '5' -> 'S'; else -> c })
-                    } else {
-                        append(when (c) { 'O' -> '0'; 'I' -> '1'; 'B' -> '8'; 'S' -> '5'; 'G' -> '6'; 'Z' -> '2'; else -> c })
+                    when {
+                        // 4ª letra = identificador de categoría. En reefers es siempre U,
+                        // así que tras la corrección dígito→letra, si no es U/J/Z forzamos
+                        // U. isValid luego revalida el dígito: si la U no cuadra, se rechaza.
+                        i == 3 -> {
+                            val letter = when (c) { '0' -> 'O'; '1' -> 'I'; '8' -> 'B'; '5' -> 'S'; else -> c }
+                            append(if (letter in CATEGORY_LETTERS) letter else 'U')
+                        }
+                        i < 4 -> append(when (c) { '0' -> 'O'; '1' -> 'I'; '8' -> 'B'; '5' -> 'S'; else -> c })
+                        else -> append(when (c) { 'O' -> '0'; 'I' -> '1'; 'B' -> '8'; 'S' -> '5'; 'G' -> '6'; 'Z' -> '2'; else -> c })
                     }
                 }
             }

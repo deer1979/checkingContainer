@@ -6,6 +6,12 @@ package com.checkingcontainer.feature.units
  */
 object Iso6346 {
 
+    // Identificador de categoría (4ª letra, posición 3). Por norma ISO 6346 solo puede
+    // ser U (contenedores), J (equipo desmontable) o Z (chasis/remolques). Sin esta
+    // restricción, el dígito verificador valida por error lecturas como A o K en vez de
+    // U (A=10, K=21, U=32 → todas ≡ 10 mod 11, mismo check digit en la posición 3).
+    private val CATEGORY_IDENTIFIERS = setOf('U', 'J', 'Z')
+
     private val CHAR_VALUES: Map<Char, Int> = buildMap {
         for (i in 0..9) put('0' + i, i)
         var v = 10
@@ -40,6 +46,7 @@ object Iso6346 {
         val s = input.trim().uppercase()
         if (s.length != 11) return false
         if (s.take(4).any { !it.isLetter() }) return false
+        if (s[3] !in CATEGORY_IDENTIFIERS) return false   // identificador de categoría
         if (s.drop(4).take(6).any { !it.isDigit() }) return false
         if (!s[10].isDigit()) return false
 
