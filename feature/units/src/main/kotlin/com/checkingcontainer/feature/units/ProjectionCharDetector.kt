@@ -1,104 +1,126 @@
 package com.checkingcontainer.feature.units
 
 import android.graphics.Bitmap
-import kotlin.math.abs
 
 /**
- * Detects individual character bounding boxes using Horizontal Projection Profile.
+ * Detecta el recuadro de cada carácter mediante Projection Profile.
  *
- * Architecture: DETECTION (where are the chars?) is separate from RECOGNITION (what do they say?).
- * ML Kit handles recognition; this handles detection — like face detection finds faces
- * before the system reads who they are.
+ * Arquitectura: la DETECCIÓN (¿dónde están los caracteres?) se separa del
+ * RECONOCIMIENTO (¿qué dicen?). ML Kit hace el reconocimiento; esto la detección
+ * — como un detector de caras localiza caras antes de identificarlas.
  *
- * How it works:
- *  1. Compute luminance per pixel
- *  2. Otsu threshold → binarize (handles dark-on-light AND light-on-dark)
- *  3. Count foreground pixels per row → projection profile
- *  4. Rows above threshold = character rows; rows below = gaps
- *  5. Merge very close segments (handles letters with internal gaps: '8', 'B', 'i')
+ * Cómo funciona:
+ *  1. Luminancia por píxel
+ *  2. Umbral de Otsu → binariza (maneja oscuro-sobre-claro Y claro-sobre-oscuro)
+ *  3. Proyección horizontal (píxeles de carácter por FILA) → rangos Y de cada glifo
+ *  4. Para cada rango Y, proyección vertical (por COLUMNA) → extent X del glifo
+ *  5. Fusiona segmentos muy cercanos (letras con huecos internos: '8','B','i')
+ *  6. Filtra por altura para descartar agujeros/pernos de la esquina
  */
 internal object ProjectionCharDetector {
 
-    data class Segment(val top: Int, val bottom: Int) {
+    /** Recuadro de un carácter dentro del crop (coordenadas en píxeles del crop). */
+    data class Glyph(val top: Int, val bottom: Int, val left: Int, val right: Int) {
         val height: Int get() = bottom - top
-        val centerY: Int get() = (top + bottom) / 2
+        val width: Int get() = right - left
     }
 
-    /**
-     * Returns character segments sorted top-to-bottom.
-     * Each segment gives the Y range of one detected character in the crop.
-     */
-    fun detect(crop: Bitmap): List<Segment> {
+    /** Devuelve los glifos detectados, ordenados de arriba a abajo. */
+    fun detectGlyphs(crop: Bitmap): List<Glyph> {
         val w = crop.width
         val h = crop.height
         if (w == 0 || h == 0) return emptyList()
 
-        // Read all pixels in a single call (much faster than per-pixel getPixel)
         val pixels = IntArray(w * h)
         crop.getPixels(pixels, 0, w, 0, 0, w, h)
 
-        // Integer luminance: (77R + 150G + 29B) >> 8  ≈  0.299R + 0.587G + 0.114B
+        // Luminancia entera: (77R + 150G + 29B) >> 8 ≈ 0.299R + 0.587G + 0.114B
         val lum = IntArray(w * h) { i ->
             val p = pixels[i]
             ((p shr 16 and 0xFF) * 77 +
-             (p shr 8  and 0xFF) * 150 +
-             (p        and 0xFF) * 29) ushr 8
+                (p shr 8 and 0xFF) * 150 +
+                (p and 0xFF) * 29) ushr 8
         }
 
-        // Otsu's threshold: optimal split between foreground and background
         val threshold = otsuThreshold(lum)
-
-        // Determine polarity: are characters the DARK or the LIGHT pixels?
-        // Whichever class is smaller (minority) = characters
+        // ¿Los caracteres son los píxeles oscuros o los claros? La clase minoritaria.
         val darkCount = lum.count { it < threshold }
         val charIsDark = darkCount <= (lum.size - darkCount)
 
-        // Horizontal projection: count character pixels per row
-        val projection = IntArray(h) { y ->
-            var count = 0
-            for (x in 0 until w) {
-                val isDark = lum[y * w + x] < threshold
-                if (if (charIsDark) isDark else !isDark) count++
-            }
-            count
+        fun isFg(idx: Int): Boolean {
+            val dark = lum[idx] < threshold
+            return if (charIsDark) dark else !dark
         }
 
-        // Adaptive row threshold: a row "has a character" if it has at least
-        // half the average character-pixel count across the whole crop
-        val avgActivity = projection.average().toFloat()
+        // Proyección horizontal: píxeles de carácter por fila
+        val rowProj = IntArray(h) { y ->
+            var count = 0
+            for (x in 0 until w) if (isFg(y * w + x)) count++
+            count
+        }
+        val avgActivity = rowProj.average().toFloat()
         val rowThreshold = (avgActivity * 0.4f).toInt().coerceAtLeast(1)
 
-        // Find runs of active rows → raw character segments
-        val raw = mutableListOf<Segment>()
+        // Rangos Y de cada carácter
+        val rawSegs = mutableListOf<Pair<Int, Int>>()
         var inChar = false
         var startY = 0
         for (y in 0 until h) {
-            val active = projection[y] >= rowThreshold
+            val active = rowProj[y] >= rowThreshold
             if (!inChar && active) {
                 inChar = true
                 startY = y
             } else if (inChar && !active) {
                 inChar = false
-                val seg = Segment(startY, y)
-                if (seg.height >= MIN_SEG_HEIGHT) raw.add(seg)
+                if (y - startY >= MIN_SEG_HEIGHT) rawSegs.add(startY to y)
             }
         }
-        if (inChar) {
-            val seg = Segment(startY, h)
-            if (seg.height >= MIN_SEG_HEIGHT) raw.add(seg)
-        }
+        if (inChar && h - startY >= MIN_SEG_HEIGHT) rawSegs.add(startY to h)
+        if (rawSegs.isEmpty()) return emptyList()
 
-        if (raw.isEmpty()) return emptyList()
-
-        // Merge segments that are too close together.
-        // Gap threshold ≈ 1/3 of the expected character height.
-        // This handles letters with internal gaps ('8', 'B', 'R', dot of 'i').
+        // Fusiona segmentos cercanos (huecos internos de letras)
         val expectedCharH = h / EXPECTED_CHARS
         val mergeGap = (expectedCharH / 3).coerceAtLeast(MIN_MERGE_GAP)
-        return mergeClose(raw, mergeGap)
+        val merged = mutableListOf(rawSegs[0])
+        for (i in 1 until rawSegs.size) {
+            val prev = merged.last()
+            val curr = rawSegs[i]
+            if (curr.first - prev.second < mergeGap) {
+                merged[merged.lastIndex] = prev.first to curr.second
+            } else {
+                merged.add(curr)
+            }
+        }
+
+        // Para cada rango Y, extent en X (proyección vertical dentro del segmento)
+        val glyphs = merged.mapNotNull { (top, bottom) ->
+            val segH = bottom - top
+            val colThreshold = (segH * 0.08f).toInt().coerceAtLeast(1)
+            var left = w
+            var right = -1
+            for (x in 0 until w) {
+                var count = 0
+                for (y in top until bottom) if (isFg(y * w + x)) count++
+                if (count >= colThreshold) {
+                    if (x < left) left = x
+                    if (x > right) right = x
+                }
+            }
+            if (right < left) return@mapNotNull null
+            Glyph(top, bottom, (left - 2).coerceAtLeast(0), (right + 3).coerceAtMost(w))
+        }
+        if (glyphs.isEmpty()) return emptyList()
+
+        // Filtra por altura: descarta agujeros/pernos del cangrejo (outliers)
+        val sortedH = glyphs.map { it.height }.sorted()
+        val median = sortedH[sortedH.size / 2]
+        val lo = (median * 0.4f).toInt()
+        val hi = (median * 2.5f).toInt()
+        val filtered = glyphs.filter { it.height in lo..hi }
+        return filtered.ifEmpty { glyphs }
     }
 
-    // Otsu's method: maximizes between-class variance to find the optimal threshold
+    // Método de Otsu: maximiza la varianza entre clases para el umbral óptimo
     private fun otsuThreshold(lum: IntArray): Int {
         val hist = IntArray(256)
         for (v in lum) hist[v]++
@@ -129,22 +151,7 @@ internal object ProjectionCharDetector {
         return thresh
     }
 
-    private fun mergeClose(segments: List<Segment>, minGap: Int): List<Segment> {
-        if (segments.size <= 1) return segments
-        val result = mutableListOf(segments[0])
-        for (i in 1 until segments.size) {
-            val prev = result.last()
-            val curr = segments[i]
-            if (curr.top - prev.bottom < minGap) {
-                result[result.lastIndex] = Segment(prev.top, curr.bottom)
-            } else {
-                result.add(curr)
-            }
-        }
-        return result
-    }
-
-    private const val EXPECTED_CHARS   = 11   // ISO 6346 container ID length
-    private const val MIN_SEG_HEIGHT   = 6    // ignore noise segments shorter than this (px)
-    private const val MIN_MERGE_GAP    = 4    // never merge segments farther apart than this (px)
+    private const val EXPECTED_CHARS = 11 // longitud del ID ISO 6346
+    private const val MIN_SEG_HEIGHT = 6  // ignora ruido más bajo que esto (px)
+    private const val MIN_MERGE_GAP  = 4  // nunca fusiona segmentos más lejos que esto (px)
 }

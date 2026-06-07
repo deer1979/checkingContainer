@@ -1,7 +1,10 @@
 package com.checkingcontainer.feature.units
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import androidx.annotation.OptIn
@@ -64,98 +67,87 @@ class TextRecognitionAnalyzer(
         val roiTop  = (bitmap.height - crop.height) / 2f
         val frameW  = bitmap.width.toFloat()
         val frameH  = bitmap.height.toFloat()
-        val cropW   = crop.width.toFloat()
 
-        // ── DETECCIÓN (WHERE) ────────────────────────────────────────────────────
-        // Projection analysis: encuentra las Y de cada carácter de forma independiente
-        // a cómo ML Kit agrupa el texto. Análogo a face-detection encontrando caras
-        // antes de identificarlas. Se ejecuta sincrónicamente aquí (rápido, ~3ms).
-        val projSegments: List<ProjectionCharDetector.Segment> =
-            if (vertical) ProjectionCharDetector.detect(crop) else emptyList()
+        if (vertical) processVertical(crop, roiLeft, roiTop, frameW, frameH)
+        else processHorizontal(crop, roiLeft, roiTop, frameW, frameH)
+    }
 
-        // ── RECONOCIMIENTO (WHAT) ────────────────────────────────────────────────
-        // ML Kit lee qué dice el texto. Es confiable para el contenido aunque falla
-        // en las posiciones cuando el texto es vertical.
+    /**
+     * Vertical (Caso A: caracteres derechos apilados). ML Kit Latin no sabe leer texto
+     * vertical, así que NO le damos la columna. En su lugar: la proyección detecta cada
+     * glifo (DÓNDE), recortamos cada uno y los pegamos en una LÍNEA HORIZONTAL sintética
+     * (composeStrip); a ML Kit le damos esa "palabra" normal (QUÉ). Esto endereza el skew
+     * y juega a favor de ML Kit. Los agujeros/pernos se reconocen como nada y se filtran.
+     */
+    private fun processVertical(crop: Bitmap, roiLeft: Float, roiTop: Float, frameW: Float, frameH: Float) {
+        val glyphs = ProjectionCharDetector.detectGlyphs(crop)
+
+        // Overlay de depuración: una caja real por glifo detectado (sin texto aún).
+        onTrackingUpdated(
+            glyphs.map { g ->
+                DetectedCharacter(
+                    text = "",
+                    boundingBox = RectF(
+                        (roiLeft + g.left)   / frameW,
+                        (roiTop  + g.top)    / frameH,
+                        (roiLeft + g.right)  / frameW,
+                        (roiTop  + g.bottom) / frameH,
+                    ),
+                )
+            },
+        )
+
+        val strip = composeStrip(crop, glyphs) ?: return
+        recognizer.process(InputImage.fromBitmap(strip, 0))
+            .addOnSuccessListener { visionText ->
+                val raw = visionText.text.filter { it.isLetterOrDigit() }.uppercase()
+
+                // Auto-detect: 11 chars que validan ISO (corrección + fix de la U)
+                if (raw.length == 11) {
+                    val corrected = correctContainerChars(raw)
+                    if (Iso6346.isValid(corrected) && done.compareAndSet(false, true)) {
+                        onValidContainerIdFound(corrected)
+                        return@addOnSuccessListener
+                    }
+                }
+
+                // MODO PRUEBA: al pulsar el disparador devuelve el texto CRUDO de la tira
+                // sintética, para medir la precisión real antes de exigir validación.
+                if (captureRequested.get() && raw.isNotEmpty() && done.compareAndSet(false, true)) {
+                    onValidContainerIdFound(raw)
+                }
+            }
+    }
+
+    /** Horizontal: ML Kit lee la línea normalmente; los Symbol.boundingBox son correctos. */
+    private fun processHorizontal(crop: Bitmap, roiLeft: Float, roiTop: Float, frameW: Float, frameH: Float) {
         recognizer.process(InputImage.fromBitmap(crop, 0))
             .addOnSuccessListener { visionText ->
-
-                if (vertical) {
-                    // Texto de ML Kit: correcto en contenido aunque incorrecto en posiciones
-                    val allChars = visionText.textBlocks
-                        .flatMap { it.lines }
-                        .sortedBy { it.boundingBox?.top ?: 0 }
-                        .joinToString("") { line ->
-                            line.text.filter { c -> c.isUpperCase() || c.isDigit() }
+                val candidates: List<Pair<String, Rect>> = visionText.textBlocks
+                    .flatMap { it.lines }
+                    .flatMap { it.elements }
+                    .flatMap { element ->
+                        val syms = element.symbols
+                        when {
+                            syms.isNotEmpty() ->
+                                syms.mapNotNull { sym ->
+                                    if (sym.confidence >= CONFIDENCE_THRESHOLD)
+                                        sym.boundingBox?.let { sym.text to it }
+                                    else null
+                                }
+                            element.text.length == 1 ->
+                                element.boundingBox?.let {
+                                    listOf(element.text to it)
+                                } ?: emptyList()
+                            else -> emptyList()
                         }
-
-                    // Posiciones de proyección: correctas en Y, independientes del texto
-                    val segs = projSegments
-
-                    if (allChars.isNotEmpty() && segs.isNotEmpty()) {
-                        // Parear: texto[i] → posición segs[i]
-                        val count = minOf(allChars.length, segs.size)
-                        val tracked = (0 until count).map { i ->
-                            val seg = segs[i]
-                            DetectedCharacter(
-                                text = allChars[i].toString(),
-                                boundingBox = RectF(
-                                    roiLeft            / frameW,
-                                    (roiTop + seg.top) / frameH,
-                                    (roiLeft + cropW)  / frameW,
-                                    (roiTop + seg.bottom) / frameH,
-                                ),
-                            )
-                        }
-                        onTrackingUpdated(tracked)
-
-                        // Auto-detect vertical: corrección por posición + dígito verificador
-                        if (allChars.length == 11) {
-                            val corrected = correctContainerChars(allChars)
-                            if (Iso6346.isValid(corrected) && done.compareAndSet(false, true)) {
-                                onValidContainerIdFound(corrected)
-                                return@addOnSuccessListener
-                            }
-                        }
-
-                        // MODO PRUEBA vertical: sin regla ISO. Al pulsar el disparador
-                        // devuelve el texto CRUDO que leyó ML Kit (sin corrección ni
-                        // validación), para medir la precisión real del reconocimiento
-                        // vertical antes de volver a exigir validación.
-                        if (captureRequested.get() && done.compareAndSet(false, true)) {
-                            onValidContainerIdFound(allChars)
-                            return@addOnSuccessListener
-                        }
-                    } else {
-                        onTrackingUpdated(emptyList())
                     }
+                    .filter { (text, _) -> text.matches(CHAR_REGEX) }
 
-                } else {
-                    // ─── MODO HORIZONTAL ─────────────────────────────────────────
-                    // Para texto horizontal los Symbol.boundingBox son correctos.
-                    val candidates: List<Pair<String, Rect>> = visionText.textBlocks
-                        .flatMap { it.lines }
-                        .flatMap { it.elements }
-                        .flatMap { element ->
-                            val syms = element.symbols
-                            when {
-                                syms.isNotEmpty() ->
-                                    syms.mapNotNull { sym ->
-                                        if (sym.confidence >= CONFIDENCE_THRESHOLD)
-                                            sym.boundingBox?.let { sym.text to it }
-                                        else null
-                                    }
-                                element.text.length == 1 ->
-                                    element.boundingBox?.let {
-                                        listOf(element.text to it)
-                                    } ?: emptyList()
-                                else -> emptyList()
-                            }
-                        }
-                        .filter { (text, _) -> text.matches(CHAR_REGEX) }
+                val column = groupByColumn(candidates).sortedBy { it.second.top }
 
-                    val column = groupByColumn(candidates).sortedBy { it.second.top }
-
-                    val tracked = column.map { (text, box) ->
+                onTrackingUpdated(
+                    column.map { (text, box) ->
                         DetectedCharacter(
                             text = text,
                             boundingBox = RectF(
@@ -165,27 +157,25 @@ class TextRecognitionAnalyzer(
                                 (roiTop  + box.bottom) / frameH,
                             ),
                         )
-                    }
-                    onTrackingUpdated(tracked)
+                    },
+                )
 
-                    // Auto-detect horizontal: busca 11 chars consecutivos en el texto OCR,
-                    // aplica corrección por posición y valida dígito verificador ISO 6346
-                    if (mode == ScannerMode.CONTAINER && !done.get()) {
-                        val raw = visionText.textBlocks
-                            .flatMap { it.lines }
-                            .joinToString("") { it.text.filter { c -> c.isLetter() || c.isDigit() } }
-                            .uppercase()
-                        Regex("[A-Z0-9]{11}").findAll(raw).forEach { match ->
-                            val corrected = correctContainerChars(match.value)
-                            if (Iso6346.isValid(corrected) && done.compareAndSet(false, true)) {
-                                onValidContainerIdFound(corrected)
-                                return@addOnSuccessListener
-                            }
+                // Auto-detect horizontal: 11 chars consecutivos, corrección + dígito ISO 6346
+                if (mode == ScannerMode.CONTAINER && !done.get()) {
+                    val raw = visionText.textBlocks
+                        .flatMap { it.lines }
+                        .joinToString("") { it.text.filter { c -> c.isLetter() || c.isDigit() } }
+                        .uppercase()
+                    Regex("[A-Z0-9]{11}").findAll(raw).forEach { match ->
+                        val corrected = correctContainerChars(match.value)
+                        if (Iso6346.isValid(corrected) && done.compareAndSet(false, true)) {
+                            onValidContainerIdFound(corrected)
+                            return@addOnSuccessListener
                         }
                     }
                 }
 
-                // Captura manual (botón disparador, ambos modos)
+                // Captura manual (botón disparador)
                 if (!captureRequested.get()) return@addOnSuccessListener
                 val result = when (mode) {
                     ScannerMode.CONTAINER  -> parseContainer(visionText.text)
@@ -256,6 +246,47 @@ class TextRecognitionAnalyzer(
         internal const val ROI_VERTICAL_HEIGHT = 0.60f
         internal const val ROI_HORIZ_WIDTH     = 0.80f
         internal const val ROI_HORIZ_HEIGHT    = 0.20f
+
+        // Tira sintética: cada glifo se normaliza a esta altura y se pegan en fila.
+        private const val STRIP_GLYPH_HEIGHT = 64
+        private const val STRIP_PADDING      = 16
+        private const val STRIP_GAP          = 16
+
+        /**
+         * Compone una LÍNEA HORIZONTAL a partir de los glifos verticales: recorta cada
+         * uno del crop, lo escala a una altura común y los pega de izquierda a derecha
+         * sobre fondo blanco. Así ML Kit recibe una "palabra" horizontal normal — su
+         * caso fuerte — en vez de la columna vertical que no sabe leer. Endereza el skew
+         * (cada glifo va recto) y los agujeros del cangrejo se vuelven ruido inocuo.
+         * Nota: los números de contenedor son oscuro-sobre-claro, que es lo que asume
+         * este pegado sobre blanco (caso real de los reefer).
+         */
+        private fun composeStrip(crop: Bitmap, glyphs: List<ProjectionCharDetector.Glyph>): Bitmap? {
+            if (glyphs.isEmpty()) return null
+            val targetH = STRIP_GLYPH_HEIGHT
+            val widths = glyphs.map { g ->
+                ((g.width.toFloat() * targetH) / g.height.coerceAtLeast(1))
+                    .toInt().coerceIn(1, targetH * 3)
+            }
+            val totalW = STRIP_PADDING * 2 + widths.sum() + STRIP_GAP * (glyphs.size - 1)
+            val strip = Bitmap.createBitmap(
+                totalW.coerceAtLeast(1),
+                targetH + STRIP_PADDING * 2,
+                Bitmap.Config.ARGB_8888,
+            )
+            val canvas = Canvas(strip)
+            canvas.drawColor(Color.WHITE)
+            val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+            var x = STRIP_PADDING
+            for (i in glyphs.indices) {
+                val g = glyphs[i]
+                val src = Rect(g.left, g.top, g.right, g.bottom)
+                val dst = Rect(x, STRIP_PADDING, x + widths[i], STRIP_PADDING + targetH)
+                canvas.drawBitmap(crop, src, dst, paint)
+                x += widths[i] + STRIP_GAP
+            }
+            return strip
+        }
 
         private fun Bitmap.cropTo(rect: Rect): Bitmap {
             val x = rect.left.coerceIn(0, width - 1)
