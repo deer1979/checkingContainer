@@ -4,6 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,8 +31,9 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.Executors
 
 /**
- * Escáner OCR a pantalla completa (Dialog). Antes era un ModalBottomSheet de altura
- * fija; ahora ocupa toda la pantalla, como las apps grandes de escaneo.
+ * Escáner OCR de **foto estática** a pantalla completa. Apuntas, tocas el disparador,
+ * se captura una foto full-res y [StillCodeRecognizer] la procesa (deskew + binarizado
+ * + varias tuberías) devolviendo el mejor esfuerzo, que rellena el campo (editable).
  */
 @Composable
 fun OcrScannerBottomSheet(
@@ -56,33 +60,58 @@ fun OcrScannerBottomSheet(
     }
 
     var verticalMode by remember { mutableStateOf(initialVertical) }
-    var trackedItems by remember { mutableStateOf(emptyList<DetectedCharacter>()) }
+    var processing by remember { mutableStateOf(false) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
 
-    // Executor de fondo: el análisis OCR (toBitmap/rotate/crop/projection/ML Kit) NO
-    // debe correr en el hilo principal o produce jank. Los callbacks de ML Kit siguen
-    // disparándose en el hilo principal, así que actualizar estado Compose es seguro.
-    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
-
-    val analyzer = remember(mode) {
-        TextRecognitionAnalyzer(
-            mode = mode,
-            isVerticalMode = { verticalMode },
-            onTrackingUpdated = { trackedItems = it },
-            onValidContainerIdFound = { containerId ->
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onSuccess(mapOf("Container No." to containerId))
-            },
-            onSuccess = { fields ->
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onSuccess(fields)
-            },
-        )
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .build()
     }
+    // Hilo de fondo para la captura + el reconocimiento pesado (Tasks.await bloquea).
+    val captureExecutor = remember { Executors.newSingleThreadExecutor() }
+    val mainExecutor = remember { ContextCompat.getMainExecutor(context) }
 
     DisposableEffect(Unit) {
-        onDispose { analysisExecutor.shutdown() }
+        onDispose { captureExecutor.shutdown() }
     }
 
+    val onShutter: () -> Unit = {
+        if (!processing) {
+            processing = true
+            statusMessage = null
+            imageCapture.takePicture(
+                captureExecutor,
+                object : ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) {
+                        val result = try {
+                            StillCodeRecognizer.recognize(image, mode, verticalMode)
+                        } finally {
+                            image.close()
+                        }
+                        mainExecutor.execute {
+                            processing = false
+                            if (result != null) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onSuccess(result)
+                            } else {
+                                statusMessage = "No se detectó. Acérquese al número y reintente."
+                            }
+                        }
+                    }
+
+                    override fun onError(exception: ImageCaptureException) {
+                        mainExecutor.execute {
+                            processing = false
+                            statusMessage = "Error al capturar. Reintente."
+                        }
+                    }
+                },
+            )
+        }
+    }
+
+    // Galería: ML Kit directo sobre la imagen (sin ROI). Útil para fotos horizontales.
     val galleryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
     ) { uri ->
@@ -93,12 +122,14 @@ fun OcrScannerBottomSheet(
                 .process(image)
                 .addOnSuccessListener { visionText ->
                     val result = when (mode) {
-                        ScannerMode.CONTAINER -> TextRecognitionAnalyzer.parseContainer(visionText.text)
-                        ScannerMode.DATA_PLATE -> TextRecognitionAnalyzer.parseDataPlate(visionText.text)
+                        ScannerMode.CONTAINER -> StillCodeRecognizer.parseContainer(visionText.text)
+                        ScannerMode.DATA_PLATE -> StillCodeRecognizer.parseDataPlate(visionText.text)
                     }
                     if (result != null) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onSuccess(result)
+                    } else {
+                        statusMessage = "No se detectó en la imagen."
                     }
                 }
         } catch (_: Exception) { }
@@ -114,11 +145,12 @@ fun OcrScannerBottomSheet(
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             if (hasCameraPermission) {
                 ScannerViewfinder(
-                    analyzer = analyzer,
-                    analysisExecutor = analysisExecutor,
+                    imageCapture = imageCapture,
                     mode = mode,
                     verticalMode = verticalMode,
-                    trackedItems = trackedItems,
+                    processing = processing,
+                    statusMessage = statusMessage,
+                    onShutter = onShutter,
                     onVerticalModeToggle = { verticalMode = !verticalMode },
                     onGalleryClick = { galleryLauncher.launch("image/*") },
                     onClose = onDismiss,

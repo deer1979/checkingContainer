@@ -110,6 +110,8 @@ fun UnitEntryScreen(
                         IconButton(onClick = { onEvent(UnitEntryEvent.ShowDeleteConfirm) }) {
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
+
+
                                 contentDescription = "Eliminar unidad",
                                 tint = MaterialTheme.colorScheme.error,
                             )
