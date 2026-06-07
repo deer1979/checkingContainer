@@ -1,6 +1,7 @@
 package com.checkingcontainer.feature.units
 
 import android.graphics.Bitmap
+import kotlin.math.abs
 
 /**
  * Detecta el recuadro de cada carácter mediante **componentes conectados** (CCA).
@@ -126,7 +127,16 @@ internal object ProjectionCharDetector {
                 merged.add(g)
             }
         }
-        return merged
+        if (merged.size <= 1) return merged
+
+        // Filtro de COLUMNA: los caracteres del número comparten un centro-X (están
+        // apilados en columna). Descarta componentes desviados a los lados —remaches,
+        // bordes, óxido, texto del poste vecino— que ensucian la tira y rompen el conteo.
+        val centersX = merged.map { (it.left + it.right) / 2 }.sorted()
+        val medianCx = centersX[centersX.size / 2]
+        val band = w * COLUMN_BAND_FRACTION
+        val col = merged.filter { abs((it.left + it.right) / 2 - medianCx) <= band }
+        return col.ifEmpty { merged }
     }
 
     /**
@@ -207,4 +217,5 @@ internal object ProjectionCharDetector {
     private const val MIN_GLYPH_HEIGHT  = 10 // ignora componentes más bajos que esto (px)
     private const val MIN_GLYPH_AREA    = 20 // ignora manchas con menos píxeles que esto
     private const val MIN_GLYPH_CONTRAST = 40 // rango de luminancia mínimo para binarizar
+    private const val COLUMN_BAND_FRACTION = 0.30f // ancho de banda (frac. del ROI) en torno al centro de la columna
 }

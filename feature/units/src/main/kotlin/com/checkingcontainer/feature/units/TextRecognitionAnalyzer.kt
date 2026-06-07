@@ -101,6 +101,11 @@ class TextRecognitionAnalyzer(
             },
         )
 
+        // Compuerta: solo intentamos reconocer si el nº de glifos es plausible (~11).
+        // Si hay mucha basura (20+ cajas) no perseguimos ruido ni hacemos esperar al
+        // usuario; las cajas igual se dibujan arriba (debug) para ver qué detectó.
+        if (glyphs.size !in PLAUSIBLE_GLYPH_RANGE) return
+
         val strip = composeStrip(crop, glyphs) ?: return
         recognizer.process(InputImage.fromBitmap(strip, 0))
             .addOnSuccessListener { visionText ->
@@ -270,6 +275,9 @@ class TextRecognitionAnalyzer(
         // Voto temporal: cuántas lecturas de 11 chars guardar y mínimo para votar.
         private const val VOTE_WINDOW = 12
         private const val VOTE_MIN    = 3
+
+        // Rango plausible de glifos detectados para intentar reconocer (ISO = 11 chars).
+        private val PLAUSIBLE_GLYPH_RANGE = 8..14
 
         /**
          * Voto por posición: para cada una de las 11 posiciones toma el carácter más
