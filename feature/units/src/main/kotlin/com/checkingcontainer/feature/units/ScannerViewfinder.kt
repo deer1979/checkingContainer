@@ -34,7 +34,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FlashOff
 import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.PhotoLibrary
-import androidx.compose.material.icons.outlined.RotateRight
+import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -284,7 +284,7 @@ internal fun ScannerViewfinder(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.RotateRight,
+                    imageVector = Icons.AutoMirrored.Outlined.RotateRight,
                     contentDescription = "Lectura vertical",
                     tint = Color.White,
                     modifier = Modifier.size(24.dp),
