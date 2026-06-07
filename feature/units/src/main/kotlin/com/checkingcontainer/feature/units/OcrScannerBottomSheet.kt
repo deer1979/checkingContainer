@@ -27,6 +27,7 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 @Composable
 fun OcrScannerBottomSheet(
     mode: ScannerMode,
+    initialVertical: Boolean = false,
     onSuccess: (Map<String, String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -47,7 +48,7 @@ fun OcrScannerBottomSheet(
         if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
-    var verticalMode by remember { mutableStateOf(false) }
+    var verticalMode by remember { mutableStateOf(initialVertical) }
     var trackedItems by remember { mutableStateOf(emptyList<DetectedCharacter>()) }
 
     val controller = remember { LifecycleCameraController(context) }

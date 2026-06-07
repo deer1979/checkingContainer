@@ -80,9 +80,17 @@ fun UnitEntryScreen(
         )
     }
 
+    if (state.showOrientationPicker) {
+        ScannerOrientationPicker(
+            onSelect = { isVertical -> onEvent(UnitEntryEvent.OpenScanner(ScannerMode.CONTAINER, isVertical)) },
+            onDismiss = { onEvent(UnitEntryEvent.DismissOrientationPicker) },
+        )
+    }
+
     if (state.showScanner) {
         OcrScannerBottomSheet(
             mode = state.scannerMode,
+            initialVertical = state.scannerInitialVertical,
             onSuccess = { fields -> onEvent(UnitEntryEvent.OcrResult(fields)) },
             onDismiss = { onEvent(UnitEntryEvent.CloseScanner) },
         )

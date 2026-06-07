@@ -29,8 +29,10 @@ data class UnitEntryUiState(
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
     val savedSuccessfully: Boolean = false,
+    val showOrientationPicker: Boolean = false,
     val showScanner: Boolean = false,
     val scannerMode: ScannerMode = ScannerMode.CONTAINER,
+    val scannerInitialVertical: Boolean = false,
     val isLookingUpCatalog: Boolean = false,
     val showValidation: Boolean = false,
     val showDeleteConfirm: Boolean = false,
@@ -69,7 +71,9 @@ sealed interface UnitEntryEvent {
     data class PtiInstructionChange(val value: PtiInstruction) : UnitEntryEvent
     data class DeployedAsChange(val value: String) : UnitEntryEvent
     data class ObservationsChange(val value: String) : UnitEntryEvent
-    data class OpenScanner(val mode: ScannerMode) : UnitEntryEvent
+    data object OpenOrientationPicker : UnitEntryEvent
+    data object DismissOrientationPicker : UnitEntryEvent
+    data class OpenScanner(val mode: ScannerMode, val isVertical: Boolean = false) : UnitEntryEvent
     data object CloseScanner : UnitEntryEvent
     data class OcrResult(val fields: Map<String, String>) : UnitEntryEvent
     data object ShowDeleteConfirm : UnitEntryEvent
@@ -79,7 +83,7 @@ sealed interface UnitEntryEvent {
 }
 
 internal fun UnitEntryUiState.applyOcrFields(fields: Map<String, String>): UnitEntryUiState {
-    var updated = copy(showScanner = false, errorMessage = null)
+    var updated = copy(showScanner = false, showOrientationPicker = false, errorMessage = null)
     fields.forEach { (key, value) ->
         updated = when (key) {
             "Container No." -> updated.copy(containerNo = value.uppercase())

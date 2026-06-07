@@ -104,12 +104,13 @@ class TextRecognitionAnalyzer(
                         }
                         onTrackingUpdated(tracked)
 
-                        // Auto-detect: el texto viene de ML Kit (confiable)
-                        if (allChars.length == 11 && CONTAINER_REGEX.matches(allChars) &&
-                            done.compareAndSet(false, true)
-                        ) {
-                            onValidContainerIdFound(allChars)
-                            return@addOnSuccessListener
+                        // Auto-detect vertical: corrección por posición + dígito verificador
+                        if (allChars.length == 11) {
+                            val corrected = correctContainerChars(allChars)
+                            if (Iso6346.isValid(corrected) && done.compareAndSet(false, true)) {
+                                onValidContainerIdFound(corrected)
+                                return@addOnSuccessListener
+                            }
                         }
                     } else {
                         onTrackingUpdated(emptyList())
@@ -126,7 +127,9 @@ class TextRecognitionAnalyzer(
                             when {
                                 syms.isNotEmpty() ->
                                     syms.mapNotNull { sym ->
-                                        sym.boundingBox?.let { sym.text to it }
+                                        if (sym.confidence >= CONFIDENCE_THRESHOLD)
+                                            sym.boundingBox?.let { sym.text to it }
+                                        else null
                                     }
                                 element.text.length == 1 ->
                                     element.boundingBox?.let {
@@ -151,6 +154,22 @@ class TextRecognitionAnalyzer(
                         )
                     }
                     onTrackingUpdated(tracked)
+
+                    // Auto-detect horizontal: busca 11 chars consecutivos en el texto OCR,
+                    // aplica corrección por posición y valida dígito verificador ISO 6346
+                    if (mode == ScannerMode.CONTAINER && !done.get()) {
+                        val raw = visionText.textBlocks
+                            .flatMap { it.lines }
+                            .joinToString("") { it.text.filter { c -> c.isLetter() || c.isDigit() } }
+                            .uppercase()
+                        Regex("[A-Z0-9]{11}").findAll(raw).forEach { match ->
+                            val corrected = correctContainerChars(match.value)
+                            if (Iso6346.isValid(corrected) && done.compareAndSet(false, true)) {
+                                onValidContainerIdFound(corrected)
+                                return@addOnSuccessListener
+                            }
+                        }
+                    }
                 }
 
                 // Captura manual (botón disparador, ambos modos)
@@ -183,10 +202,30 @@ class TextRecognitionAnalyzer(
 
     companion object {
 
-        private const val FRAME_INTERVAL_MS   = 250L
+        private const val FRAME_INTERVAL_MS    = 250L
         private const val COLUMN_TOLERANCE_PX = 35f
+        private const val CONFIDENCE_THRESHOLD = 0.5f
         private val CHAR_REGEX                = Regex("[A-Z0-9]")
         private val CONTAINER_REGEX           = Regex("^[A-Z]{4}\\d{7}$")
+
+        /**
+         * Corrige confusiones comunes de OCR según la posición ISO 6346:
+         * - Posiciones 0-3: deben ser letras (O→0, I→1, B→8 en sentido contrario)
+         * - Posiciones 4-10: deben ser dígitos (0→O, 1→I, 8→B en sentido contrario)
+         */
+        internal fun correctContainerChars(raw: String): String {
+            if (raw.length != 11) return raw
+            return buildString(11) {
+                for (i in raw.indices) {
+                    val c = raw[i].uppercaseChar()
+                    if (i < 4) {
+                        append(when (c) { '0' -> 'O'; '1' -> 'I'; '8' -> 'B'; '5' -> 'S'; else -> c })
+                    } else {
+                        append(when (c) { 'O' -> '0'; 'I' -> '1'; 'B' -> '8'; 'S' -> '5'; 'G' -> '6'; 'Z' -> '2'; else -> c })
+                    }
+                }
+            }
+        }
 
         private const val ROI_VERTICAL_WIDTH  = 0.15f
         private const val ROI_VERTICAL_HEIGHT = 0.80f
@@ -216,11 +255,19 @@ class TextRecognitionAnalyzer(
         }
 
         fun parseContainer(text: String): Map<String, String>? {
-            val noSpaces = text.replace(Regex("\\s+"), "")
+            val upper = text.uppercase()
+            val noSpaces = upper.replace(Regex("\\s+"), "")
+            // Intentar match de 11 chars alfanuméricos con corrección y check digit
+            Regex("[A-Z0-9]{11}").findAll(noSpaces).forEach { m ->
+                val corrected = correctContainerChars(m.value)
+                if (Iso6346.isValid(corrected)) return mapOf("Container No." to corrected)
+            }
+            // Fallback: 4 letras + 7 dígitos exactos
             Regex("[A-Z]{4}[0-9]{7}").find(noSpaces)?.let { m ->
                 return mapOf("Container No." to m.value)
             }
-            val lines = text.lines()
+            // Fallback: código de propietario en una línea, serial en la siguiente
+            val lines = upper.lines()
                 .map { it.replace(Regex("[^A-Z0-9]"), "") }
                 .filter { it.isNotEmpty() }
             val ownerIdx = lines.indexOfFirst { it.matches(Regex("[A-Z]{4}")) }
@@ -232,6 +279,7 @@ class TextRecognitionAnalyzer(
                     }
                 }
             }
+            // Fallback: 10 chars → computar dígito verificador
             Regex("[A-Z]{4}[0-9]{6}").find(noSpaces)?.let { m ->
                 val first10 = m.value
                 val check = Iso6346.computeCheckDigit(first10)

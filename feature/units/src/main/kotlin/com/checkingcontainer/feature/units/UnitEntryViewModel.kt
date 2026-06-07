@@ -87,7 +87,14 @@ class UnitEntryViewModel @Inject constructor(
                 is UnitEntryEvent.PtiInstructionChange -> s.copy(ptiInstruction = event.value)
                 is UnitEntryEvent.DeployedAsChange -> s.copy(deployedAs = event.value)
                 is UnitEntryEvent.ObservationsChange -> s.copy(observations = event.value)
-                is UnitEntryEvent.OpenScanner -> s.copy(showScanner = true, scannerMode = event.mode)
+                UnitEntryEvent.OpenOrientationPicker -> s.copy(showOrientationPicker = true)
+                UnitEntryEvent.DismissOrientationPicker -> s.copy(showOrientationPicker = false)
+                is UnitEntryEvent.OpenScanner -> s.copy(
+                    showOrientationPicker = false,
+                    showScanner = true,
+                    scannerMode = event.mode,
+                    scannerInitialVertical = event.isVertical,
+                )
                 UnitEntryEvent.CloseScanner -> s.copy(showScanner = false)
                 is UnitEntryEvent.OcrResult -> s.applyOcrFields(event.fields)
                 UnitEntryEvent.ShowDeleteConfirm -> s.copy(showDeleteConfirm = true)

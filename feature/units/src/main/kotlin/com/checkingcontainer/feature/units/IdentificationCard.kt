@@ -123,7 +123,7 @@ internal fun IdentificationCard(
                         }
                     } else {
                         IconButton(
-                            onClick = { onEvent(UnitEntryEvent.OpenScanner(ScannerMode.CONTAINER)) },
+                            onClick = { onEvent(UnitEntryEvent.OpenOrientationPicker) },
                         ) {
                             Icon(Icons.Outlined.CameraAlt, contentDescription = "Escanear")
                         }
