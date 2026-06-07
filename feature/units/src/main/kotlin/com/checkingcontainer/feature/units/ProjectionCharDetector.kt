@@ -129,6 +129,29 @@ internal object ProjectionCharDetector {
         return merged
     }
 
+    /**
+     * Devuelve un bitmap del glifo binarizado (negro sobre blanco) usando un umbral de
+     * Otsu LOCAL de ese glifo. Local = robusto al glare: cada carácter se umbraliza con
+     * su propia iluminación, en vez de un umbral global que se rompe con franjas de sol.
+     */
+    fun binarizedGlyph(crop: Bitmap, g: Glyph): Bitmap {
+        val gw = g.width.coerceAtLeast(1)
+        val gh = g.height.coerceAtLeast(1)
+        val px = IntArray(gw * gh)
+        crop.getPixels(px, 0, gw, g.left, g.top, gw, gh)
+        val lum = IntArray(gw * gh) { i ->
+            val p = px[i]
+            ((p shr 16 and 0xFF) * 77 +
+                (p shr 8 and 0xFF) * 150 +
+                (p and 0xFF) * 29) ushr 8
+        }
+        val t = otsuThreshold(lum)
+        val out = IntArray(gw * gh) { i ->
+            if (lum[i] < t) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+        }
+        return Bitmap.createBitmap(out, gw, gh, Bitmap.Config.ARGB_8888)
+    }
+
     /** Fracción de solapamiento vertical respecto al glifo más bajo (0..1). */
     private fun overlapY(a: Glyph, b: Glyph): Float {
         val top = maxOf(a.top, b.top)

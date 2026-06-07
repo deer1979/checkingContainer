@@ -38,6 +38,10 @@ class TextRecognitionAnalyzer(
     private val done = AtomicBoolean(false)
     private val lastFrameTimestamp = AtomicLong(0L)
 
+    // Lecturas verticales recientes (solo de 11 chars) para el voto por posición.
+    // Se accede únicamente desde el listener de ML Kit (hilo principal) → sin sincronizar.
+    private val recentReads = ArrayDeque<String>()
+
     fun triggerCapture() { captureRequested.set(true) }
 
     @OptIn(ExperimentalGetImage::class)
@@ -102,9 +106,20 @@ class TextRecognitionAnalyzer(
             .addOnSuccessListener { visionText ->
                 val raw = visionText.text.filter { it.isLetterOrDigit() }.uppercase()
 
-                // Auto-detect: 11 chars que validan ISO (corrección + fix de la U)
+                // Acumula lecturas de 11 chars para el voto temporal por posición.
                 if (raw.length == 11) {
-                    val corrected = correctContainerChars(raw)
+                    recentReads.addLast(raw)
+                    while (recentReads.size > VOTE_WINDOW) recentReads.removeFirst()
+                }
+
+                // Candidatos a validar: el VOTO de varios frames (más fiable que uno solo)
+                // y la lectura cruda actual. Cada uno pasa por corrección + dígito ISO.
+                val candidates = buildList {
+                    if (recentReads.size >= VOTE_MIN) add(majorityVote(recentReads))
+                    if (raw.length == 11) add(raw)
+                }
+                for (cand in candidates) {
+                    val corrected = correctContainerChars(cand)
                     if (Iso6346.isValid(corrected) && done.compareAndSet(false, true)) {
                         onValidContainerIdFound(corrected)
                         return@addOnSuccessListener
@@ -252,6 +267,29 @@ class TextRecognitionAnalyzer(
         private const val STRIP_PADDING      = 16
         private const val STRIP_GAP          = 16
 
+        // Voto temporal: cuántas lecturas de 11 chars guardar y mínimo para votar.
+        private const val VOTE_WINDOW = 12
+        private const val VOTE_MIN    = 3
+
+        /**
+         * Voto por posición: para cada una de las 11 posiciones toma el carácter más
+         * frecuente entre las lecturas recientes. Reconstruye el número correcto aunque
+         * ningún frame individual lo haya leído entero bien (cada uno falla un char
+         * distinto). Asume que todas las lecturas tienen longitud 11.
+         */
+        private fun majorityVote(reads: List<String>): String {
+            val sb = StringBuilder(11)
+            for (i in 0 until 11) {
+                val counts = HashMap<Char, Int>()
+                for (r in reads) {
+                    val c = r[i]
+                    counts[c] = (counts[c] ?: 0) + 1
+                }
+                sb.append(counts.maxByOrNull { it.value }!!.key)
+            }
+            return sb.toString()
+        }
+
         /**
          * Compone una LÍNEA HORIZONTAL a partir de los glifos verticales: recorta cada
          * uno del crop, lo escala a una altura común y los pega de izquierda a derecha
@@ -280,9 +318,11 @@ class TextRecognitionAnalyzer(
             var x = STRIP_PADDING
             for (i in glyphs.indices) {
                 val g = glyphs[i]
-                val src = Rect(g.left, g.top, g.right, g.bottom)
+                // Cada glifo binarizado (negro sobre blanco, umbral local) → ML Kit limpio
+                val glyphBmp = ProjectionCharDetector.binarizedGlyph(crop, g)
                 val dst = Rect(x, STRIP_PADDING, x + widths[i], STRIP_PADDING + targetH)
-                canvas.drawBitmap(crop, src, dst, paint)
+                canvas.drawBitmap(glyphBmp, null, dst, paint)
+                glyphBmp.recycle()
                 x += widths[i] + STRIP_GAP
             }
             return strip
