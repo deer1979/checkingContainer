@@ -145,9 +145,10 @@ internal fun ScannerViewfinder(
             val accent = Color(0xFF00E676)
             val borderColor = if (detecting) accent else white.copy(alpha = 0.85f)
 
-            // ROI centrado según el modo
-            val roiW = if (verticalMode) size.width * 0.15f else size.width * 0.80f
-            val roiH = if (verticalMode) size.height * 0.80f else size.height * 0.35f
+            // ROI centrado según el modo. Tamaños desde la única fuente de verdad
+            // en TextRecognitionAnalyzer, para que recuadro y recorte siempre coincidan.
+            val roiW = size.width * if (verticalMode) TextRecognitionAnalyzer.ROI_VERTICAL_WIDTH else TextRecognitionAnalyzer.ROI_HORIZ_WIDTH
+            val roiH = size.height * if (verticalMode) TextRecognitionAnalyzer.ROI_VERTICAL_HEIGHT else TextRecognitionAnalyzer.ROI_HORIZ_HEIGHT
             val roiLeft = (size.width - roiW) / 2f
             val roiTop = (size.height - roiH) / 2f
             val roiRight = roiLeft + roiW

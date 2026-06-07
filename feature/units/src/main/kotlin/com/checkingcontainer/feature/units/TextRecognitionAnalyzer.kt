@@ -240,10 +240,14 @@ class TextRecognitionAnalyzer(
             }
         }
 
-        private const val ROI_VERTICAL_WIDTH  = 0.15f
-        private const val ROI_VERTICAL_HEIGHT = 0.80f
-        private const val ROI_HORIZ_WIDTH     = 0.80f
-        private const val ROI_HORIZ_HEIGHT    = 0.35f
+        // ── TAMAÑOS DEL ROI (única fuente de verdad) ─────────────────────────────
+        // Fracción del frame (0..1). El recorte del OCR (cropRoi) y el recuadro que
+        // dibuja ScannerViewfinder usan ESTOS mismos valores, así que ajusta aquí y
+        // ambos cambian juntos. Todos los ROI están centrados.
+        internal const val ROI_VERTICAL_WIDTH  = 0.15f
+        internal const val ROI_VERTICAL_HEIGHT = 0.60f
+        internal const val ROI_HORIZ_WIDTH     = 0.80f
+        internal const val ROI_HORIZ_HEIGHT    = 0.20f
 
         private fun Bitmap.cropTo(rect: Rect): Bitmap {
             val x = rect.left.coerceIn(0, width - 1)
