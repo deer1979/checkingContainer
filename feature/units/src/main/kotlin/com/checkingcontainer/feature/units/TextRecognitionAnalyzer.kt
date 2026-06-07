@@ -112,6 +112,15 @@ class TextRecognitionAnalyzer(
                                 return@addOnSuccessListener
                             }
                         }
+
+                        // MODO PRUEBA vertical: sin regla ISO. Al pulsar el disparador
+                        // devuelve el texto CRUDO que leyó ML Kit (sin corrección ni
+                        // validación), para medir la precisión real del reconocimiento
+                        // vertical antes de volver a exigir validación.
+                        if (captureRequested.get() && done.compareAndSet(false, true)) {
+                            onValidContainerIdFound(allChars)
+                            return@addOnSuccessListener
+                        }
                     } else {
                         onTrackingUpdated(emptyList())
                     }
