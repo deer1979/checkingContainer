@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +46,9 @@ fun AnnouncementsListRoute(
     viewModel: AnnouncementsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.list.collectAsStateWithLifecycle()
+    // Al entrar (y cada vez que llega un anuncio nuevo mientras se ve la lista),
+    // marcar todo como leído para que el badge de la pestaña quede en cero.
+    LaunchedEffect(state.items) { viewModel.markAllSeen() }
     Scaffold(
         topBar = {
             TopAppBar(

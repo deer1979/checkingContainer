@@ -1,5 +1,7 @@
 package com.checkingcontainer.ui
 
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -12,14 +14,27 @@ fun AppBottomBar(
     destinations: List<TopLevelDestination>,
     currentRoute: String?,
     onSelect: (TopLevelDestination) -> Unit,
+    unreadAnnouncements: Int = 0,
 ) {
     NavigationBar {
         destinations.forEach { dest ->
+            val badgeCount =
+                if (dest == TopLevelDestination.Announcements) unreadAnnouncements else 0
             NavigationBarItem(
                 selected = currentRoute == dest.route ||
                     currentRoute?.startsWith("${dest.route}/") == true,
                 onClick = { onSelect(dest) },
-                icon = { Icon(dest.icon, contentDescription = null) },
+                icon = {
+                    if (badgeCount > 0) {
+                        BadgedBox(
+                            badge = { Badge { Text(if (badgeCount > 99) "99+" else "$badgeCount") } },
+                        ) {
+                            Icon(dest.icon, contentDescription = null)
+                        }
+                    } else {
+                        Icon(dest.icon, contentDescription = null)
+                    }
+                },
                 label = { Text(dest.label) },
                 alwaysShowLabel = true,
             )

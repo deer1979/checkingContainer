@@ -3,6 +3,8 @@ package com.checkingcontainer.feature.announcements
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.AnnouncementsRepository
+import com.checkingcontainer.core.domain.AuthRepository
+import com.checkingcontainer.core.domain.AuthState
 import com.checkingcontainer.core.model.Announcement
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -19,6 +22,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class AnnouncementsViewModel @Inject constructor(
     private val repository: AnnouncementsRepository,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
 
     val list: StateFlow<AnnouncementsUiState> = repository.observeAll()
@@ -44,5 +48,14 @@ class AnnouncementsViewModel @Inject constructor(
 
     fun onDelete(id: String) {
         viewModelScope.launch { repository.delete(id) }
+    }
+
+    /** Al ver la lista, marca los anuncios como leídos para el usuario actual. */
+    fun markAllSeen() {
+        viewModelScope.launch {
+            val userId = (authRepository.state.first() as? AuthState.Authenticated)?.user?.id
+                ?: return@launch
+            repository.markAllSeen(userId)
+        }
     }
 }

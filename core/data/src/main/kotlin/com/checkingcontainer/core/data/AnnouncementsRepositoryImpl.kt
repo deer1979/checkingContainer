@@ -1,5 +1,9 @@
 package com.checkingcontainer.core.data
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
 import com.checkingcontainer.core.database.dao.AnnouncementDao
@@ -11,6 +15,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -19,6 +24,7 @@ import kotlinx.coroutines.withContext
 class AnnouncementsRepositoryImpl @Inject constructor(
     private val dao: AnnouncementDao,
     private val firestoreService: FirestoreService,
+    private val dataStore: DataStore<Preferences>,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : AnnouncementsRepository {
 
@@ -29,6 +35,23 @@ class AnnouncementsRepositoryImpl @Inject constructor(
 
     override suspend fun getById(id: String): Announcement? =
         withContext(ioDispatcher) { dao.findById(id)?.toDomain() }
+
+    // ── Leídos / no leídos (por usuario, local) ─────────────────────────────────
+
+    override fun unreadCount(userId: Long): Flow<Int> =
+        combine(observeAll(), lastSeen(userId)) { items, seen ->
+            items.count { it.publishedAt > seen }
+        }
+
+    override suspend fun markAllSeen(userId: Long) {
+        dataStore.edit { it[lastSeenKey(userId)] = System.currentTimeMillis() }
+    }
+
+    private fun lastSeen(userId: Long): Flow<Long> =
+        dataStore.data.map { it[lastSeenKey(userId)] ?: 0L }
+
+    private fun lastSeenKey(userId: Long) =
+        longPreferencesKey("announcements_last_seen_$userId")
 
     // ── Writes ────────────────────────────────────────────────────────────────
 

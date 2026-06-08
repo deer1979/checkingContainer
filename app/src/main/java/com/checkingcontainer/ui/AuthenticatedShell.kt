@@ -9,6 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -42,12 +44,16 @@ fun AuthenticatedShell(user: User) {
     val destinations = remember(user.role) { TopLevelDestination.forRole(user.role) }
     val startDestination = if (user.role.isAdmin) USERS_LIST_ROUTE else ANNOUNCEMENTS_LIST_ROUTE
 
+    val shellViewModel: ShellViewModel = hiltViewModel()
+    val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
+
     Scaffold(
         bottomBar = {
             AppBottomBar(
                 destinations = destinations,
                 currentRoute = currentRoute,
                 onSelect = { dest -> navigateToTopLevel(navController, dest) },
+                unreadAnnouncements = unreadAnnouncements,
             )
         },
         modifier = Modifier.fillMaxSize(),
