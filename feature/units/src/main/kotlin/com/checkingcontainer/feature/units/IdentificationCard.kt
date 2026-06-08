@@ -62,8 +62,12 @@ internal fun IdentificationCard(
             OutlinedTextField(
                 value = state.containerNo,
                 onValueChange = { v ->
-                    val upper = v.uppercase()
-                    if (upper.length <= 11) {
+                    // Recortar a 11 en vez de descartar toda la entrada: si el campo ya
+                    // tiene 11 caracteres (p. ej. tras escanear o al editar una unidad),
+                    // rechazar la tecla congelaba la edición. Con take(11) se puede
+                    // corregir borrando, seleccionando-y-reemplazando o insertando.
+                    val upper = v.uppercase().take(11)
+                    if (upper != state.containerNo) {
                         onEvent(UnitEntryEvent.ContainerNoChange(upper))
                         if (upper.length == 11 && Iso6346.isValid(upper)) {
                             focusManager.moveFocus(FocusDirection.Down)
