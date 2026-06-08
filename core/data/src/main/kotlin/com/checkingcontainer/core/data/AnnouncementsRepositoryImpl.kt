@@ -8,8 +8,11 @@ import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
 import com.checkingcontainer.core.database.dao.AnnouncementDao
 import com.checkingcontainer.core.database.entity.AnnouncementEntity
+import com.checkingcontainer.core.database.entity.toEntity
 import com.checkingcontainer.core.domain.AnnouncementsRepository
+import com.checkingcontainer.core.domain.PendingAttachment
 import com.checkingcontainer.core.model.Announcement
+import com.checkingcontainer.core.model.Attachment
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,6 +27,7 @@ import kotlinx.coroutines.withContext
 class AnnouncementsRepositoryImpl @Inject constructor(
     private val dao: AnnouncementDao,
     private val firestoreService: FirestoreService,
+    private val storageService: StorageService,
     private val dataStore: DataStore<Preferences>,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : AnnouncementsRepository {
@@ -60,15 +64,22 @@ class AnnouncementsRepositoryImpl @Inject constructor(
         summary: String,
         body: String,
         authorName: String,
+        attachments: List<PendingAttachment>,
     ) = withContext(ioDispatcher) {
-        val entity = AnnouncementEntity(
-            id          = UUID.randomUUID().toString(),
+        val id = UUID.randomUUID().toString()
+        val uploaded = attachments.map { p ->
+            val url = storageService.upload(id, p.name, p.bytes, p.contentType)
+            Attachment(url = url, name = p.name, contentType = p.contentType, sizeBytes = p.sizeBytes)
+        }
+        val entity = Announcement(
+            id          = id,
             title       = title,
             summary     = summary.ifBlank { title },
             body        = body,
             authorName  = authorName,
             publishedAt = System.currentTimeMillis(),
-        )
+            attachments = uploaded,
+        ).toEntity()
         dao.insert(entity)
         firestoreService.upsertAnnouncement(entity)
     }
@@ -79,7 +90,9 @@ class AnnouncementsRepositoryImpl @Inject constructor(
     }
 
     override suspend fun delete(id: String): Unit = withContext(ioDispatcher) {
+        val urls = dao.findById(id)?.toDomain()?.attachments?.map { it.url }.orEmpty()
         dao.deleteById(id)
         firestoreService.deleteAnnouncement(id)
+        urls.forEach { storageService.deleteByUrl(it) }
     }
 }

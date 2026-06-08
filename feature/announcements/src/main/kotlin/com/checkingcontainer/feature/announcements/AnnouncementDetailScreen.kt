@@ -123,6 +123,10 @@ fun AnnouncementDetailRoute(
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+                if (item.attachments.isNotEmpty()) {
+                    Spacer(Modifier.height(24.dp))
+                    AnnouncementAttachments(item.attachments)
+                }
             }
         }
     }

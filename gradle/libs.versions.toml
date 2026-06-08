@@ -39,6 +39,9 @@ datastore = "1.2.1"
 camerax = "1.6.1"
 mlkitTextRecognition = "19.0.1"
 
+# Image loading
+coil = "3.1.0"
+
 # Async
 coroutines = "1.10.2"
 kotlinxCollectionsImmutable = "0.3.8"
@@ -121,9 +124,9 @@ mlkit-text-recognition = { group = "com.google.android.gms", name = "play-servic
 # supabase-realtime  = { group = "io.github.jan-tennert.supabase", name = "realtime-kt" }
 # supabase-storage   = { group = "io.github.jan-tennert.supabase", name = "storage-kt" }
 # ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp" }
-# Coil — REMOVIDO (sin Storage de Supabase no hay imágenes remotas por ahora)
-# coil-compose        = { group = "io.coil-kt.coil3", name = "coil-compose" }
-# coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp" }
+# Coil 3 — imágenes remotas (adjuntos de anuncios en Firebase Storage)
+coil-compose        = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.8.1" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
 

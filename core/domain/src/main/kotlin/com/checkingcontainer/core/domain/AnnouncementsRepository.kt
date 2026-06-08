@@ -3,10 +3,24 @@ package com.checkingcontainer.core.domain
 import com.checkingcontainer.core.model.Announcement
 import kotlinx.coroutines.flow.Flow
 
+/** Adjunto aún sin subir: bytes leídos del archivo elegido por el usuario. */
+data class PendingAttachment(
+    val name: String,
+    val contentType: String,
+    val bytes: ByteArray,
+    val sizeBytes: Long,
+)
+
 interface AnnouncementsRepository {
     fun observeAll(): Flow<List<Announcement>>
     suspend fun getById(id: String): Announcement?
-    suspend fun publish(title: String, summary: String, body: String, authorName: String)
+    suspend fun publish(
+        title: String,
+        summary: String,
+        body: String,
+        authorName: String,
+        attachments: List<PendingAttachment> = emptyList(),
+    )
     suspend fun refreshFromRemote()
     suspend fun delete(id: String)
 
