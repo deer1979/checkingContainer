@@ -2,13 +2,11 @@ package com.checkingcontainer.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AcUnit
-import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.checkingcontainer.core.model.UserRole
-import com.checkingcontainer.feature.admin.navigation.ADMIN_ROUTE
 import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
 import com.checkingcontainer.feature.settings.navigation.SETTINGS_ROUTE
 import com.checkingcontainer.feature.units.navigation.UNITS_ROUTE
@@ -29,12 +27,6 @@ enum class TopLevelDestination(
         route = USERS_LIST_ROUTE,
         label = "Usuarios",
         icon = Icons.Outlined.Group,
-        adminOnly = true,
-    ),
-    Admin(
-        route = ADMIN_ROUTE,
-        label = "Admin",
-        icon = Icons.Outlined.AdminPanelSettings,
         adminOnly = true,
     ),
     Units(

@@ -43,7 +43,7 @@ class AdminViewModel @Inject constructor(
                 )
             }
             if (result.isSuccess) {
-                _state.update { AdminUiState(publishedCount = it.publishedCount + 1) }
+                _state.update { it.copy(isPublishing = false, published = true) }
             } else {
                 _state.update { it.copy(isPublishing = false) }
             }

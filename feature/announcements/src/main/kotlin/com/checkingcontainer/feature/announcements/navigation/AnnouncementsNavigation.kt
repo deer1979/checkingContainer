@@ -24,6 +24,8 @@ fun announcementDetailRoute(id: String): String = "announcements/$id"
 fun NavGraphBuilder.announcementsGraph(
     navController: NavHostController,
     sharedTransitionScope: SharedTransitionScope,
+    isAdmin: Boolean = false,
+    onCreateAnnouncement: () -> Unit = {},
 ) {
     composable(route = ANNOUNCEMENTS_LIST_ROUTE) { backStackEntry ->
         val parent = remember(backStackEntry) {
@@ -36,6 +38,8 @@ fun NavGraphBuilder.announcementsGraph(
             onAnnouncementClick = { id ->
                 navController.navigate(announcementDetailRoute(id))
             },
+            isAdmin = isAdmin,
+            onCreateClick = onCreateAnnouncement,
             viewModel = vm,
         )
     }

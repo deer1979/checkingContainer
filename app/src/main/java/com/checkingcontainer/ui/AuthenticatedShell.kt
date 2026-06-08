@@ -16,6 +16,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.checkingcontainer.navigation.TopLevelDestination
 import com.checkingcontainer.core.model.User
+import com.checkingcontainer.feature.admin.navigation.ADMIN_ROUTE
 import com.checkingcontainer.feature.admin.navigation.adminScreen
 import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
 import com.checkingcontainer.feature.announcements.navigation.announcementsGraph
@@ -64,9 +65,14 @@ fun AuthenticatedShell(user: User) {
                 announcementsGraph(
                     navController = navController,
                     sharedTransitionScope = this@SharedTransitionLayout,
+                    isAdmin = user.role.isAdmin,
+                    onCreateAnnouncement = { navController.navigate(ADMIN_ROUTE) },
                 )
                 usersGraph(navController = navController)
-                adminScreen()
+                adminScreen(
+                    onBack = { navController.popBackStack() },
+                    onPublished = { navController.popBackStack() },
+                )
                 unitsGraph(navController = navController)
                 settingsScreen()
             }
