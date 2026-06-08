@@ -111,7 +111,6 @@ fun UnitEntryScreen(
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
                                 contentDescription = "Eliminar unidad",
-
                                 tint = MaterialTheme.colorScheme.error,
                             )
                         }
