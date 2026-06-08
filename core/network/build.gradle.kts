@@ -8,9 +8,10 @@ android {
 }
 
 dependencies {
-    // Firebase Firestore (api — transitivo para core:data)
+    // Firebase Firestore + Storage (api — transitivo para core:data)
     api(platform(libs.firebase.bom))
     api(libs.firebase.firestore)
+    api(libs.firebase.storage)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.kotlinx.coroutines.android)
 }

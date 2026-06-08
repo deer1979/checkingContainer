@@ -12,6 +12,7 @@ data class AnnouncementEntity(
     val body: String,
     val authorName: String,
     val publishedAt: Long,
+    val attachments: String = "[]",
 ) {
     fun toDomain() = Announcement(
         id = id,
@@ -20,6 +21,7 @@ data class AnnouncementEntity(
         body = body,
         authorName = authorName,
         publishedAt = publishedAt,
+        attachments = AttachmentJson.decode(attachments),
     )
 }
 
@@ -30,4 +32,5 @@ fun Announcement.toEntity() = AnnouncementEntity(
     body = body,
     authorName = authorName,
     publishedAt = publishedAt,
+    attachments = AttachmentJson.encode(attachments),
 )

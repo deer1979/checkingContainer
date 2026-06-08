@@ -74,6 +74,7 @@ class FirestoreService @Inject constructor(
                         body = body,
                         authorName = doc.getString("authorName") ?: "",
                         publishedAt = doc.getLong("publishedAt") ?: 0L,
+                        attachments = doc.getString("attachments") ?: "[]",
                     )
                 }
         } catch (e: Exception) {
@@ -220,6 +221,7 @@ private fun AnnouncementEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "body"        to body,
     "authorName"  to authorName,
     "publishedAt" to publishedAt,
+    "attachments" to attachments,
 )
 
 private fun ReeferUnitEntity.toFirestoreMap(): Map<String, Any?> = mapOf(

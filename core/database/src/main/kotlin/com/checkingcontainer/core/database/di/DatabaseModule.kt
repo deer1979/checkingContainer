@@ -18,6 +18,7 @@ import com.checkingcontainer.core.database.migrations.MIGRATION_7_8
 import com.checkingcontainer.core.database.migrations.MIGRATION_8_9
 import com.checkingcontainer.core.database.migrations.MIGRATION_9_10
 import com.checkingcontainer.core.database.migrations.MIGRATION_10_11
+import com.checkingcontainer.core.database.migrations.MIGRATION_11_12
 import com.checkingcontainer.core.database.migrations.seedAnnouncements
 import com.checkingcontainer.core.database.migrations.seedFullCatalog
 import com.checkingcontainer.core.database.migrations.seedManufacturers
@@ -44,7 +45,7 @@ object DatabaseModule {
         AppDatabase::class.java,
         "checkingcontainer.db",
     )
-        .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+        .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
         .addCallback(seedOnCreateCallback)
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
