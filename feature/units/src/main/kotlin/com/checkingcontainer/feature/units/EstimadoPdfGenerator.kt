@@ -268,10 +268,9 @@ class EstimadoPdfGenerator @Inject constructor(
 
     private suspend fun loadBitmap(loader: coil3.ImageLoader, url: String): Bitmap? =
         runCatching {
-            val req = ImageRequest.Builder(context)
-                .data(url)
-                .build()
-            val result = loader.execute(req)
-            (result as? SuccessResult)?.image?.let { (it as? BitmapImage)?.bitmap }
+            val req = ImageRequest.Builder(context).data(url).build()
+            val bmp = (loader.execute(req) as? SuccessResult)?.image?.let { (it as? BitmapImage)?.bitmap }
+            // PDF canvas is software-rendered; hardware bitmaps must be copied to software
+            bmp?.let { if (it.config == Bitmap.Config.HARDWARE) it.copy(Bitmap.Config.ARGB_8888, false) else it }
         }.getOrNull()
 }
