@@ -259,7 +259,7 @@ class EstimadoPdfGenerator @Inject constructor(
 
         doc.finishPage(page)
 
-        ByteArrayOutputStream().use { out ->
+        return ByteArrayOutputStream().use { out ->
             doc.writeTo(out)
             doc.close()
             out.toByteArray()
@@ -270,7 +270,6 @@ class EstimadoPdfGenerator @Inject constructor(
         runCatching {
             val req = ImageRequest.Builder(context)
                 .data(url)
-                .allowHardware(false)
                 .build()
             val result = loader.execute(req)
             (result as? SuccessResult)?.image?.let { (it as? BitmapImage)?.bitmap }
