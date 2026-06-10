@@ -11,7 +11,7 @@ import com.checkingcontainer.navigation.TopLevelDestination
 
 @Composable
 fun AppBottomBar(
-    destinations: List<TopLevelDestination>,
+    destinations: Collection<TopLevelDestination>,
     currentRoute: String?,
     onSelect: (TopLevelDestination) -> Unit,
     unreadAnnouncements: Int = 0,

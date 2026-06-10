@@ -8,6 +8,7 @@ import com.checkingcontainer.core.domain.AuthState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -21,9 +22,11 @@ import kotlinx.coroutines.flow.stateIn
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ShellViewModel @Inject constructor(
-    auth: AuthRepository,
+    private val auth: AuthRepository,
     announcements: AnnouncementsRepository,
 ) : ViewModel() {
+
+    fun logout() { viewModelScope.launch { auth.logout() } }
 
     val unreadAnnouncements: StateFlow<Int> = auth.state
         .flatMapLatest { state ->

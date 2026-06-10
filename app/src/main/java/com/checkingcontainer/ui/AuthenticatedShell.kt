@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,18 +21,15 @@ import com.checkingcontainer.feature.admin.navigation.ADMIN_ROUTE
 import com.checkingcontainer.feature.admin.navigation.adminScreen
 import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
 import com.checkingcontainer.feature.announcements.navigation.announcementsGraph
+import com.checkingcontainer.feature.settings.navigation.SETTINGS_ROUTE
 import com.checkingcontainer.feature.settings.navigation.settingsScreen
 import com.checkingcontainer.feature.units.navigation.unitsGraph
 import com.checkingcontainer.feature.users.navigation.USERS_LIST_ROUTE
 import com.checkingcontainer.feature.users.navigation.usersGraph
 
 /**
- * Post-login shell. Scaffold + bottom NavigationBar wrap an inner NavHost
- * holding all authenticated destinations. Start destination is role-based:
- * admins land on user management; everyone else lands on announcements.
- *
- * Wrapped in [SharedTransitionLayout] so list → detail flows (announcements)
- * can share visual elements across destinations.
+ * Post-login shell. Barra inferior con Anuncios y Unidades. Ajustes y Usuarios
+ * se acceden desde el avatar del usuario en el TopAppBar de cada pantalla raíz.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -41,16 +37,17 @@ fun AuthenticatedShell(user: User) {
     val navController = rememberNavController()
     val currentEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentEntry?.destination?.route
-    val destinations = remember(user.role) { TopLevelDestination.forRole(user.role) }
-    val startDestination = if (user.role.isAdmin) USERS_LIST_ROUTE else ANNOUNCEMENTS_LIST_ROUTE
 
     val shellViewModel: ShellViewModel = hiltViewModel()
     val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
 
+    val onSettingsClick = { navController.navigate(SETTINGS_ROUTE) }
+    val onLogout       = { shellViewModel.logout() }
+
     Scaffold(
         bottomBar = {
             AppBottomBar(
-                destinations = destinations,
+                destinations = TopLevelDestination.entries,
                 currentRoute = currentRoute,
                 onSelect = { dest -> navigateToTopLevel(navController, dest) },
                 unreadAnnouncements = unreadAnnouncements,
@@ -65,7 +62,7 @@ fun AuthenticatedShell(user: User) {
         ) {
             NavHost(
                 navController = navController,
-                startDestination = startDestination,
+                startDestination = ANNOUNCEMENTS_LIST_ROUTE,
                 modifier = Modifier.fillMaxSize(),
             ) {
                 announcementsGraph(
@@ -73,14 +70,25 @@ fun AuthenticatedShell(user: User) {
                     sharedTransitionScope = this@SharedTransitionLayout,
                     isAdmin = user.role.isAdmin,
                     onCreateAnnouncement = { navController.navigate(ADMIN_ROUTE) },
+                    user = user,
+                    onSettingsClick = onSettingsClick,
+                    onLogout = onLogout,
                 )
                 usersGraph(navController = navController)
                 adminScreen(
                     onBack = { navController.popBackStack() },
                     onPublished = { navController.popBackStack() },
                 )
-                unitsGraph(navController = navController)
-                settingsScreen()
+                unitsGraph(
+                    navController = navController,
+                    user = user,
+                    onSettingsClick = onSettingsClick,
+                    onLogout = onLogout,
+                )
+                settingsScreen(
+                    isAdmin = user.role.isAdmin,
+                    onUsersClick = { navController.navigate(USERS_LIST_ROUTE) },
+                )
             }
         }
     }

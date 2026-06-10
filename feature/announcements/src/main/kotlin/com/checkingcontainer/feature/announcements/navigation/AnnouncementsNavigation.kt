@@ -10,6 +10,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.checkingcontainer.core.model.User
 import com.checkingcontainer.feature.announcements.AnnouncementDetailRoute
 import com.checkingcontainer.feature.announcements.AnnouncementsListRoute
 import com.checkingcontainer.feature.announcements.AnnouncementsViewModel
@@ -26,6 +27,9 @@ fun NavGraphBuilder.announcementsGraph(
     sharedTransitionScope: SharedTransitionScope,
     isAdmin: Boolean = false,
     onCreateAnnouncement: () -> Unit = {},
+    user: User? = null,
+    onSettingsClick: () -> Unit = {},
+    onLogout: () -> Unit = {},
 ) {
     composable(route = ANNOUNCEMENTS_LIST_ROUTE) { backStackEntry ->
         val parent = remember(backStackEntry) {
@@ -40,6 +44,9 @@ fun NavGraphBuilder.announcementsGraph(
             },
             isAdmin = isAdmin,
             onCreateClick = onCreateAnnouncement,
+            user = user,
+            onSettingsClick = onSettingsClick,
+            onLogout = onLogout,
             viewModel = vm,
         )
     }

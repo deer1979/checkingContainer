@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.checkingcontainer.core.designsystem.UserAvatarMenu
+import com.checkingcontainer.core.model.User
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +45,9 @@ fun AnnouncementsListRoute(
     onAnnouncementClick: (String) -> Unit,
     isAdmin: Boolean = false,
     onCreateClick: () -> Unit = {},
+    user: User? = null,
+    onSettingsClick: () -> Unit = {},
+    onLogout: () -> Unit = {},
     viewModel: AnnouncementsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.list.collectAsStateWithLifecycle()
@@ -58,6 +63,13 @@ fun AnnouncementsListRoute(
                         IconButton(onClick = onCreateClick) {
                             Icon(Icons.Outlined.Add, contentDescription = "Crear anuncio")
                         }
+                    }
+                    if (user != null) {
+                        UserAvatarMenu(
+                            user = user,
+                            onSettingsClick = onSettingsClick,
+                            onLogout = onLogout,
+                        )
                     }
                 },
             )

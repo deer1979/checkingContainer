@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.checkingcontainer.core.designsystem.UserAvatarMenu
+import com.checkingcontainer.core.model.User
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -43,6 +45,9 @@ fun UnitListRoute(
     onNewInspection: () -> Unit,
     onUnitClick: (String) -> Unit,
     onSearch: () -> Unit = {},
+    user: User? = null,
+    onSettingsClick: () -> Unit = {},
+    onLogout: () -> Unit = {},
     viewModel: UnitListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -55,6 +60,13 @@ fun UnitListRoute(
                 actions = {
                     IconButton(onClick = onSearch) {
                         Icon(Icons.Outlined.Search, contentDescription = "Buscar equipo")
+                    }
+                    if (user != null) {
+                        UserAvatarMenu(
+                            user = user,
+                            onSettingsClick = onSettingsClick,
+                            onLogout = onLogout,
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

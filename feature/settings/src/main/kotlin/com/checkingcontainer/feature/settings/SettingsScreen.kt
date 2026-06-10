@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
@@ -36,12 +37,16 @@ import com.checkingcontainer.core.model.ThemeConfig
 @Composable
 fun SettingsRoute(
     onBack: () -> Unit,
+    isAdmin: Boolean = false,
+    onUsersClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     SettingsScreen(
         state = state,
         onBack = onBack,
+        isAdmin = isAdmin,
+        onUsersClick = onUsersClick,
         onThemeChange = viewModel::onThemeChange,
         onToggleDynamicColor = viewModel::onDynamicColorChange,
         onToggleNotifications = viewModel::onToggleNotifications,
@@ -55,6 +60,8 @@ fun SettingsRoute(
 private fun SettingsScreen(
     state: SettingsUiState,
     onBack: () -> Unit,
+    isAdmin: Boolean = false,
+    onUsersClick: () -> Unit = {},
     onThemeChange: (ThemeConfig) -> Unit,
     onToggleDynamicColor: (Boolean) -> Unit,
     onToggleNotifications: (Boolean) -> Unit,
@@ -123,6 +130,19 @@ private fun SettingsScreen(
                 )
             }
             item { HorizontalDivider() }
+
+            if (isAdmin) {
+                item { SectionHeader("Administración") }
+                item {
+                    ListItem(
+                        headlineContent = { Text("Gestión de usuarios") },
+                        supportingContent = { Text("Crear, editar y desactivar usuarios") },
+                        leadingContent = { Icon(Icons.Outlined.Group, contentDescription = null) },
+                        modifier = Modifier.clickable(onClick = onUsersClick),
+                    )
+                }
+                item { HorizontalDivider() }
+            }
 
             item { SectionHeader("Acerca de") }
             item {

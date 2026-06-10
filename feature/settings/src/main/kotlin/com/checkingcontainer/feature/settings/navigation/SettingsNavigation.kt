@@ -6,8 +6,15 @@ import com.checkingcontainer.feature.settings.SettingsRoute
 
 const val SETTINGS_ROUTE = "settings"
 
-fun NavGraphBuilder.settingsScreen() {
+fun NavGraphBuilder.settingsScreen(
+    isAdmin: Boolean = false,
+    onUsersClick: () -> Unit = {},
+) {
     composable(route = SETTINGS_ROUTE) {
-        SettingsRoute(onBack = {})
+        SettingsRoute(
+            onBack = {},
+            isAdmin = isAdmin,
+            onUsersClick = onUsersClick,
+        )
     }
 }
