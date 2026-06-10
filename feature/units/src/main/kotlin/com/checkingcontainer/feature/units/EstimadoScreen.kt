@@ -1,29 +1,41 @@
 package com.checkingcontainer.feature.units
 
 import android.content.Intent
+import android.graphics.Matrix
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import androidx.activity.compose.BackHandler
 import androidx.core.content.FileProvider
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
@@ -36,11 +48,11 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -107,21 +119,32 @@ fun EstimadoRoute(
 
     BackHandler(enabled = hasUnsavedData) { showDiscardDialog = true }
 
-    // Compartir PDF cuando esté listo
+    // Mostrar preview del PDF cuando esté listo
     val context = LocalContext.current
-    val pdfFilePath = state.pdfFilePath
-    LaunchedEffect(pdfFilePath) {
-        if (pdfFilePath != null) {
-            val file = File(pdfFilePath)
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/pdf"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(Intent.createChooser(intent, "Compartir estimado"))
-            viewModel.clearPdfPath()
-        }
+    var showPdfPreview by remember { mutableStateOf(false) }
+    val pdfPreviewPath = state.pdfPreviewPath
+    LaunchedEffect(pdfPreviewPath) {
+        if (pdfPreviewPath != null) showPdfPreview = true
+    }
+
+    if (showPdfPreview && pdfPreviewPath != null) {
+        PdfPreviewSheet(
+            filePath = pdfPreviewPath,
+            onShare = {
+                val file = File(pdfPreviewPath)
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, "Compartir estimado"))
+            },
+            onDismiss = {
+                showPdfPreview = false
+                viewModel.clearPdfPath()
+            },
+        )
     }
 
     if (showDiscardDialog) {
@@ -194,38 +217,47 @@ fun EstimadoScreen(
                 ),
             )
         },
-        floatingActionButton = {
+        bottomBar = {
             if (!state.isLoading) {
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                BottomAppBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ) {
-                    // FAB PDF — visible cuando el estimado ya fue guardado y tiene ítems
+                    // ← Atrás
+                    BottomBarBtn(
+                        icon = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, Modifier.size(22.dp)) },
+                        label = "Atrás",
+                        onClick = onBack,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    // Guardar
+                    if (state.status != EstimadoStatus.CERRADO) {
+                        BottomBarBtn(
+                            icon = {
+                                if (state.isSaving)
+                                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                                else
+                                    Icon(Icons.Outlined.Save, null, Modifier.size(22.dp))
+                            },
+                            label = if (state.isSaving) "Guardando…" else "Guardar",
+                            onClick = onSave,
+                            enabled = !state.isSaving,
+                        )
+                    }
+                    // Compartir PDF
                     if (state.estimadoId != 0L && state.damages.isNotEmpty()) {
-                        ExtendedFloatingActionButton(
-                            onClick = onGeneratePdf,
+                        BottomBarBtn(
                             icon = {
                                 if (state.isGeneratingPdf)
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                                 else
-                                    Icon(Icons.Outlined.Share, contentDescription = null)
+                                    Icon(Icons.Outlined.Share, null, Modifier.size(22.dp))
                             },
-                            text = { Text(if (state.isGeneratingPdf) "Generando…" else "Compartir PDF") },
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            label = if (state.isGeneratingPdf) "Generando…" else "Ver PDF",
+                            onClick = onGeneratePdf,
+                            enabled = !state.isGeneratingPdf,
                         )
                     }
-                    // FAB Guardar — visible cuando no está cerrado
-                    if (state.status != EstimadoStatus.CERRADO) {
-                        ExtendedFloatingActionButton(
-                            onClick = onSave,
-                            icon = {
-                                if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                else Icon(Icons.Outlined.Save, contentDescription = null)
-                            },
-                            text = { Text(if (state.isSaving) "Guardando…" else "Guardar Estimado") },
-                        )
-                    }
+                    Spacer(Modifier.width(8.dp))
                 }
             }
         },
@@ -355,8 +387,6 @@ fun EstimadoScreen(
             state.errorMessage?.let { msg ->
                 Text(msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
-
-            Spacer(Modifier.height(88.dp))
         }
     }
 
@@ -893,4 +923,126 @@ private fun formatDate(millis: Long): String {
 private fun createCameraUri(context: android.content.Context): Uri {
     val file = java.io.File(context.cacheDir, "photo_${System.currentTimeMillis()}.jpg")
     return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+}
+
+@Composable
+private fun BottomBarBtn(
+    icon: @Composable () -> Unit,
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        icon()
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PdfPreviewSheet(
+    filePath: String,
+    onShare: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    var pages by remember { mutableStateOf<List<android.graphics.Bitmap>>(emptyList()) }
+    var isRendering by remember { mutableStateOf(true) }
+
+    LaunchedEffect(filePath) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val file = java.io.File(filePath)
+                val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+                val renderer = PdfRenderer(pfd)
+                val dm = context.resources.displayMetrics
+                val targetW = dm.widthPixels - (32 * dm.density).toInt()
+                val list = mutableListOf<android.graphics.Bitmap>()
+                for (i in 0 until renderer.pageCount) {
+                    val page = renderer.openPage(i)
+                    val scale = targetW.toFloat() / page.width
+                    val bmp = android.graphics.Bitmap.createBitmap(
+                        (page.width * scale).toInt(),
+                        (page.height * scale).toInt(),
+                        android.graphics.Bitmap.Config.ARGB_8888,
+                    )
+                    page.render(bmp, null, Matrix().apply { setScale(scale, scale) }, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    page.close()
+                    list.add(bmp)
+                }
+                renderer.close()
+                pfd.close()
+                list
+            }.onSuccess { list -> pages = list }
+            isRendering = false
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f),
+        ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Vista previa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onDismiss) { Text("Cerrar") }
+                    Button(onClick = onShare) {
+                        Icon(Icons.Outlined.Share, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Compartir")
+                    }
+                }
+            }
+            HorizontalDivider()
+
+            if (isRendering) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CircularProgressIndicator()
+                        Text("Preparando vista previa…", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(pages) { bmp ->
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(4.dp)),
+                            contentScale = ContentScale.FillWidth,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

@@ -32,8 +32,8 @@ data class EstimadoUiState(
     val isGeneratingPdf: Boolean = false,
     val errorMessage: String? = null,
     val savedMessage: String? = null,
-    // PDF listo para compartir (ruta al archivo temporal)
-    val pdfFilePath: String? = null,
+    // PDF listo para previsualizar (ruta al archivo temporal)
+    val pdfPreviewPath: String? = null,
     // Bottom sheet activo
     val activeSheet: EstimadoSheet? = null,
 )

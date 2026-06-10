@@ -324,7 +324,7 @@ class EstimadoViewModel @Inject constructor(
                     launch(Dispatchers.IO) {
                         runCatching { estimadosRepo.uploadPdf(inspectionId, bytes) }
                     }
-                    _state.update { it.copy(isGeneratingPdf = false, pdfFilePath = file.absolutePath) }
+                    _state.update { it.copy(isGeneratingPdf = false, pdfPreviewPath = file.absolutePath) }
                 }
                 .onFailure { error ->
                     _state.update {
@@ -334,5 +334,5 @@ class EstimadoViewModel @Inject constructor(
         }
     }
 
-    fun clearPdfPath() = _state.update { it.copy(pdfFilePath = null) }
+    fun clearPdfPath() = _state.update { it.copy(pdfPreviewPath = null) }
 }
