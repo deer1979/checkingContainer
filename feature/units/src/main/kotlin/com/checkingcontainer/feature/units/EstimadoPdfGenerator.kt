@@ -204,7 +204,7 @@ class EstimadoPdfGenerator @Inject constructor(
                 val py = y
                 photoBox(item.damagePhoto?.let { photos[it] }, lx, py, photoSz, "ANTES")
                 photoBox(item.repairPhoto?.let { photos[it] }, rx, py, photoSz, "DESPUÉS")
-                y += photoSz + 18f
+                y += photoSz + 32f
             }
 
             // Acción de reparación
