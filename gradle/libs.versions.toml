@@ -127,7 +127,6 @@ mlkit-text-recognition = { group = "com.google.android.gms", name = "play-servic
 # Coil 3 — imágenes remotas (adjuntos de anuncios en Firebase Storage)
 coil-compose        = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
-kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.8.1" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
 
 # Firebase

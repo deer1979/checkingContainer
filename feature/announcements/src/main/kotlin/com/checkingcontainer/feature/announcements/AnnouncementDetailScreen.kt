@@ -33,7 +33,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
-import androidx.compose.ui.platform.LocalLocale
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -113,7 +112,7 @@ fun AnnouncementDetailRoute(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Por ${item.authorName} · ${SimpleDateFormat("dd MMM yyyy", LocalLocale.current.platformLocale).format(Date(item.publishedAt))}",
+                    text = "Por ${item.authorName} · ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(item.publishedAt))}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
