@@ -15,7 +15,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -78,12 +77,14 @@ fun EstimadosListScreen(
                     selected = pagerState.currentPage == 0,
                     onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
                     text = {
-                        if (state.openList.isNotEmpty()) {
-                            BadgedBox(badge = { Badge { Text("${state.openList.size}") } }) {
-                                Text("Abiertos")
-                            }
-                        } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
                             Text("Abiertos")
+                            if (state.openList.isNotEmpty()) {
+                                Badge { Text("${state.openList.size}") }
+                            }
                         }
                     },
                 )

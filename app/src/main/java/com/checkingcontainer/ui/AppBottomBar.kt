@@ -1,6 +1,7 @@
 package com.checkingcontainer.ui
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
@@ -26,7 +27,9 @@ fun AppBottomBar(
 ) {
     NavigationBar(
         modifier = Modifier
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp)
+            .navigationBarsPadding()
+            .padding(vertical = 8.dp)
             .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp))
             .clip(RoundedCornerShape(28.dp)),
         windowInsets = WindowInsets(0),
