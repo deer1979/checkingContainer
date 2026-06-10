@@ -9,6 +9,7 @@ import com.checkingcontainer.core.domain.InspectionRepository
 import com.checkingcontainer.core.domain.ReeferEquipmentRepository
 import com.checkingcontainer.core.domain.usecase.CatalogLookupUseCase
 import com.checkingcontainer.core.model.Brand
+import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.feature.units.navigation.UNIT_ENTRY_ID_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.SimpleDateFormat
@@ -147,17 +148,24 @@ class UnitEntryViewModel @Inject constructor(
             val equipment = current.toEquipment()
             val inspection = current.toInspection(authUser.id, authUser.fullName, authUser.location)
 
-            val result = if (current.inspectionId != null) {
+            var savedInspectionId = current.inspectionId ?: 0L
+
+            val result: Result<Unit> = if (current.inspectionId != null) {
                 equipmentRepo.upsert(equipment)
                 inspectionRepo.update(inspection.copy(id = current.inspectionId))
             } else {
                 equipmentRepo.upsert(equipment)
-                inspectionRepo.create(inspection).map {}
+                inspectionRepo.create(inspection).also { r ->
+                    savedInspectionId = r.getOrElse { 0L }
+                }.map {}
             }
 
             result
                 .onSuccess {
-                    _state.update { it.copy(isSaving = false, savedSuccessfully = true) }
+                    val navTarget = if (current.status == InspStatus.EST && savedInspectionId != 0L) {
+                        savedInspectionId
+                    } else null
+                    _state.update { it.copy(isSaving = false, savedSuccessfully = true, navigateToEstimado = navTarget) }
                 }
                 .onFailure { error ->
                     _state.update {

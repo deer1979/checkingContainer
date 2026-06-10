@@ -29,6 +29,7 @@ data class UnitEntryUiState(
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
     val savedSuccessfully: Boolean = false,
+    val navigateToEstimado: Long? = null,
     val showOrientationPicker: Boolean = false,
     val showScanner: Boolean = false,
     val scannerMode: ScannerMode = ScannerMode.CONTAINER,

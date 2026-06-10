@@ -35,12 +35,16 @@ import com.checkingcontainer.core.designsystem.theme.AppTheme
 fun UnitEntryRoute(
     onBack: () -> Unit,
     onDeleted: () -> Unit = onBack,
+    onNavigateToEstimado: (Long) -> Unit = {},
     viewModel: UnitEntryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(state.savedSuccessfully) {
-        if (state.savedSuccessfully) onBack()
+        if (state.savedSuccessfully) {
+            val estTarget = state.navigateToEstimado
+            if (estTarget != null) onNavigateToEstimado(estTarget) else onBack()
+        }
     }
     LaunchedEffect(state.deletedSuccessfully) {
         if (state.deletedSuccessfully) onDeleted()

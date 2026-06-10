@@ -8,6 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.checkingcontainer.core.database.AppDatabase
 import com.checkingcontainer.core.database.dao.AnnouncementDao
 import com.checkingcontainer.core.database.dao.CatalogDao
+import com.checkingcontainer.core.database.dao.EstimadoDao
 import com.checkingcontainer.core.database.dao.InspectionDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
@@ -19,6 +20,7 @@ import com.checkingcontainer.core.database.migrations.MIGRATION_8_9
 import com.checkingcontainer.core.database.migrations.MIGRATION_9_10
 import com.checkingcontainer.core.database.migrations.MIGRATION_10_11
 import com.checkingcontainer.core.database.migrations.MIGRATION_11_12
+import com.checkingcontainer.core.database.migrations.MIGRATION_12_13
 import com.checkingcontainer.core.database.migrations.seedAnnouncements
 import com.checkingcontainer.core.database.migrations.seedFullCatalog
 import com.checkingcontainer.core.database.migrations.seedManufacturers
@@ -45,7 +47,7 @@ object DatabaseModule {
         AppDatabase::class.java,
         "checkingcontainer.db",
     )
-        .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+        .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
         .addCallback(seedOnCreateCallback)
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
@@ -64,6 +66,9 @@ object DatabaseModule {
 
     @Provides
     fun providesAnnouncementDao(db: AppDatabase): AnnouncementDao = db.announcementDao()
+
+    @Provides
+    fun providesEstimadoDao(db: AppDatabase): EstimadoDao = db.estimadoDao()
 
     /** Seeds SuperAdmin + full catalog on first install. Login: nick = sadmin, PIN = 000000. */
     private val seedOnCreateCallback = object : RoomDatabase.Callback() {

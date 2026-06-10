@@ -2,6 +2,7 @@ package com.checkingcontainer.core.data.di
 
 import com.checkingcontainer.core.data.AnnouncementsRepositoryImpl
 import com.checkingcontainer.core.data.CatalogRepositoryImpl
+import com.checkingcontainer.core.data.EstimadosRepositoryImpl
 import com.checkingcontainer.core.data.InspectionRepositoryImpl
 import com.checkingcontainer.core.data.ReeferEquipmentRepositoryImpl
 import com.checkingcontainer.core.data.ThemeRepositoryImpl
@@ -9,6 +10,7 @@ import com.checkingcontainer.core.data.AuthRepositoryImpl
 import com.checkingcontainer.core.data.UsersRepositoryImpl
 import com.checkingcontainer.core.domain.AnnouncementsRepository
 import com.checkingcontainer.core.domain.CatalogRepository
+import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.domain.InspectionRepository
 import com.checkingcontainer.core.domain.ReeferEquipmentRepository
 import com.checkingcontainer.core.domain.ThemeRepository
@@ -55,4 +57,8 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindThemeRepository(impl: ThemeRepositoryImpl): ThemeRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindEstimadosRepository(impl: EstimadosRepositoryImpl): EstimadosRepository
 }

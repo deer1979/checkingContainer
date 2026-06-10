@@ -4,6 +4,7 @@ import android.util.Log
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
 import com.checkingcontainer.core.database.entity.AnnouncementEntity
+import com.checkingcontainer.core.database.entity.EstimadoEntity
 import com.checkingcontainer.core.database.entity.InspectionEntity
 import com.checkingcontainer.core.database.entity.ReeferUnitEntity
 import com.checkingcontainer.core.database.entity.UserEntity
@@ -26,6 +27,7 @@ private const val COL_ANNOUNCEMENTS = "announcements"
 private const val COL_REEFER_UNITS = "reefer_units"
 private const val COL_INSPECTIONS = "inspections"
 private const val COL_USERS = "users"
+private const val COL_ESTIMADOS = "estimados"
 
 @Singleton
 class FirestoreService @Inject constructor(
@@ -188,6 +190,30 @@ class FirestoreService @Inject constructor(
         awaitClose { listener.remove() }
     }
 
+    // ── Estimados ────────────────────────────────────────────────────────────
+
+    suspend fun upsertEstimado(entity: EstimadoEntity): Unit = withContext(ioDispatcher) {
+        try {
+            firestore.collection(COL_ESTIMADOS)
+                .document(entity.id.toString())
+                .set(entity.toFirestoreMap())
+                .await()
+        } catch (e: Exception) {
+            Log.w(TAG, "upsertEstimado deferred (offline?): ${e.message}")
+        }
+    }
+
+    suspend fun deleteEstimado(id: Long): Unit = withContext(ioDispatcher) {
+        try {
+            firestore.collection(COL_ESTIMADOS)
+                .document(id.toString())
+                .delete()
+                .await()
+        } catch (e: Exception) {
+            Log.w(TAG, "deleteEstimado deferred (offline?): ${e.message}")
+        }
+    }
+
     // ── Users ────────────────────────────────────────────────────────────────
 
     suspend fun upsertUser(entity: UserEntity): Unit = withContext(ioDispatcher) {
@@ -252,6 +278,24 @@ private fun InspectionEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "noteDigitacion"     to noteDigitacion,
     "avisoDigitacion"    to avisoDigitacion,
     "diasPendiente"      to diasPendiente,
+)
+
+private fun EstimadoEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
+    "id"                to id,
+    "inspectionId"      to inspectionId,
+    "containerNo"       to containerNo,
+    "clientName"        to clientName,
+    "technicianId"      to technicianId,
+    "technicianName"    to technicianName,
+    "location"          to location,
+    "createdAt"         to createdAt,
+    "closedAt"          to closedAt,
+    "status"            to status.name,
+    "damageDescription" to damageDescription,
+    "damagePhotos"      to damagePhotos,
+    "repairDescription" to repairDescription,
+    "repairPhotos"      to repairPhotos,
+    "reportUrl"         to reportUrl,
 )
 
 private fun UserEntity.toFirestoreMap(): Map<String, Any?> = mapOf(

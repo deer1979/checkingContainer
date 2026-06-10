@@ -37,6 +37,18 @@ class StorageService @Inject constructor(
         ref.downloadUrl.await().toString()
     }
 
+    /** Sube [bytes] a [storagePath] y devuelve la URL de descarga pública. */
+    suspend fun uploadToPath(
+        storagePath: String,
+        bytes: ByteArray,
+        contentType: String = "image/jpeg",
+    ): String = withContext(ioDispatcher) {
+        val ref = storage.reference.child(storagePath)
+        val metadata = StorageMetadata.Builder().setContentType(contentType).build()
+        ref.putBytes(bytes, metadata).await()
+        ref.downloadUrl.await().toString()
+    }
+
     /** Borra un archivo a partir de su URL de descarga. No lanza si ya no existe. */
     suspend fun deleteByUrl(url: String): Unit = withContext(ioDispatcher) {
         runCatching { storage.getReferenceFromUrl(url).delete().await() }

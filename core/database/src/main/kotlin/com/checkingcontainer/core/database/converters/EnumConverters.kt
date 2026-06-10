@@ -1,10 +1,11 @@
 package com.checkingcontainer.core.database.converters
 
 import androidx.room.TypeConverter
+import com.checkingcontainer.core.model.Brand
+import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.PtiInstruction
-import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.UserRole
 
 class EnumConverters {
@@ -43,4 +44,11 @@ class EnumConverters {
     @TypeConverter
     fun stringToBrand(value: String?): Brand? =
         value?.let { runCatching { Brand.valueOf(it) }.getOrNull() }
+
+    @TypeConverter
+    fun estimadoStatusToString(value: EstimadoStatus?): String? = value?.name
+
+    @TypeConverter
+    fun stringToEstimadoStatus(value: String?): EstimadoStatus? =
+        value?.let { runCatching { EstimadoStatus.valueOf(it) }.getOrNull() }
 }
