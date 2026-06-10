@@ -1,6 +1,7 @@
 package com.checkingcontainer.feature.units
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -82,14 +84,43 @@ private val USD = NumberFormat.getCurrencyInstance(Locale("es", "US")).apply {
 
 @Composable
 fun EstimadoRoute(
-    onNavigateToList: () -> Unit,
+    onBack: () -> Unit,
     viewModel: EstimadoViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var showDiscardDialog by remember { mutableStateOf(false) }
+
+    val hasUnsavedData = !state.isLoading &&
+        state.estimadoId == 0L &&
+        (state.clientName.isNotBlank() || state.damages.isNotEmpty())
+
+    val onBackSafe: () -> Unit = {
+        if (hasUnsavedData) showDiscardDialog = true else onBack()
+    }
+
+    BackHandler(enabled = hasUnsavedData) { showDiscardDialog = true }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("¿Salir sin guardar?") },
+            text = { Text("Los datos ingresados se perderán si sales sin guardar el estimado.") },
+            confirmButton = {
+                Button(onClick = { showDiscardDialog = false; onBack() }) {
+                    Text("Salir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
 
     EstimadoScreen(
         state = state,
-        onBack = onNavigateToList,
+        onBack = onBackSafe,
         onEvent = viewModel::onEvent,
         onSave = viewModel::save,
         onAddDamagePhoto = viewModel::addDamagePhoto,

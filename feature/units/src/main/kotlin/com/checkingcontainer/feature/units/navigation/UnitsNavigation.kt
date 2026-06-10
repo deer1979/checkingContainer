@@ -83,11 +83,7 @@ fun NavGraphBuilder.unitsGraph(
         arguments = listOf(navArgument(ESTIMADO_INSPECTION_ID_ARG) { type = NavType.LongType }),
     ) {
         EstimadoRoute(
-            onNavigateToList = {
-                navController.navigate(ESTIMADOS_LIST_ROUTE) {
-                    popUpTo(ESTIMADOS_LIST_ROUTE) { inclusive = true }
-                }
-            },
+            onBack = { navController.popBackStack() },
         )
     }
 }
