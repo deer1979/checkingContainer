@@ -88,6 +88,11 @@ class EstimadoViewModel @Inject constructor(
                         pendingDamageDescription = ""
                         _state.update { it.copy(activeSheet = sheet) }
                     }
+                    is EstimadoSheet.EditDamage -> {
+                        pendingDamageDescription = _state.value.damages
+                            .find { it.id == sheet.itemId }?.damageDescription ?: ""
+                        _state.update { it.copy(activeSheet = sheet) }
+                    }
                     is EstimadoSheet.RepairItem -> {
                         pendingRepairAction = _state.value.damages
                             .find { it.id == sheet.itemId }?.repairAction ?: ""
@@ -121,11 +126,43 @@ class EstimadoViewModel @Inject constructor(
                     )
                 }
             }
+            is EstimadoEvent.ConfirmEditDamage -> {
+                if (pendingDamageDescription.isBlank()) return
+                _state.update { s ->
+                    s.copy(
+                        damages = s.damages.map { item ->
+                            if (item.id == event.itemId)
+                                item.copy(damageDescription = pendingDamageDescription.trim())
+                            else item
+                        },
+                        activeSheet = null,
+                        savedMessage = null,
+                    )
+                }
+            }
             is EstimadoEvent.RemoveDamageItem -> {
                 val item = _state.value.damages.find { it.id == event.itemId } ?: return
                 _state.update { it.copy(damages = it.damages - item) }
                 item.damagePhoto?.let { url -> deletePhotoAsync(url) }
                 item.repairPhoto?.let { url -> deletePhotoAsync(url) }
+            }
+            is EstimadoEvent.RemoveDamagePhoto -> {
+                val item = _state.value.damages.find { it.id == event.itemId } ?: return
+                item.damagePhoto?.let { deletePhotoAsync(it) }
+                _state.update { s ->
+                    s.copy(damages = s.damages.map {
+                        if (it.id == event.itemId) it.copy(damagePhoto = null) else it
+                    })
+                }
+            }
+            is EstimadoEvent.RemoveRepairPhoto -> {
+                val item = _state.value.damages.find { it.id == event.itemId } ?: return
+                item.repairPhoto?.let { deletePhotoAsync(it) }
+                _state.update { s ->
+                    s.copy(damages = s.damages.map {
+                        if (it.id == event.itemId) it.copy(repairPhoto = null) else it
+                    })
+                }
             }
             is EstimadoEvent.RepairActionChange ->
                 pendingRepairAction = event.value

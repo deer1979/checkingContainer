@@ -40,6 +40,7 @@ data class EstimadoUiState(
 
 sealed interface EstimadoSheet {
     data object AddDamage : EstimadoSheet
+    data class EditDamage(val itemId: String) : EstimadoSheet
     data class RepairItem(val itemId: String) : EstimadoSheet
     data class EditValor(val itemId: String) : EstimadoSheet
 }
@@ -53,7 +54,10 @@ sealed interface EstimadoEvent {
     // Daño
     data class DamageDescriptionChange(val value: String) : EstimadoEvent
     data object ConfirmAddDamage : EstimadoEvent
+    data class ConfirmEditDamage(val itemId: String) : EstimadoEvent
     data class RemoveDamageItem(val itemId: String) : EstimadoEvent
+    data class RemoveDamagePhoto(val itemId: String) : EstimadoEvent
+    data class RemoveRepairPhoto(val itemId: String) : EstimadoEvent
     // Reparación
     data class RepairActionChange(val itemId: String, val value: String) : EstimadoEvent
     data class ConfirmRepair(val itemId: String) : EstimadoEvent

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.material.icons.outlined.AttachMoney
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Share
@@ -314,8 +315,11 @@ fun EstimadoScreen(
                             estimadoSaved = state.estimadoId != 0L,
                             isUploading = state.isUploadingPhoto,
                             isClosed = state.status == EstimadoStatus.CERRADO,
+                            onEditDescriptionClick = { onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.EditDamage(item.id))) },
                             onRepairClick = { onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.RepairItem(item.id))) },
                             onRemoveClick = { onEvent(EstimadoEvent.RemoveDamageItem(item.id)) },
+                            onRemoveDamagePhoto = { onEvent(EstimadoEvent.RemoveDamagePhoto(item.id)) },
+                            onRemoveRepairPhoto = { onEvent(EstimadoEvent.RemoveRepairPhoto(item.id)) },
                             onAddDamagePhoto = { uri -> onAddDamagePhoto(item.id, uri) },
                             onAddRepairPhoto = { uri -> onAddRepairPhoto(item.id, uri) },
                         )
@@ -364,10 +368,25 @@ fun EstimadoScreen(
                 sheetState = sheetState,
             ) {
                 AddDamageSheet(
+                    title = "Agregar daño",
                     initialDescription = getPendingDamageDescription(),
                     onDescriptionChange = { onEvent(EstimadoEvent.DamageDescriptionChange(it)) },
                     onCancel = { scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(EstimadoEvent.DismissSheet) } },
                     onConfirm = { onEvent(EstimadoEvent.ConfirmAddDamage) },
+                )
+            }
+        }
+        is EstimadoSheet.EditDamage -> {
+            ModalBottomSheet(
+                onDismissRequest = { onEvent(EstimadoEvent.DismissSheet) },
+                sheetState = sheetState,
+            ) {
+                AddDamageSheet(
+                    title = "Editar daño",
+                    initialDescription = getPendingDamageDescription(),
+                    onDescriptionChange = { onEvent(EstimadoEvent.DamageDescriptionChange(it)) },
+                    onCancel = { scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(EstimadoEvent.DismissSheet) } },
+                    onConfirm = { onEvent(EstimadoEvent.ConfirmEditDamage(sheet.itemId)) },
                 )
             }
         }
@@ -416,14 +435,26 @@ private fun DamageItemCard(
     estimadoSaved: Boolean,
     isUploading: Boolean,
     isClosed: Boolean,
+    onEditDescriptionClick: () -> Unit,
     onRepairClick: () -> Unit,
     onRemoveClick: () -> Unit,
+    onRemoveDamagePhoto: () -> Unit,
+    onRemoveRepairPhoto: () -> Unit,
     onAddDamagePhoto: (Uri) -> Unit,
     onAddRepairPhoto: (Uri) -> Unit,
 ) {
+    val context = LocalContext.current
+    var cameraDamageUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraRepairUri by remember { mutableStateOf<Uri?>(null) }
+
     val pickDamage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let(onAddDamagePhoto) }
-    val captureDamage = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { }
+    val captureDamage = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) cameraDamageUri?.let { onAddDamagePhoto(it) }
+    }
     val pickRepair = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let(onAddRepairPhoto) }
+    val captureRepair = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) cameraRepairUri?.let { onAddRepairPhoto(it) }
+    }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -446,54 +477,64 @@ private fun DamageItemCard(
                         )
                     }
                 }
-                if (!isClosed && item.status == DamageItemStatus.PENDIENTE) {
-                    IconButton(onClick = onRemoveClick, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Eliminar ítem", modifier = Modifier.size(16.dp))
+                if (!isClosed) {
+                    IconButton(onClick = onEditDescriptionClick, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Outlined.Edit, contentDescription = "Editar descripción", modifier = Modifier.size(20.dp))
+                    }
+                    if (item.status == DamageItemStatus.PENDIENTE) {
+                        IconButton(onClick = onRemoveClick, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Eliminar ítem", modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
             }
         }
 
-        Text(
-            item.damageDescription,
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        Text(item.damageDescription, style = MaterialTheme.typography.bodyMedium)
 
         // Fotos lado a lado: daño (izq) / reparación (der)
-        val damagePhotoUrl = item.damagePhoto
-        val repairPhotoUrl = item.repairPhoto
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // Foto daño — izquierda
             Box(Modifier.weight(1f)) {
-                if (damagePhotoUrl != null) {
+                if (item.damagePhoto != null) {
                     PhotoThumbnail(
-                        url = damagePhotoUrl,
+                        url = item.damagePhoto,
                         label = "ANTES",
-                        canRemove = false,
+                        canRemove = !isClosed,
+                        onRemove = onRemoveDamagePhoto,
                     )
-                } else if (!isClosed && item.status == DamageItemStatus.PENDIENTE) {
+                } else if (!isClosed) {
                     PhotoPickerButton(
                         label = "Foto del daño",
                         isUploading = isUploading,
                         onGallery = { pickDamage.launch("image/*") },
-                        onCamera = { /* camera intent */ },
+                        onCamera = {
+                            val uri = createCameraUri(context)
+                            cameraDamageUri = uri
+                            captureDamage.launch(uri)
+                        },
                     )
                 }
             }
             // Foto reparación — derecha
             Box(Modifier.weight(1f)) {
-                if (repairPhotoUrl != null) {
+                if (item.repairPhoto != null) {
                     PhotoThumbnail(
-                        url = repairPhotoUrl,
+                        url = item.repairPhoto,
                         label = "DESPUÉS",
-                        canRemove = false,
+                        canRemove = !isClosed,
+                        onRemove = onRemoveRepairPhoto,
                     )
                 } else if (item.status == DamageItemStatus.REPARADO && !isClosed) {
                     PhotoPickerButton(
                         label = "Foto reparación",
                         isUploading = isUploading,
                         onGallery = { pickRepair.launch("image/*") },
-                        onCamera = { },
+                        onCamera = {
+                            val uri = createCameraUri(context)
+                            cameraRepairUri = uri
+                            captureRepair.launch(uri)
+                        },
                     )
                 } else if (item.status == DamageItemStatus.PENDIENTE) {
                     Box(
@@ -527,7 +568,7 @@ private fun DamageItemCard(
                 onClick = onRepairClick,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Outlined.Build, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Outlined.Build, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Reparar ítem")
             }
@@ -614,6 +655,7 @@ private fun ValoresSummaryCard(
 
 @Composable
 private fun AddDamageSheet(
+    title: String,
     initialDescription: String,
     onDescriptionChange: (String) -> Unit,
     onCancel: () -> Unit,
@@ -625,7 +667,7 @@ private fun AddDamageSheet(
         Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Agregar daño", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         OutlinedTextField(
             value = text,
             onValueChange = { text = it; onDescriptionChange(it) },
@@ -782,10 +824,11 @@ private fun PhotoThumbnail(url: String, label: String, canRemove: Boolean, onRem
                 onClick = onRemove,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .size(24.dp)
-                    .background(Color.Black.copy(alpha = 0.55f), CircleShape),
+                    .padding(4.dp)
+                    .size(32.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), CircleShape),
             ) {
-                Icon(Icons.Outlined.Close, contentDescription = "Eliminar foto", tint = Color.White, modifier = Modifier.size(12.dp))
+                Icon(Icons.Outlined.Close, contentDescription = "Eliminar foto", tint = Color.White, modifier = Modifier.size(16.dp))
             }
         }
     }
@@ -807,12 +850,12 @@ private fun PhotoPickerButton(label: String, isUploading: Boolean, onGallery: ()
         } else {
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(onClick = onCamera, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Outlined.AddAPhoto, contentDescription = "Cámara", modifier = Modifier.size(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                IconButton(onClick = onCamera, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Outlined.AddAPhoto, contentDescription = "Cámara", modifier = Modifier.size(26.dp))
                 }
-                IconButton(onClick = onGallery, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Outlined.Image, contentDescription = "Galería", modifier = Modifier.size(20.dp))
+                IconButton(onClick = onGallery, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Outlined.Image, contentDescription = "Galería", modifier = Modifier.size(26.dp))
                 }
             }
         }
@@ -843,4 +886,9 @@ private fun SectionTitle(text: String) {
 private fun formatDate(millis: Long): String {
     val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
     return sdf.format(java.util.Date(millis))
+}
+
+private fun createCameraUri(context: android.content.Context): Uri {
+    val file = java.io.File(context.cacheDir, "photo_${System.currentTimeMillis()}.jpg")
+    return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 }
