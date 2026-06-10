@@ -61,4 +61,13 @@ class EstimadosRepositoryImpl @Inject constructor(
     override suspend fun deletePhoto(url: String): Unit = withContext(ioDispatcher) {
         storageService.deleteByUrl(url)
     }
+
+    override suspend fun uploadPdf(inspectionId: Long, bytes: ByteArray): String =
+        withContext(ioDispatcher) {
+            storageService.uploadToPath(
+                "estimados/$inspectionId/reporte.pdf",
+                bytes,
+                contentType = "application/pdf",
+            )
+        }
 }

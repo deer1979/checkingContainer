@@ -22,11 +22,11 @@ internal const val UNIT_ENTRY_ID_ARG = "unitId"
 const val UNIT_DETAIL_ROUTE_PATTERN = "units/detail/{containerNo}"
 internal const val UNIT_DETAIL_ARG = "containerNo"
 const val ESTIMADO_INSPECTION_ID_ARG = "inspectionId"
-private const val ESTIMADO_ROUTE_PATTERN = "estimados/{$ESTIMADO_INSPECTION_ID_ARG}"
+private const val ESTIMADO_ROUTE_PATTERN = "estimado/{$ESTIMADO_INSPECTION_ID_ARG}"
 
 fun unitDetailRoute(containerNo: String) = "units/detail/$containerNo"
 fun unitEntryEditRoute(unitId: Long) = "$UNITS_ENTRY_BASE?unitId=$unitId"
-fun estimadoRoute(inspectionId: Long) = "estimados/$inspectionId"
+fun estimadoRoute(inspectionId: Long) = "estimado/$inspectionId"
 
 fun NavGraphBuilder.unitsGraph(
     navController: NavHostController,

@@ -1,7 +1,9 @@
 package com.checkingcontainer.feature.units
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.core.content.FileProvider
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -54,6 +56,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +64,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -71,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import java.io.File
 import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.EstimadoStatus
@@ -100,6 +105,23 @@ fun EstimadoRoute(
 
     BackHandler(enabled = hasUnsavedData) { showDiscardDialog = true }
 
+    // Compartir PDF cuando esté listo
+    val context = LocalContext.current
+    val pdfFilePath = state.pdfFilePath
+    LaunchedEffect(pdfFilePath) {
+        if (pdfFilePath != null) {
+            val file = File(pdfFilePath)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, "Compartir estimado"))
+            viewModel.clearPdfPath()
+        }
+    }
+
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
@@ -123,6 +145,7 @@ fun EstimadoRoute(
         onBack = onBackSafe,
         onEvent = viewModel::onEvent,
         onSave = viewModel::save,
+        onGeneratePdf = viewModel::generateAndSharePdf,
         onAddDamagePhoto = viewModel::addDamagePhoto,
         onAddRepairPhoto = viewModel::addRepairPhoto,
         getPendingDamageDescription = viewModel::getPendingDamageDescription,
@@ -139,6 +162,7 @@ fun EstimadoScreen(
     onBack: () -> Unit,
     onEvent: (EstimadoEvent) -> Unit,
     onSave: () -> Unit,
+    onGeneratePdf: () -> Unit,
     onAddDamagePhoto: (String, Uri) -> Unit,
     onAddRepairPhoto: (String, Uri) -> Unit,
     getPendingDamageDescription: () -> String,
@@ -169,15 +193,38 @@ fun EstimadoScreen(
             )
         },
         floatingActionButton = {
-            if (!state.isLoading && state.status != EstimadoStatus.CERRADO) {
-                ExtendedFloatingActionButton(
-                    onClick = onSave,
-                    icon = {
-                        if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Outlined.Save, contentDescription = null)
-                    },
-                    text = { Text(if (state.isSaving) "Guardando…" else "Guardar Estimado") },
-                )
+            if (!state.isLoading) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    // FAB PDF — visible cuando el estimado ya fue guardado y tiene ítems
+                    if (state.estimadoId != 0L && state.damages.isNotEmpty()) {
+                        ExtendedFloatingActionButton(
+                            onClick = onGeneratePdf,
+                            icon = {
+                                if (state.isGeneratingPdf)
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                else
+                                    Icon(Icons.Outlined.Share, contentDescription = null)
+                            },
+                            text = { Text(if (state.isGeneratingPdf) "Generando…" else "Compartir PDF") },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                    // FAB Guardar — visible cuando no está cerrado
+                    if (state.status != EstimadoStatus.CERRADO) {
+                        ExtendedFloatingActionButton(
+                            onClick = onSave,
+                            icon = {
+                                if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                else Icon(Icons.Outlined.Save, contentDescription = null)
+                            },
+                            text = { Text(if (state.isSaving) "Guardando…" else "Guardar Estimado") },
+                        )
+                    }
+                }
             }
         },
         modifier = Modifier.fillMaxSize(),
@@ -508,18 +555,31 @@ private fun ValoresSummaryCard(
             SectionTitle("Valores")
 
             damages.forEachIndexed { index, item ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Ítem ${index + 1}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "M. obra: ${USD.format(item.laborCost ?: 0.0)}  Mat: ${USD.format(item.materialCost ?: 0.0)}",
+                            "Ítem ${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            "M. obra: ${USD.format(item.laborCost ?: 0.0)}  |  Mat: ${USD.format(item.materialCost ?: 0.0)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     if (!isClosed) {
-                        IconButton(onClick = { onEditValor(item.id) }, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Outlined.AttachMoney, contentDescription = "Editar valor", modifier = Modifier.size(18.dp))
+                        FilledTonalButton(
+                            onClick = { onEditValor(item.id) },
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        ) {
+                            Icon(Icons.Outlined.AttachMoney, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Editar", style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }

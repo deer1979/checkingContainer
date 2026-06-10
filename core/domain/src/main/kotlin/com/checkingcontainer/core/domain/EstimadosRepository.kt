@@ -13,4 +13,5 @@ interface EstimadosRepository {
     fun countOpen(): Flow<Int>
     suspend fun uploadItemPhoto(inspectionId: Long, itemId: String, isDano: Boolean, bytes: ByteArray): String
     suspend fun deletePhoto(url: String)
+    suspend fun uploadPdf(inspectionId: Long, bytes: ByteArray): String
 }

@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 
@@ -31,6 +32,7 @@ class EstimadoViewModel @Inject constructor(
     private val estimadosRepo: EstimadosRepository,
     private val inspectionRepo: InspectionRepository,
     private val reeferUnitRepo: ReeferEquipmentRepository,
+    private val pdfGenerator: EstimadoPdfGenerator,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -252,4 +254,48 @@ class EstimadoViewModel @Inject constructor(
     fun getPendingRepairAction() = pendingRepairAction
     fun getPendingLaborCost() = pendingLaborCost
     fun getPendingMaterialCost() = pendingMaterialCost
+
+    fun generateAndSharePdf() {
+        val current = _state.value
+        if (current.estimadoId == 0L || current.damages.isEmpty()) return
+        viewModelScope.launch {
+            _state.update { it.copy(isGeneratingPdf = true, errorMessage = null) }
+            val estimado = Estimado(
+                id = current.estimadoId,
+                inspectionId = inspectionId,
+                containerNo = current.containerNo,
+                manufacturer = current.manufacturer,
+                unitModel = current.unitModel,
+                unitModelNo = current.unitModelNo,
+                unitSerialNo = current.unitSerialNo,
+                yearOfBuilt = current.yearOfBuilt,
+                unitType = current.unitType,
+                clientName = current.clientName,
+                location = current.location,
+                technicianName = current.technicianName,
+                createdAt = current.createdAt,
+                approvedAt = current.approvedAt,
+                status = current.status,
+                damages = current.damages,
+                hasIva = current.hasIva,
+            )
+            runCatching { pdfGenerator.generate(estimado) }
+                .onSuccess { bytes ->
+                    val file = File(context.cacheDir, "estimado_${inspectionId}.pdf")
+                    withContext(Dispatchers.IO) { file.writeBytes(bytes) }
+                    // Subir a Firebase Storage en segundo plano
+                    launch(Dispatchers.IO) {
+                        runCatching { estimadosRepo.uploadPdf(inspectionId, bytes) }
+                    }
+                    _state.update { it.copy(isGeneratingPdf = false, pdfFilePath = file.absolutePath) }
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(isGeneratingPdf = false, errorMessage = "Error al generar PDF: ${error.message}")
+                    }
+                }
+        }
+    }
+
+    fun clearPdfPath() = _state.update { it.copy(pdfFilePath = null) }
 }
