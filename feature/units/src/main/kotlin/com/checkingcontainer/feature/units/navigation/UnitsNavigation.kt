@@ -7,12 +7,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.feature.units.EstimadoRoute
+import com.checkingcontainer.feature.units.EstimadosListRoute
 import com.checkingcontainer.feature.units.ReeferSearchRoute
 import com.checkingcontainer.feature.units.UnitDetailRoute
 import com.checkingcontainer.feature.units.UnitEntryRoute
 import com.checkingcontainer.feature.units.UnitListRoute
 
 const val UNITS_ROUTE = "units"
+const val ESTIMADOS_LIST_ROUTE = "estimados"
 private const val UNITS_ENTRY_BASE = "units/entry"
 private const val UNITS_ENTRY_ROUTE = "$UNITS_ENTRY_BASE?unitId={unitId}"
 private const val UNITS_SEARCH_ROUTE = "units/search"
@@ -54,7 +56,11 @@ fun NavGraphBuilder.unitsGraph(
         UnitEntryRoute(
             onBack = { navController.popBackStack() },
             onDeleted = { navController.popBackStack(UNITS_ROUTE, false) },
-            onNavigateToEstimado = { inspId -> navController.navigate(estimadoRoute(inspId)) },
+            onNavigateToEstimado = { inspId ->
+                navController.navigate(estimadoRoute(inspId)) {
+                    popUpTo(UNITS_ROUTE)
+                }
+            },
         )
     }
     composable(
@@ -77,7 +83,19 @@ fun NavGraphBuilder.unitsGraph(
         arguments = listOf(navArgument(ESTIMADO_INSPECTION_ID_ARG) { type = NavType.LongType }),
     ) {
         EstimadoRoute(
-            onBack = { navController.popBackStack() },
+            onNavigateToList = {
+                navController.navigate(ESTIMADOS_LIST_ROUTE) {
+                    popUpTo(ESTIMADOS_LIST_ROUTE) { inclusive = true }
+                }
+            },
+        )
+    }
+}
+
+fun NavGraphBuilder.estimadosGraph(navController: NavHostController) {
+    composable(route = ESTIMADOS_LIST_ROUTE) {
+        EstimadosListRoute(
+            onEstimadoClick = { inspId -> navController.navigate(estimadoRoute(inspId)) },
         )
     }
 }

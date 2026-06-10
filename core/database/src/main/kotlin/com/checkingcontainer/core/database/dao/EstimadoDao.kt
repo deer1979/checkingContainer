@@ -19,6 +19,15 @@ interface EstimadoDao {
     @Query("SELECT * FROM estimados WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): EstimadoEntity?
 
+    @Query("SELECT * FROM estimados WHERE status = 'ABIERTO' ORDER BY createdAt DESC")
+    fun observeOpen(): Flow<List<EstimadoEntity>>
+
+    @Query("SELECT * FROM estimados WHERE status = 'CERRADO' ORDER BY closedAt DESC")
+    fun observeClosed(): Flow<List<EstimadoEntity>>
+
+    @Query("SELECT COUNT(*) FROM estimados WHERE status = 'ABIERTO'")
+    fun countOpen(): Flow<Int>
+
     @Query("SELECT * FROM estimados ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<EstimadoEntity>>
 

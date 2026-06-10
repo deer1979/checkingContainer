@@ -23,6 +23,7 @@ import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST
 import com.checkingcontainer.feature.announcements.navigation.announcementsGraph
 import com.checkingcontainer.feature.settings.navigation.SETTINGS_ROUTE
 import com.checkingcontainer.feature.settings.navigation.settingsScreen
+import com.checkingcontainer.feature.units.navigation.estimadosGraph
 import com.checkingcontainer.feature.units.navigation.unitsGraph
 import com.checkingcontainer.feature.users.navigation.USERS_LIST_ROUTE
 import com.checkingcontainer.feature.users.navigation.usersGraph
@@ -40,6 +41,7 @@ fun AuthenticatedShell(user: User) {
 
     val shellViewModel: ShellViewModel = hiltViewModel()
     val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
+    val openEstimados by shellViewModel.openEstimados.collectAsStateWithLifecycle()
 
     val onSettingsClick = { navController.navigate(SETTINGS_ROUTE) }
     val onLogout       = { shellViewModel.logout() }
@@ -51,6 +53,7 @@ fun AuthenticatedShell(user: User) {
                 currentRoute = currentRoute,
                 onSelect = { dest -> navigateToTopLevel(navController, dest) },
                 unreadAnnouncements = unreadAnnouncements,
+                openEstimados = openEstimados,
             )
         },
         modifier = Modifier.fillMaxSize(),
@@ -85,6 +88,7 @@ fun AuthenticatedShell(user: User) {
                     onSettingsClick = onSettingsClick,
                     onLogout = onLogout,
                 )
+                estimadosGraph(navController = navController)
                 settingsScreen(
                     isAdmin = user.role.isAdmin,
                     onUsersClick = { navController.navigate(USERS_LIST_ROUTE) },

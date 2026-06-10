@@ -7,8 +7,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.domain.InspectionRepository
+import com.checkingcontainer.core.domain.ReeferEquipmentRepository
+import com.checkingcontainer.core.model.DamageItem
+import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.Estimado
-import com.checkingcontainer.core.model.EstimadoFase
 import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.feature.units.navigation.ESTIMADO_INSPECTION_ID_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -27,6 +30,7 @@ class EstimadoViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val estimadosRepo: EstimadosRepository,
     private val inspectionRepo: InspectionRepository,
+    private val reeferUnitRepo: ReeferEquipmentRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -35,26 +39,36 @@ class EstimadoViewModel @Inject constructor(
     private val _state = MutableStateFlow(EstimadoUiState(inspectionId = inspectionId))
     val state: StateFlow<EstimadoUiState> = _state.asStateFlow()
 
+    // Temporary fields for bottom-sheet forms
+    private var pendingDamageDescription = ""
+    private var pendingRepairAction = ""
+    private var pendingLaborCost = ""
+    private var pendingMaterialCost = ""
+
     init {
         viewModelScope.launch {
             val inspection = inspectionRepo.findById(inspectionId)
+            val unit = inspection?.containerNo?.let { reeferUnitRepo.findByContainerNo(it) }
             val existing = estimadosRepo.findByInspectionId(inspectionId)
             _state.update {
                 it.copy(
                     isLoading = false,
                     containerNo = inspection?.containerNo ?: "",
-                    technicianId = inspection?.technicianId ?: 0L,
                     technicianName = inspection?.technicianName ?: "",
-                    location = inspection?.location ?: "",
+                    manufacturer = unit?.manufacturer ?: "",
+                    unitModel = unit?.unitModel ?: "",
+                    unitModelNo = unit?.unitModelNo ?: "",
+                    unitSerialNo = unit?.unitSerialNo ?: "",
+                    yearOfBuilt = unit?.yearOfBuilt ?: "",
+                    unitType = unit?.unitType ?: "",
                     estimadoId = existing?.id ?: 0L,
                     clientName = existing?.clientName ?: "",
-                    damageDescription = existing?.damageDescription ?: "",
-                    damagePhotos = existing?.damagePhotos ?: emptyList(),
-                    repairDescription = existing?.repairDescription ?: "",
-                    repairPhotos = existing?.repairPhotos ?: emptyList(),
-                    status = existing?.status ?: EstimadoStatus.ABIERTO,
+                    location = existing?.location ?: inspection?.location ?: "",
                     createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                    showRepairSection = existing?.status == EstimadoStatus.REPARADO,
+                    approvedAt = existing?.approvedAt,
+                    status = existing?.status ?: EstimadoStatus.ABIERTO,
+                    damages = existing?.damages ?: emptyList(),
+                    hasIva = existing?.hasIva ?: false,
                 )
             }
         }
@@ -64,25 +78,98 @@ class EstimadoViewModel @Inject constructor(
         when (event) {
             is EstimadoEvent.ClientNameChange ->
                 _state.update { it.copy(clientName = event.value, savedMessage = null) }
-            is EstimadoEvent.DamageDescriptionChange ->
-                _state.update { it.copy(damageDescription = event.value, savedMessage = null) }
-            is EstimadoEvent.RepairDescriptionChange ->
-                _state.update { it.copy(repairDescription = event.value, savedMessage = null) }
-            EstimadoEvent.ShowRepairSection ->
-                _state.update { it.copy(showRepairSection = true) }
-            EstimadoEvent.MarkAsReparado -> {
-                _state.update { it.copy(status = EstimadoStatus.REPARADO) }
-                save()
+            is EstimadoEvent.LocationChange ->
+                _state.update { it.copy(location = event.value, savedMessage = null) }
+            is EstimadoEvent.ShowSheet -> {
+                when (val sheet = event.sheet) {
+                    is EstimadoSheet.AddDamage -> {
+                        pendingDamageDescription = ""
+                        _state.update { it.copy(activeSheet = sheet) }
+                    }
+                    is EstimadoSheet.RepairItem -> {
+                        pendingRepairAction = _state.value.damages
+                            .find { it.id == sheet.itemId }?.repairAction ?: ""
+                        _state.update { it.copy(activeSheet = sheet) }
+                    }
+                    is EstimadoSheet.EditValor -> {
+                        val item = _state.value.damages.find { it.id == sheet.itemId }
+                        pendingLaborCost = item?.laborCost?.toString() ?: ""
+                        pendingMaterialCost = item?.materialCost?.toString() ?: ""
+                        _state.update { it.copy(activeSheet = sheet) }
+                    }
+                }
             }
-            is EstimadoEvent.RemoveDamagePhoto -> removePhoto(event.url, EstimadoFase.DANO)
-            is EstimadoEvent.RemoveRepairPhoto -> removePhoto(event.url, EstimadoFase.REPARACION)
+            EstimadoEvent.DismissSheet ->
+                _state.update { it.copy(activeSheet = null) }
+            is EstimadoEvent.IvaToggle ->
+                _state.update { it.copy(hasIva = event.enabled) }
+            is EstimadoEvent.DamageDescriptionChange ->
+                pendingDamageDescription = event.value
+            is EstimadoEvent.ConfirmAddDamage -> {
+                if (pendingDamageDescription.isBlank()) return
+                val newItem = DamageItem(
+                    id = UUID.randomUUID().toString(),
+                    damageDescription = pendingDamageDescription.trim(),
+                )
+                _state.update {
+                    it.copy(
+                        damages = it.damages + newItem,
+                        activeSheet = null,
+                        savedMessage = null,
+                    )
+                }
+            }
+            is EstimadoEvent.RemoveDamageItem -> {
+                val item = _state.value.damages.find { it.id == event.itemId } ?: return
+                _state.update { it.copy(damages = it.damages - item) }
+                item.damagePhoto?.let { url -> deletePhotoAsync(url) }
+                item.repairPhoto?.let { url -> deletePhotoAsync(url) }
+            }
+            is EstimadoEvent.RepairActionChange ->
+                pendingRepairAction = event.value
+            is EstimadoEvent.ConfirmRepair -> {
+                val now = System.currentTimeMillis()
+                val isFirstRepair = _state.value.damages.none { it.status == DamageItemStatus.REPARADO }
+                _state.update { s ->
+                    s.copy(
+                        damages = s.damages.map { item ->
+                            if (item.id == event.itemId)
+                                item.copy(
+                                    repairAction = pendingRepairAction.trim(),
+                                    status = DamageItemStatus.REPARADO,
+                                )
+                            else item
+                        },
+                        approvedAt = if (isFirstRepair && s.approvedAt == null) now else s.approvedAt,
+                        activeSheet = null,
+                        savedMessage = null,
+                    )
+                }
+            }
+            is EstimadoEvent.LaborCostChange -> pendingLaborCost = event.value
+            is EstimadoEvent.MaterialCostChange -> pendingMaterialCost = event.value
+            is EstimadoEvent.ConfirmValor -> {
+                _state.update { s ->
+                    s.copy(
+                        damages = s.damages.map { item ->
+                            if (item.id == event.itemId)
+                                item.copy(
+                                    laborCost = pendingLaborCost.toDoubleOrNull(),
+                                    materialCost = pendingMaterialCost.toDoubleOrNull(),
+                                )
+                            else item
+                        },
+                        activeSheet = null,
+                    )
+                }
+            }
         }
     }
 
-    fun addDamagePhoto(uri: Uri) = uploadPhoto(uri, EstimadoFase.DANO)
-    fun addRepairPhoto(uri: Uri) = uploadPhoto(uri, EstimadoFase.REPARACION)
+    fun addDamagePhoto(itemId: String, uri: Uri) = uploadPhoto(itemId, isDano = true, uri = uri)
+    fun addRepairPhoto(itemId: String, uri: Uri) = uploadPhoto(itemId, isDano = false, uri = uri)
 
-    private fun uploadPhoto(uri: Uri, fase: EstimadoFase) {
+    private fun uploadPhoto(itemId: String, isDano: Boolean, uri: Uri) {
         viewModelScope.launch {
             _state.update { it.copy(isUploadingPhoto = true, errorMessage = null) }
             val bytes = withContext(Dispatchers.IO) {
@@ -93,32 +180,26 @@ class EstimadoViewModel @Inject constructor(
                 return@launch
             }
             runCatching {
-                estimadosRepo.uploadPhoto(inspectionId, fase, bytes)
+                estimadosRepo.uploadItemPhoto(inspectionId, itemId, isDano, bytes)
             }.onSuccess { url ->
                 _state.update { s ->
-                    if (fase == EstimadoFase.DANO)
-                        s.copy(isUploadingPhoto = false, damagePhotos = s.damagePhotos + url, savedMessage = null)
-                    else
-                        s.copy(isUploadingPhoto = false, repairPhotos = s.repairPhotos + url, savedMessage = null)
+                    s.copy(
+                        isUploadingPhoto = false,
+                        damages = s.damages.map { item ->
+                            if (item.id != itemId) item
+                            else if (isDano) item.copy(damagePhoto = url)
+                            else item.copy(repairPhoto = url)
+                        },
+                    )
                 }
             }.onFailure { error ->
-                _state.update {
-                    it.copy(isUploadingPhoto = false, errorMessage = error.message ?: "Error al subir foto")
-                }
+                _state.update { it.copy(isUploadingPhoto = false, errorMessage = error.message ?: "Error al subir foto") }
             }
         }
     }
 
-    private fun removePhoto(url: String, fase: EstimadoFase) {
-        _state.update { s ->
-            if (fase == EstimadoFase.DANO)
-                s.copy(damagePhotos = s.damagePhotos - url, savedMessage = null)
-            else
-                s.copy(repairPhotos = s.repairPhotos - url, savedMessage = null)
-        }
-        viewModelScope.launch(Dispatchers.IO) {
-            estimadosRepo.deletePhoto(url)
-        }
+    private fun deletePhotoAsync(url: String) {
+        viewModelScope.launch(Dispatchers.IO) { estimadosRepo.deletePhoto(url) }
     }
 
     fun save() {
@@ -126,20 +207,28 @@ class EstimadoViewModel @Inject constructor(
             val current = _state.value
             _state.update { it.copy(isSaving = true, errorMessage = null, savedMessage = null) }
             val now = System.currentTimeMillis()
+            val allReparado = current.damages.isNotEmpty() &&
+                current.damages.all { it.status == DamageItemStatus.REPARADO }
             val estimado = Estimado(
                 id = current.estimadoId,
                 inspectionId = inspectionId,
                 containerNo = current.containerNo,
+                manufacturer = current.manufacturer,
+                unitModel = current.unitModel,
+                unitModelNo = current.unitModelNo,
+                unitSerialNo = current.unitSerialNo,
+                yearOfBuilt = current.yearOfBuilt,
+                unitType = current.unitType,
                 clientName = current.clientName.trim(),
-                technicianId = current.technicianId,
+                location = current.location.trim(),
+                technicianId = 0,
                 technicianName = current.technicianName,
-                location = current.location,
                 createdAt = if (current.estimadoId == 0L) now else current.createdAt,
-                status = current.status,
-                damageDescription = current.damageDescription.trim(),
-                damagePhotos = current.damagePhotos,
-                repairDescription = current.repairDescription.trim(),
-                repairPhotos = current.repairPhotos,
+                approvedAt = current.approvedAt,
+                closedAt = if (allReparado) now else null,
+                status = if (allReparado) EstimadoStatus.CERRADO else EstimadoStatus.ABIERTO,
+                damages = current.damages,
+                hasIva = current.hasIva,
             )
             runCatching { estimadosRepo.save(estimado) }
                 .onSuccess { savedId ->
@@ -148,15 +237,19 @@ class EstimadoViewModel @Inject constructor(
                             isSaving = false,
                             estimadoId = if (current.estimadoId == 0L) savedId else current.estimadoId,
                             createdAt = if (current.estimadoId == 0L) now else current.createdAt,
-                            savedMessage = "Guardado",
+                            status = estimado.status,
+                            savedMessage = if (allReparado) "Estimado cerrado" else "Guardado",
                         )
                     }
                 }
                 .onFailure { error ->
-                    _state.update {
-                        it.copy(isSaving = false, errorMessage = error.message ?: "Error al guardar")
-                    }
+                    _state.update { it.copy(isSaving = false, errorMessage = error.message ?: "Error al guardar") }
                 }
         }
     }
+
+    fun getPendingDamageDescription() = pendingDamageDescription
+    fun getPendingRepairAction() = pendingRepairAction
+    fun getPendingLaborCost() = pendingLaborCost
+    fun getPendingMaterialCost() = pendingMaterialCost
 }

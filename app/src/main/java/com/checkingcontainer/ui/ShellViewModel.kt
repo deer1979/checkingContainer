@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.AnnouncementsRepository
 import com.checkingcontainer.core.domain.AuthRepository
 import com.checkingcontainer.core.domain.AuthState
+import com.checkingcontainer.core.domain.EstimadosRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,9 +25,13 @@ import kotlinx.coroutines.flow.stateIn
 class ShellViewModel @Inject constructor(
     private val auth: AuthRepository,
     announcements: AnnouncementsRepository,
+    estimados: EstimadosRepository,
 ) : ViewModel() {
 
     fun logout() { viewModelScope.launch { auth.logout() } }
+
+    val openEstimados: StateFlow<Int> = estimados.countOpen()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     val unreadAnnouncements: StateFlow<Int> = auth.state
         .flatMapLatest { state ->

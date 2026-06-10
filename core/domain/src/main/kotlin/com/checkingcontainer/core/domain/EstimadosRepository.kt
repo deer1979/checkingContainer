@@ -1,7 +1,6 @@
 package com.checkingcontainer.core.domain
 
 import com.checkingcontainer.core.model.Estimado
-import com.checkingcontainer.core.model.EstimadoFase
 import kotlinx.coroutines.flow.Flow
 
 interface EstimadosRepository {
@@ -9,6 +8,9 @@ interface EstimadosRepository {
     fun observeByInspectionId(inspectionId: Long): Flow<Estimado?>
     suspend fun findByInspectionId(inspectionId: Long): Estimado?
     suspend fun delete(id: Long)
-    suspend fun uploadPhoto(inspectionId: Long, fase: EstimadoFase, bytes: ByteArray): String
+    fun observeOpen(): Flow<List<Estimado>>
+    fun observeClosed(): Flow<List<Estimado>>
+    fun countOpen(): Flow<Int>
+    suspend fun uploadItemPhoto(inspectionId: Long, itemId: String, isDano: Boolean, bytes: ByteArray): String
     suspend fun deletePhoto(url: String)
 }

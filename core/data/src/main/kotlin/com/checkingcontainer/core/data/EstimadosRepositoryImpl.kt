@@ -6,12 +6,10 @@ import com.checkingcontainer.core.database.dao.EstimadoDao
 import com.checkingcontainer.core.database.entity.toEntity
 import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.model.Estimado
-import com.checkingcontainer.core.model.EstimadoFase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,8 +24,8 @@ class EstimadosRepositoryImpl @Inject constructor(
     override suspend fun save(estimado: Estimado): Long = withContext(ioDispatcher) {
         val entity = estimado.toEntity()
         val savedId = dao.upsert(entity)
-        val persistedEntity = entity.copy(id = if (estimado.id == 0L) savedId else estimado.id)
-        firestoreService.upsertEstimado(persistedEntity)
+        val persisted = entity.copy(id = if (estimado.id == 0L) savedId else estimado.id)
+        firestoreService.upsertEstimado(persisted)
         savedId
     }
 
@@ -42,12 +40,23 @@ class EstimadosRepositoryImpl @Inject constructor(
         firestoreService.deleteEstimado(id)
     }
 
-    override suspend fun uploadPhoto(inspectionId: Long, fase: EstimadoFase, bytes: ByteArray): String =
-        withContext(ioDispatcher) {
-            val folder = if (fase == EstimadoFase.DANO) "dano" else "reparacion"
-            val fileName = "${UUID.randomUUID()}.jpg"
-            storageService.uploadToPath("estimados/$inspectionId/$folder/$fileName", bytes)
-        }
+    override fun observeOpen(): Flow<List<Estimado>> =
+        dao.observeOpen().map { list -> list.map { it.toDomain() } }
+
+    override fun observeClosed(): Flow<List<Estimado>> =
+        dao.observeClosed().map { list -> list.map { it.toDomain() } }
+
+    override fun countOpen(): Flow<Int> = dao.countOpen()
+
+    override suspend fun uploadItemPhoto(
+        inspectionId: Long,
+        itemId: String,
+        isDano: Boolean,
+        bytes: ByteArray,
+    ): String = withContext(ioDispatcher) {
+        val phase = if (isDano) "dano" else "reparacion"
+        storageService.uploadToPath("estimados/$inspectionId/items/$itemId/$phase.jpg", bytes)
+    }
 
     override suspend fun deletePhoto(url: String): Unit = withContext(ioDispatcher) {
         storageService.deleteByUrl(url)

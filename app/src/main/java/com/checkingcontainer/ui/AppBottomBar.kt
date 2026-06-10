@@ -15,11 +15,15 @@ fun AppBottomBar(
     currentRoute: String?,
     onSelect: (TopLevelDestination) -> Unit,
     unreadAnnouncements: Int = 0,
+    openEstimados: Int = 0,
 ) {
     NavigationBar {
         destinations.forEach { dest ->
-            val badgeCount =
-                if (dest == TopLevelDestination.Announcements) unreadAnnouncements else 0
+            val badgeCount = when (dest) {
+                TopLevelDestination.Announcements -> unreadAnnouncements
+                TopLevelDestination.Estimados -> openEstimados
+                else -> 0
+            }
             NavigationBarItem(
                 selected = currentRoute == dest.route ||
                     currentRoute?.startsWith("${dest.route}/") == true,
