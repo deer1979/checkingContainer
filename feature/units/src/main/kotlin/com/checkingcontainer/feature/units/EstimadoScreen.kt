@@ -81,6 +81,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -221,7 +223,12 @@ fun EstimadoScreen(
         bottomBar = {
             if (!state.isLoading) {
                 BottomAppBar(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp))
+                        .clip(RoundedCornerShape(28.dp)),
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    windowInsets = WindowInsets(0),
                 ) {
                     BottomBarBtn(
                         icon = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, Modifier.size(24.dp)) },
@@ -258,6 +265,7 @@ fun EstimadoScreen(
             }
         },
         modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0),
     ) { innerPadding ->
         if (state.isLoading) {
             Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
