@@ -381,12 +381,14 @@ private fun DamageItemCard(
         )
 
         // Fotos lado a lado: daño (izq) / reparación (der)
+        val damagePhotoUrl = item.damagePhoto
+        val repairPhotoUrl = item.repairPhoto
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // Foto daño — izquierda
             Box(Modifier.weight(1f)) {
-                if (item.damagePhoto != null) {
+                if (damagePhotoUrl != null) {
                     PhotoThumbnail(
-                        url = item.damagePhoto,
+                        url = damagePhotoUrl,
                         label = "ANTES",
                         canRemove = false,
                     )
@@ -401,9 +403,9 @@ private fun DamageItemCard(
             }
             // Foto reparación — derecha
             Box(Modifier.weight(1f)) {
-                if (item.repairPhoto != null) {
+                if (repairPhotoUrl != null) {
                     PhotoThumbnail(
-                        url = item.repairPhoto,
+                        url = repairPhotoUrl,
                         label = "DESPUÉS",
                         canRemove = false,
                     )
