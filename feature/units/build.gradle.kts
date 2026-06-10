@@ -19,9 +19,6 @@ dependencies {
     // ML Kit text recognition (unbundled V2)
     implementation(libs.mlkit.text.recognition)
 
-    // ML Kit GenAI Prompt API (Gemini Nano on-device, Alpha)
-    implementation(libs.mlkit.genai.prompt)
-
     // Coil — thumbnails de fotos en EstimadoScreen
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)

@@ -25,19 +25,8 @@ import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import dagger.hilt.android.EntryPointAccessors
 import java.util.concurrent.Executors
 
-/**
- * Escáner OCR a pantalla completa (Dialog). Antes era un ModalBottomSheet de altura
- * fija; ahora ocupa toda la pantalla, como las apps grandes de escaneo.
- *
- * Flujo de reconocimiento:
- *  1. ML Kit analiza cada frame → si encuentra ISO 6346 válido, cierra y devuelve resultado.
- *  2. Si ML Kit lee 11 chars pero no pasan validación, pasa el texto crudo a Gemini Nano
- *     (solo en dispositivos con AICore, Android 14+) para corrección de confusiones OCR.
- *  3. Si Gemini Nano tampoco lo resuelve (o no está disponible), el streaming continúa.
- */
 @Composable
 fun OcrScannerBottomSheet(
     mode: ScannerMode,
@@ -65,31 +54,6 @@ fun OcrScannerBottomSheet(
     var verticalMode by remember { mutableStateOf(initialVertical) }
     var trackedItems by remember { mutableStateOf(emptyList<DetectedCharacter>()) }
 
-    // Gemini Nano corrector — obtenido desde el grafo Hilt singleton.
-    // Si el dispositivo no tiene AICore, correct() devuelve null de inmediato.
-    val geminiCorrector = remember {
-        EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            GeminiNanoCorrectorEntryPoint::class.java,
-        ).geminiNanoCorrector()
-    }
-
-    // Candidato de 11 chars que ML Kit no pudo validar; Gemini Nano lo reintenta.
-    var pendingRawCandidate by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(pendingRawCandidate) {
-        val raw = pendingRawCandidate ?: return@LaunchedEffect
-        val corrected = geminiCorrector.correct(raw) ?: return@LaunchedEffect
-        if (Iso6346.isValid(corrected)) {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onSuccess(mapOf("Container No." to corrected))
-        }
-        pendingRawCandidate = null
-    }
-
-    // Executor de fondo: el análisis OCR (toBitmap/rotate/crop/projection/ML Kit) NO
-    // debe correr en el hilo principal o produce jank. Los callbacks de ML Kit siguen
-    // disparándose en el hilo principal, así que actualizar estado Compose es seguro.
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
 
     val analyzer = remember(mode) {
@@ -100,10 +64,6 @@ fun OcrScannerBottomSheet(
             onValidContainerIdFound = { containerId ->
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onSuccess(mapOf("Container No." to containerId))
-            },
-            onRawCandidateAvailable = { raw ->
-                // Solo actualiza si no hay otro candidato pendiente (evita saturar Nano).
-                if (pendingRawCandidate == null) pendingRawCandidate = raw
             },
             onSuccess = { fields ->
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
