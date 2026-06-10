@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -222,42 +223,37 @@ fun EstimadoScreen(
                 BottomAppBar(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ) {
-                    // ← Atrás
                     BottomBarBtn(
-                        icon = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, Modifier.size(22.dp)) },
+                        icon = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, Modifier.size(24.dp)) },
                         label = "Atrás",
                         onClick = onBack,
                     )
-                    Spacer(Modifier.weight(1f))
-                    // Guardar
                     if (state.status != EstimadoStatus.CERRADO) {
                         BottomBarBtn(
                             icon = {
                                 if (state.isSaving)
-                                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                                 else
-                                    Icon(Icons.Outlined.Save, null, Modifier.size(22.dp))
+                                    Icon(Icons.Outlined.Save, null, Modifier.size(24.dp))
                             },
                             label = if (state.isSaving) "Guardando…" else "Guardar",
                             onClick = onSave,
                             enabled = !state.isSaving,
                         )
                     }
-                    // Compartir PDF
                     if (state.estimadoId != 0L && state.damages.isNotEmpty()) {
                         BottomBarBtn(
                             icon = {
                                 if (state.isGeneratingPdf)
-                                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                                 else
-                                    Icon(Icons.Outlined.Share, null, Modifier.size(22.dp))
+                                    Icon(Icons.Outlined.Share, null, Modifier.size(24.dp))
                             },
                             label = if (state.isGeneratingPdf) "Generando…" else "Ver PDF",
                             onClick = onGeneratePdf,
                             enabled = !state.isGeneratingPdf,
                         )
                     }
-                    Spacer(Modifier.width(8.dp))
                 }
             }
         },
@@ -926,7 +922,7 @@ private fun createCameraUri(context: android.content.Context): Uri {
 }
 
 @Composable
-private fun BottomBarBtn(
+private fun RowScope.BottomBarBtn(
     icon: @Composable () -> Unit,
     label: String,
     onClick: () -> Unit,
@@ -934,11 +930,12 @@ private fun BottomBarBtn(
 ) {
     Column(
         modifier = Modifier
+            .weight(1f)
             .clip(RoundedCornerShape(8.dp))
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         icon()
         Text(
@@ -946,6 +943,7 @@ private fun BottomBarBtn(
             style = MaterialTheme.typography.labelSmall,
             color = if (enabled) MaterialTheme.colorScheme.onSurface
                     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            maxLines = 1,
         )
     }
 }

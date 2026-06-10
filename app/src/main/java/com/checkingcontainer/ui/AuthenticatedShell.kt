@@ -48,13 +48,17 @@ fun AuthenticatedShell(user: User) {
 
     Scaffold(
         bottomBar = {
-            AppBottomBar(
-                destinations = TopLevelDestination.entries,
-                currentRoute = currentRoute,
-                onSelect = { dest -> navigateToTopLevel(navController, dest) },
-                unreadAnnouncements = unreadAnnouncements,
-                openEstimados = openEstimados,
-            )
+            // Ocultar la nav global en pantallas con su propia barra de acciones
+            val hideBottomNav = currentRoute?.startsWith("estimado/") == true
+            if (!hideBottomNav) {
+                AppBottomBar(
+                    destinations = TopLevelDestination.entries,
+                    currentRoute = currentRoute,
+                    onSelect = { dest -> navigateToTopLevel(navController, dest) },
+                    unreadAnnouncements = unreadAnnouncements,
+                    openEstimados = openEstimados,
+                )
+            }
         },
         modifier = Modifier.fillMaxSize(),
     ) { innerPadding ->
