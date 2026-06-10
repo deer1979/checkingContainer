@@ -30,6 +30,9 @@ class TextRecognitionAnalyzer(
     // NOTA: el ID de contenedor es referencial — la PK para historial de reparaciones
     // es el Número de Estimativo, no este ID.
     private val onValidContainerIdFound: (String) -> Unit = {},
+    // Candidato de 11 chars que NO pasó Iso6346 tras corrección posicional.
+    // OcrScannerBottomSheet lo reintenta con Gemini Nano si está disponible.
+    private val onRawCandidateAvailable: ((String) -> Unit)? = null,
     private val onSuccess: (Map<String, String>) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
@@ -131,6 +134,11 @@ class TextRecognitionAnalyzer(
                     }
                 }
 
+                // Ningún candidato pasó ISO — ofrecer el raw al corrector Gemini Nano.
+                if (raw.length == 11 && !done.get()) {
+                    onRawCandidateAvailable?.invoke(raw)
+                }
+
                 // MODO PRUEBA: al pulsar el disparador devuelve el texto CRUDO de la tira
                 // sintética, para medir la precisión real antes de exigir validación.
                 if (captureRequested.get() && raw.isNotEmpty() && done.compareAndSet(false, true)) {
@@ -191,6 +199,12 @@ class TextRecognitionAnalyzer(
                         if (Iso6346.isValid(corrected) && done.compareAndSet(false, true)) {
                             onValidContainerIdFound(corrected)
                             return@addOnSuccessListener
+                        }
+                    }
+                    // Ningún match pasó ISO — reportar el primer candidato a Gemini Nano.
+                    if (!done.get()) {
+                        Regex("[A-Z0-9]{11}").find(raw)?.let { match ->
+                            onRawCandidateAvailable?.invoke(match.value)
                         }
                     }
                 }
