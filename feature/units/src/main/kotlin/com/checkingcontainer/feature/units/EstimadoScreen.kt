@@ -1044,6 +1044,10 @@ private fun PdfPreviewSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        // Sin gestos de arrastre en la hoja: el deslizar queda solo para el scroll
+        // de las páginas (antes el gesto arrastraba la hoja y rebotaba arriba).
+        // Se cierra con el botón "Cerrar" o tocando fuera.
+        sheetGesturesEnabled = false,
     ) {
         Column(
             Modifier
