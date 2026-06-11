@@ -93,6 +93,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
 
+    // Coil: ImageLoader global con caché de memoria/disco (ver MyApplication)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+
     // Compose (BOM resolves versions)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)

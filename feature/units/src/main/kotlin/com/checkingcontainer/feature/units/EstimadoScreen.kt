@@ -92,6 +92,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import java.io.File
 import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
@@ -837,11 +838,18 @@ private fun PhotoThumbnail(url: String, label: String, canRemove: Boolean, onRem
             .aspectRatio(1f)
             .clip(RoundedCornerShape(8.dp)),
     ) {
+        // Thumbnail cuadrado de media pantalla: decodificar a 600px en vez de
+        // la resolución completa de la cámara ahorra memoria y carga más rápido.
         AsyncImage(
-            model = url,
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(url)
+                .size(600)
+                .build(),
             contentDescription = label,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceVariant),
         )
         Surface(
             modifier = Modifier.align(Alignment.BottomStart).padding(4.dp),
@@ -919,10 +927,10 @@ private fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
 }
 
-private fun formatDate(millis: Long): String {
-    val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
-    return sdf.format(java.util.Date(millis))
-}
+// Instancia única: crearla en cada recomposición es costoso. Solo se usa desde composición (un hilo).
+private val DATE_FORMAT = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+
+private fun formatDate(millis: Long): String = DATE_FORMAT.format(java.util.Date(millis))
 
 private fun createCameraUri(context: android.content.Context): Uri {
     val file = java.io.File(context.cacheDir, "photo_${System.currentTimeMillis()}.jpg")

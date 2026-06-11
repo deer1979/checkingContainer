@@ -151,5 +151,7 @@ private fun EmptyInspections(modifier: Modifier = Modifier) {
     }
 }
 
-internal fun formatDateTime(millis: Long): String =
-    SimpleDateFormat("dd/MM/yyyy · HH:mm", Locale.getDefault()).format(Date(millis))
+// Instancia única: crearla por cada item es costoso. Solo se usa desde composición (un hilo).
+private val DATE_TIME_FORMAT = SimpleDateFormat("dd/MM/yyyy · HH:mm", Locale.getDefault())
+
+internal fun formatDateTime(millis: Long): String = DATE_TIME_FORMAT.format(Date(millis))

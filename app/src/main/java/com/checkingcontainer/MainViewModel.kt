@@ -20,19 +20,19 @@ class MainViewModel @Inject constructor(
 
     val authState: StateFlow<AuthState> = authRepository.state.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        started = SharingStarted.WhileSubscribed(5_000),
         initialValue = AuthState.Loading,
     )
 
     val themeConfig: StateFlow<ThemeConfig> = themeRepository.themeConfig.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        started = SharingStarted.WhileSubscribed(5_000),
         initialValue = ThemeConfig.FOLLOW_SYSTEM,
     )
 
     val dynamicColor: StateFlow<Boolean> = themeRepository.dynamicColor.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        started = SharingStarted.WhileSubscribed(5_000),
         initialValue = true,
     )
 }

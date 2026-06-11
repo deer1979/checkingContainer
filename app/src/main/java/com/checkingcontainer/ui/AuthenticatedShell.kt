@@ -40,14 +40,18 @@ fun AuthenticatedShell(user: User) {
     val currentRoute = currentEntry?.destination?.route
 
     val shellViewModel: ShellViewModel = hiltViewModel()
-    val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
-    val openEstimados by shellViewModel.openEstimados.collectAsStateWithLifecycle()
+    // Activa la sync de digitación solo mientras el shell está en primer plano.
+    shellViewModel.digitacionSync.collectAsStateWithLifecycle()
 
     val onSettingsClick = { navController.navigate(SETTINGS_ROUTE) }
     val onLogout       = { shellViewModel.logout() }
 
     Scaffold(
         bottomBar = {
+            // Los badges se colectan aquí dentro para que sus cambios solo
+            // recompongan la barra inferior y no el shell completo.
+            val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
+            val openEstimados by shellViewModel.openEstimados.collectAsStateWithLifecycle()
             // Ocultar la nav global en pantallas con su propia barra de acciones
             val hideBottomNav = currentRoute?.startsWith("estimado/") == true
             if (!hideBottomNav) {

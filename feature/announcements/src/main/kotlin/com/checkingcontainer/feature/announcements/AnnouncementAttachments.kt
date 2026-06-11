@@ -2,6 +2,7 @@ package com.checkingcontainer.feature.announcements
 
 import android.content.Intent
 import androidx.core.net.toUri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -59,8 +60,9 @@ internal fun AnnouncementAttachments(
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 320.dp)
+                        .heightIn(min = 120.dp, max = 320.dp)
                         .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .clickable { open(att.url) },
                 )
             } else {

@@ -16,6 +16,7 @@ import com.checkingcontainer.feature.units.navigation.ESTIMADO_INSPECTION_ID_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,9 +50,12 @@ class EstimadoViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val inspection = inspectionRepo.findById(inspectionId)
+            // findById y findByInspectionId son independientes: en paralelo.
+            val inspectionDeferred = async { inspectionRepo.findById(inspectionId) }
+            val existingDeferred = async { estimadosRepo.findByInspectionId(inspectionId) }
+            val inspection = inspectionDeferred.await()
             val unit = inspection?.containerNo?.let { reeferUnitRepo.findByContainerNo(it) }
-            val existing = estimadosRepo.findByInspectionId(inspectionId)
+            val existing = existingDeferred.await()
             _state.update {
                 it.copy(
                     isLoading = false,

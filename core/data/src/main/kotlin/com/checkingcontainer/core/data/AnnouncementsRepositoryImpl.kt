@@ -17,8 +17,9 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -32,6 +33,9 @@ class AnnouncementsRepositoryImpl @Inject constructor(
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : AnnouncementsRepository {
 
+    @Volatile
+    private var lastRefreshAt = 0L
+
     override fun observeAll(): Flow<List<Announcement>> =
         dao.observeAll()
             .map { list -> list.map { it.toDomain() } }
@@ -42,10 +46,9 @@ class AnnouncementsRepositoryImpl @Inject constructor(
 
     // ── Leídos / no leídos (por usuario, local) ─────────────────────────────────
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun unreadCount(userId: Long): Flow<Int> =
-        combine(observeAll(), lastSeen(userId)) { items, seen ->
-            items.count { it.publishedAt > seen }
-        }
+        lastSeen(userId).flatMapLatest { seen -> dao.observeUnreadCount(seen) }
 
     override suspend fun markAllSeen(userId: Long) {
         dataStore.edit { it[lastSeenKey(userId)] = System.currentTimeMillis() }
@@ -85,8 +88,15 @@ class AnnouncementsRepositoryImpl @Inject constructor(
     }
 
     override suspend fun refreshFromRemote() = withContext(ioDispatcher) {
+        // Throttle: la pestaña de anuncios se abre con frecuencia; un fetch
+        // completo de Firestore cada vez es innecesario.
+        val now = System.currentTimeMillis()
+        if (now - lastRefreshAt < REFRESH_THROTTLE_MS) return@withContext
         val remote = firestoreService.fetchAllAnnouncements()
-        if (remote.isNotEmpty()) dao.replaceAll(remote)
+        if (remote.isNotEmpty()) {
+            dao.replaceAllDiff(remote)
+            lastRefreshAt = now
+        }
     }
 
     override suspend fun delete(id: String): Unit = withContext(ioDispatcher) {
@@ -96,3 +106,5 @@ class AnnouncementsRepositoryImpl @Inject constructor(
         urls.forEach { storageService.deleteByUrl(it) }
     }
 }
+
+private const val REFRESH_THROTTLE_MS = 5L * 60 * 1000

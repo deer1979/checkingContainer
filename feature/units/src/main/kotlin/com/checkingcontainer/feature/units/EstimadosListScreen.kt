@@ -189,5 +189,7 @@ private fun EstimadoListItem(estimado: Estimado, onClick: () -> Unit) {
     }
 }
 
-private fun formatDate(millis: Long): String =
-    SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(millis))
+// Instancia única: crearla por cada item es costoso. Solo se usa desde composición (un hilo).
+private val DATE_FORMAT = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+
+private fun formatDate(millis: Long): String = DATE_FORMAT.format(Date(millis))

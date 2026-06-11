@@ -53,7 +53,9 @@ fun AnnouncementsListRoute(
     val state by viewModel.list.collectAsStateWithLifecycle()
     // Al entrar (y cada vez que llega un anuncio nuevo mientras se ve la lista),
     // marcar todo como leído para que el badge de la pestaña quede en cero.
-    LaunchedEffect(state.items) { viewModel.markAllSeen() }
+    // La key es el publishedAt más reciente: solo re-marca cuando hay un anuncio
+    // nuevo, no en cada emisión de Room.
+    LaunchedEffect(state.items.maxOfOrNull { it.publishedAt }) { viewModel.markAllSeen() }
     Scaffold(
         topBar = {
             TopAppBar(

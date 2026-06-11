@@ -5,6 +5,13 @@ import com.checkingcontainer.core.model.InspectionWithEquipment
 import kotlinx.coroutines.flow.Flow
 
 interface InspectionRepository {
+    /**
+     * Sincroniza en Room los cambios de digitación que llegan de Firestore mientras
+     * el flow esté colectado. El llamador controla el ciclo de vida (p. ej. solo
+     * con la app autenticada en primer plano).
+     */
+    fun digitacionSync(): Flow<Unit>
+
     /** Stream de las últimas 24h con datos de equipo para la pantalla de lista. */
     fun observeLast24h(): Flow<List<InspectionWithEquipment>>
 

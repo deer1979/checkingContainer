@@ -11,14 +11,10 @@ import com.checkingcontainer.core.model.Inspection
 import com.checkingcontainer.core.model.InspectionWithEquipment
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import javax.inject.Inject
@@ -33,37 +29,29 @@ class InspectionRepositoryImpl @Inject constructor(
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : InspectionRepository {
 
-    private val syncScope = CoroutineScope(
-        SupervisorJob() + ioDispatcher + CoroutineExceptionHandler { _, t ->
-            if (t !is CancellationException) Log.e(TAG, "digitacion sync error: ${t.message}", t)
-        },
-    )
-
-    init {
-        syncScope.launch {
-            firestoreService.observeInspectionsDigitacion()
-                .catch { e -> Log.w(TAG, "digitacion flow error: ${e.message}") }
-                .collect { updates ->
-                    updates.forEach { update ->
-                        try {
-                            dao.updateDigitacion(
-                                id = update.id,
-                                idDigitador = update.idDigitador,
-                                timestampDigitador = update.timestampDigitador,
-                                statusDigitacion = update.statusDigitacion,
-                                noteDigitacion = update.noteDigitacion,
-                                avisoDigitacion = update.avisoDigitacion,
-                                diasPendiente = update.diasPendiente,
-                            )
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            Log.w(TAG, "updateDigitacion failed id=${update.id}: ${e.message}")
-                        }
+    override fun digitacionSync(): Flow<Unit> =
+        firestoreService.observeInspectionsDigitacion()
+            .map { updates ->
+                updates.forEach { update ->
+                    try {
+                        dao.updateDigitacion(
+                            id = update.id,
+                            idDigitador = update.idDigitador,
+                            timestampDigitador = update.timestampDigitador,
+                            statusDigitacion = update.statusDigitacion,
+                            noteDigitacion = update.noteDigitacion,
+                            avisoDigitacion = update.avisoDigitacion,
+                            diasPendiente = update.diasPendiente,
+                        )
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w(TAG, "updateDigitacion failed id=${update.id}: ${e.message}")
                     }
                 }
-        }
-    }
+            }
+            .catch { e -> Log.w(TAG, "digitacion flow error: ${e.message}") }
+            .flowOn(ioDispatcher)
 
     override fun observeLast24h(): Flow<List<InspectionWithEquipment>> {
         val since = System.currentTimeMillis() - 24L * 60 * 60 * 1000

@@ -6,6 +6,7 @@ import com.checkingcontainer.core.domain.AnnouncementsRepository
 import com.checkingcontainer.core.domain.AuthRepository
 import com.checkingcontainer.core.domain.AuthState
 import com.checkingcontainer.core.domain.EstimadosRepository
+import com.checkingcontainer.core.domain.InspectionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,9 +27,17 @@ class ShellViewModel @Inject constructor(
     private val auth: AuthRepository,
     announcements: AnnouncementsRepository,
     estimados: EstimadosRepository,
+    inspections: InspectionRepository,
 ) : ViewModel() {
 
     fun logout() { viewModelScope.launch { auth.logout() } }
+
+    /**
+     * Mantiene la sync de digitación activa solo mientras el shell autenticado
+     * está en primer plano (se colecta con collectAsStateWithLifecycle).
+     */
+    val digitacionSync: StateFlow<Unit> = inspections.digitacionSync()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Unit)
 
     val openEstimados: StateFlow<Int> = estimados.countOpen()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)

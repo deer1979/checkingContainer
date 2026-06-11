@@ -149,5 +149,7 @@ internal fun EmptyAnnouncements(modifier: Modifier = Modifier) {
     }
 }
 
-internal fun formatDate(millis: Long): String =
-    SimpleDateFormat("dd MMM yyyy · HH:mm", Locale.getDefault()).format(Date(millis))
+// Instancia única: crearla por cada card es costoso. Solo se usa desde composición (un hilo).
+private val DATE_FORMAT = SimpleDateFormat("dd MMM yyyy · HH:mm", Locale.getDefault())
+
+internal fun formatDate(millis: Long): String = DATE_FORMAT.format(Date(millis))

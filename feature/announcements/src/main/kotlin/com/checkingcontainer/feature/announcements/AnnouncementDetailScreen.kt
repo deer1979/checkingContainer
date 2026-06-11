@@ -112,7 +112,7 @@ fun AnnouncementDetailRoute(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Por ${item.authorName} · ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(item.publishedAt))}",
+                    text = "Por ${item.authorName} · ${DETAIL_DATE_FORMAT.format(Date(item.publishedAt))}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -130,3 +130,6 @@ fun AnnouncementDetailRoute(
         }
     }
 }
+
+// Instancia única: crearla en cada recomposición es costoso. Solo se usa desde composición (un hilo).
+private val DETAIL_DATE_FORMAT = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
