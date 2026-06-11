@@ -89,7 +89,7 @@ private fun UsersList(
     var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(users, key = { it.id }) { user ->
+        items(users, key = { it.id }, contentType = { "user" }) { user ->
             var menuExpanded by remember { mutableStateOf(false) }
             ListItem(
                 headlineContent = { Text(user.fullName) },

@@ -61,7 +61,13 @@ class TextRecognitionAnalyzer(
         // ViewPort recorta el frame al mismo FOV que el preview (cropRect). Recortamos
         // ANTES de rotar para que el bitmap quede alineado 1:1 con lo que ve el usuario,
         // eliminando la corrección FILL_CENTER manual del overlay.
-        val bitmap   = rawBitmap.cropTo(cropRect).rotate(rotation)
+        // Cada paso puede devolver la misma instancia o una copia: se recicla cada
+        // intermedio solo cuando la identidad cambió (este analyzer corre ~4 veces
+        // por segundo; sin reciclar, el escáner termina en OOM).
+        val cropped = rawBitmap.cropTo(cropRect)
+        val bitmap  = cropped.rotate(rotation) // rotate ya recicla su receptor si rota
+        if (cropped !== rawBitmap) rawBitmap.recycle()
+
         val vertical = isVerticalMode()
         val crop     = bitmap.cropRoi(vertical)
 
@@ -69,6 +75,7 @@ class TextRecognitionAnalyzer(
         val roiTop  = (bitmap.height - crop.height) / 2f
         val frameW  = bitmap.width.toFloat()
         val frameH  = bitmap.height.toFloat()
+        if (crop !== bitmap) bitmap.recycle()
 
         if (vertical) processVertical(crop, roiLeft, roiTop, frameW, frameH)
         else processHorizontal(crop, roiLeft, roiTop, frameW, frameH)
@@ -102,9 +109,15 @@ class TextRecognitionAnalyzer(
         // Compuerta: solo intentamos reconocer si el nº de glifos es plausible (~11).
         // Si hay mucha basura (20+ cajas) no perseguimos ruido ni hacemos esperar al
         // usuario; las cajas igual se dibujan arriba (debug) para ver qué detectó.
-        if (glyphs.size !in PLAUSIBLE_GLYPH_RANGE) return
+        if (glyphs.size !in PLAUSIBLE_GLYPH_RANGE) {
+            crop.recycle()
+            return
+        }
 
-        val strip = composeStrip(crop, glyphs) ?: return
+        val strip = composeStrip(crop, glyphs)
+        // composeStrip ya copió los glifos a la tira: el crop no se necesita más.
+        crop.recycle()
+        if (strip == null) return
         recognizer.process(InputImage.fromBitmap(strip, 0))
             .addOnSuccessListener { visionText ->
                 val raw = visionText.text.filter { it.isLetterOrDigit() }.uppercase()
@@ -135,6 +148,9 @@ class TextRecognitionAnalyzer(
                     onValidContainerIdFound(raw)
                 }
             }
+            // Se ejecuta tras éxito O fallo de ML Kit: la tira ya no está en uso.
+            // (Antes un fallo del recognizer dejaba el bitmap colgado para siempre.)
+            .addOnCompleteListener { strip.recycle() }
     }
 
     /** Horizontal: ML Kit lee la línea normalmente; los Symbol.boundingBox son correctos. */
@@ -205,6 +221,8 @@ class TextRecognitionAnalyzer(
                     captureRequested.set(false)
                 }
             }
+            // Se ejecuta tras éxito O fallo de ML Kit: el crop ya no está en uso.
+            .addOnCompleteListener { crop.recycle() }
     }
 
     private fun groupByColumn(candidates: List<Pair<String, Rect>>): List<Pair<String, Rect>> {

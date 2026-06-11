@@ -118,7 +118,7 @@ fun EstimadosListScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp),
                     ) {
-                        items(list, key = { it.id }) { estimado ->
+                        items(list, key = { it.id }, contentType = { "estimado" }) { estimado ->
                             EstimadoListItem(
                                 estimado = estimado,
                                 onClick = { onEstimadoClick(estimado.inspectionId) },

@@ -27,13 +27,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -76,6 +74,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -275,77 +274,127 @@ fun EstimadoScreen(
             return@Scaffold
         }
 
-        Column(
+        // Launchers compartidos para fotos: un solo par galería/cámara para toda
+        // la pantalla (antes se creaban 4 por cada ítem de daño). El destino
+        // pendiente sobrevive a process death (la cámara puede matar la app).
+        val context = LocalContext.current
+        var pendingPhotoItemId by rememberSaveable { mutableStateOf<String?>(null) }
+        var pendingPhotoIsRepair by rememberSaveable { mutableStateOf(false) }
+        var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
+
+        val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            val itemId = pendingPhotoItemId
+            if (uri != null && itemId != null) {
+                if (pendingPhotoIsRepair) onAddRepairPhoto(itemId, uri) else onAddDamagePhoto(itemId, uri)
+            }
+            pendingPhotoItemId = null
+        }
+        val capturePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            val itemId = pendingPhotoItemId
+            val uri = pendingCameraUri?.let(Uri::parse)
+            if (success && itemId != null && uri != null) {
+                if (pendingPhotoIsRepair) onAddRepairPhoto(itemId, uri) else onAddDamagePhoto(itemId, uri)
+            }
+            pendingPhotoItemId = null
+            pendingCameraUri = null
+        }
+        val requestGalleryPhoto: (String, Boolean) -> Unit = { itemId, isRepair ->
+            pendingPhotoItemId = itemId
+            pendingPhotoIsRepair = isRepair
+            pickPhoto.launch("image/*")
+        }
+        val requestCameraPhoto: (String, Boolean) -> Unit = { itemId, isRepair ->
+            val uri = createCameraUri(context)
+            pendingPhotoItemId = itemId
+            pendingPhotoIsRepair = isRepair
+            pendingCameraUri = uri.toString()
+            capturePhoto.launch(uri)
+        }
+
+        // LazyColumn con ítems independientes: teclear en un campo solo recompone
+        // su propio ítem, no la pantalla completa.
+        LazyColumn(
             modifier = Modifier
                 .padding(innerPadding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // ── CLIENTE ──────────────────────────────────────────────────────────
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionTitle("Cliente")
-                    OutlinedTextField(
-                        value = state.clientName,
-                        onValueChange = { onEvent(EstimadoEvent.ClientNameChange(it)) },
-                        label = { Text("Nombre del cliente") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                        enabled = state.status != EstimadoStatus.CERRADO,
-                    )
-                    OutlinedTextField(
-                        value = state.location,
-                        onValueChange = { onEvent(EstimadoEvent.LocationChange(it)) },
-                        label = { Text("Localidad") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                        enabled = state.status != EstimadoStatus.CERRADO,
-                    )
-                    if (state.technicianName.isNotEmpty()) {
-                        InfoRow("Elaborado por", state.technicianName)
-                    }
-                    if (state.createdAt > 0) {
-                        InfoRow("Fecha", formatDate(state.createdAt))
-                    }
-                    if (state.approvedAt != null) {
-                        InfoRow("Aprobado", formatDate(state.approvedAt))
+            item(key = "cliente", contentType = "card") {
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SectionTitle("Cliente")
+                        OutlinedTextField(
+                            value = state.clientName,
+                            onValueChange = { onEvent(EstimadoEvent.ClientNameChange(it)) },
+                            label = { Text("Nombre del cliente") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                            enabled = state.status != EstimadoStatus.CERRADO,
+                        )
+                        OutlinedTextField(
+                            value = state.location,
+                            onValueChange = { onEvent(EstimadoEvent.LocationChange(it)) },
+                            label = { Text("Localidad") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                            enabled = state.status != EstimadoStatus.CERRADO,
+                        )
+                        if (state.technicianName.isNotEmpty()) {
+                            InfoRow("Elaborado por", state.technicianName)
+                        }
+                        if (state.createdAt > 0) {
+                            InfoRow("Fecha", formatDate(state.createdAt))
+                        }
+                        if (state.approvedAt != null) {
+                            InfoRow("Aprobado", formatDate(state.approvedAt))
+                        }
                     }
                 }
             }
 
             // ── EQUIPO ───────────────────────────────────────────────────────────
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionTitle("Datos del equipo")
-                    InfoRow("No. Contenedor", state.containerNo)
-                    if (state.unitSerialNo.isNotEmpty()) InfoRow("No. Serie", state.unitSerialNo)
-                    if (state.manufacturer.isNotEmpty()) InfoRow("Fabricante", state.manufacturer)
-                    if (state.unitModel.isNotEmpty()) InfoRow("Modelo", state.unitModel)
-                    if (state.unitModelNo.isNotEmpty()) InfoRow("No. Modelo", state.unitModelNo)
-                    if (state.yearOfBuilt.isNotEmpty()) InfoRow("Año", state.yearOfBuilt)
-                    if (state.unitType.isNotEmpty()) InfoRow("Tipo", state.unitType)
+            item(key = "equipo", contentType = "card") {
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SectionTitle("Datos del equipo")
+                        InfoRow("No. Contenedor", state.containerNo)
+                        if (state.unitSerialNo.isNotEmpty()) InfoRow("No. Serie", state.unitSerialNo)
+                        if (state.manufacturer.isNotEmpty()) InfoRow("Fabricante", state.manufacturer)
+                        if (state.unitModel.isNotEmpty()) InfoRow("Modelo", state.unitModel)
+                        if (state.unitModelNo.isNotEmpty()) InfoRow("No. Modelo", state.unitModelNo)
+                        if (state.yearOfBuilt.isNotEmpty()) InfoRow("Año", state.yearOfBuilt)
+                        if (state.unitType.isNotEmpty()) InfoRow("Tipo", state.unitType)
+                    }
                 }
             }
 
             // ── DAÑOS ────────────────────────────────────────────────────────────
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionTitle("Daños encontrados")
-
-                    if (state.damages.isEmpty()) {
-                        Text(
-                            "Sin ítems de daño aún.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+            item(key = "danos-header", contentType = "header") {
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SectionTitle("Daños encontrados")
+                        if (state.damages.isEmpty()) {
+                            Text(
+                                "Sin ítems de daño aún.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
+                }
+            }
 
-                    state.damages.forEachIndexed { index, item ->
-                        if (index > 0) HorizontalDivider()
+            itemsIndexed(
+                items = state.damages,
+                key = { _, item -> item.id },
+                contentType = { _, _ -> "damage" },
+            ) { index, item ->
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
                         DamageItemCard(
                             item = item,
                             index = index + 1,
@@ -357,40 +406,48 @@ fun EstimadoScreen(
                             onRemoveClick = { onEvent(EstimadoEvent.RemoveDamageItem(item.id)) },
                             onRemoveDamagePhoto = { onEvent(EstimadoEvent.RemoveDamagePhoto(item.id)) },
                             onRemoveRepairPhoto = { onEvent(EstimadoEvent.RemoveRepairPhoto(item.id)) },
-                            onAddDamagePhoto = { uri -> onAddDamagePhoto(item.id, uri) },
-                            onAddRepairPhoto = { uri -> onAddRepairPhoto(item.id, uri) },
+                            onRequestGalleryPhoto = { isRepair -> requestGalleryPhoto(item.id, isRepair) },
+                            onRequestCameraPhoto = { isRepair -> requestCameraPhoto(item.id, isRepair) },
                         )
                     }
+                }
+            }
 
-                    if (state.status != EstimadoStatus.CERRADO) {
-                        OutlinedButton(
-                            onClick = { onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.AddDamage)) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Agregar daño")
-                        }
+            if (state.status != EstimadoStatus.CERRADO) {
+                item(key = "danos-add", contentType = "button") {
+                    OutlinedButton(
+                        onClick = { onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.AddDamage)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Agregar daño")
                     }
                 }
             }
 
             // ── VALORES ──────────────────────────────────────────────────────────
             if (state.damages.isNotEmpty()) {
-                ValoresSummaryCard(
-                    damages = state.damages,
-                    hasIva = state.hasIva,
-                    isClosed = state.status == EstimadoStatus.CERRADO,
-                    onIvaToggle = { onEvent(EstimadoEvent.IvaToggle(it)) },
-                    onEditValor = { itemId -> onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.EditValor(itemId))) },
-                )
+                item(key = "valores", contentType = "card") {
+                    ValoresSummaryCard(
+                        damages = state.damages,
+                        hasIva = state.hasIva,
+                        isClosed = state.status == EstimadoStatus.CERRADO,
+                        onIvaToggle = { onEvent(EstimadoEvent.IvaToggle(it)) },
+                        onEditValor = { itemId -> onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.EditValor(itemId))) },
+                    )
+                }
             }
 
-            state.savedMessage?.let { msg ->
-                Text("✓ $msg", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            }
-            state.errorMessage?.let { msg ->
-                Text(msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            item(key = "mensajes", contentType = "messages") {
+                Column {
+                    state.savedMessage?.let { msg ->
+                        Text("✓ $msg", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                    state.errorMessage?.let { msg ->
+                        Text(msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
         }
     }
@@ -475,22 +532,10 @@ private fun DamageItemCard(
     onRemoveClick: () -> Unit,
     onRemoveDamagePhoto: () -> Unit,
     onRemoveRepairPhoto: () -> Unit,
-    onAddDamagePhoto: (Uri) -> Unit,
-    onAddRepairPhoto: (Uri) -> Unit,
+    // isRepair: false = foto del daño (antes), true = foto de la reparación (después)
+    onRequestGalleryPhoto: (Boolean) -> Unit,
+    onRequestCameraPhoto: (Boolean) -> Unit,
 ) {
-    val context = LocalContext.current
-    var cameraDamageUri by remember { mutableStateOf<Uri?>(null) }
-    var cameraRepairUri by remember { mutableStateOf<Uri?>(null) }
-
-    val pickDamage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let(onAddDamagePhoto) }
-    val captureDamage = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        if (success) cameraDamageUri?.let { onAddDamagePhoto(it) }
-    }
-    val pickRepair = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let(onAddRepairPhoto) }
-    val captureRepair = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        if (success) cameraRepairUri?.let { onAddRepairPhoto(it) }
-    }
-
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -544,12 +589,8 @@ private fun DamageItemCard(
                     PhotoPickerButton(
                         label = "Foto del daño",
                         isUploading = isUploading,
-                        onGallery = { pickDamage.launch("image/*") },
-                        onCamera = {
-                            val uri = createCameraUri(context)
-                            cameraDamageUri = uri
-                            captureDamage.launch(uri)
-                        },
+                        onGallery = { onRequestGalleryPhoto(false) },
+                        onCamera = { onRequestCameraPhoto(false) },
                     )
                 }
             }
@@ -566,12 +607,8 @@ private fun DamageItemCard(
                     PhotoPickerButton(
                         label = "Foto reparación",
                         isUploading = isUploading,
-                        onGallery = { pickRepair.launch("image/*") },
-                        onCamera = {
-                            val uri = createCameraUri(context)
-                            cameraRepairUri = uri
-                            captureRepair.launch(uri)
-                        },
+                        onGallery = { onRequestGalleryPhoto(true) },
+                        onCamera = { onRequestCameraPhoto(true) },
                     )
                 } else if (item.status == DamageItemStatus.PENDIENTE) {
                     Box(
@@ -1045,7 +1082,11 @@ private fun PdfPreviewSheet(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(pages) { bmp ->
+                    itemsIndexed(
+                        items = pages,
+                        key = { i, _ -> i },
+                        contentType = { _, _ -> "page" },
+                    ) { _, bmp ->
                         Image(
                             bitmap = bmp.asImageBitmap(),
                             contentDescription = null,

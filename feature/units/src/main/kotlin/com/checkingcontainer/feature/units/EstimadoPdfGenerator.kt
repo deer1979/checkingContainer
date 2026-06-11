@@ -17,6 +17,8 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import com.checkingcontainer.core.model.Estimado
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -34,7 +36,9 @@ class EstimadoPdfGenerator @Inject constructor(
     private val usd = NumberFormat.getCurrencyInstance(Locale("es", "US"))
         .apply { maximumFractionDigits = 2 }
 
-    suspend fun generate(estimado: Estimado): ByteArray {
+    // Todo el dibujo (Canvas, StaticLayout, bitmaps) fuera del main thread:
+    // con varios ítems y fotos, hacerlo en Main congelaba la UI 2-3 segundos.
+    suspend fun generate(estimado: Estimado): ByteArray = withContext(Dispatchers.Default) {
         val loader = SingletonImageLoader.get(context)
 
         // Pre-cargar todas las fotos antes de empezar a dibujar
@@ -259,7 +263,7 @@ class EstimadoPdfGenerator @Inject constructor(
 
         doc.finishPage(page)
 
-        return ByteArrayOutputStream().use { out ->
+        ByteArrayOutputStream().use { out ->
             doc.writeTo(out)
             doc.close()
             out.toByteArray()
@@ -268,7 +272,10 @@ class EstimadoPdfGenerator @Inject constructor(
 
     private suspend fun loadBitmap(loader: coil3.ImageLoader, url: String): Bitmap? =
         runCatching {
-            val req = ImageRequest.Builder(context).data(url).build()
+            // Las fotos se dibujan a ~175pt en el PDF: decodificar a 700px en vez
+            // de la resolución completa de la cámara baja ~10x el pico de memoria
+            // (se retienen todas las fotos a la vez mientras se dibuja).
+            val req = ImageRequest.Builder(context).data(url).size(700).build()
             val bmp = (loader.execute(req) as? SuccessResult)?.image?.let { (it as? BitmapImage)?.bitmap }
             // PDF canvas is software-rendered; hardware bitmaps must be copied to software
             bmp?.let { if (it.config == Bitmap.Config.HARDWARE) it.copy(Bitmap.Config.ARGB_8888, false) else it }

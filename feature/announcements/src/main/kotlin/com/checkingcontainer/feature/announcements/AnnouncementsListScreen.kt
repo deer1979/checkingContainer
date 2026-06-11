@@ -3,12 +3,11 @@ package com.checkingcontainer.feature.announcements
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -116,8 +115,9 @@ private fun AnnouncementsList(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(state.items, key = { it.id }) { item ->
+        items(state.items, key = { it.id }, contentType = { "announcement" }) { item ->
             AnnouncementCard(
                 announcement = item,
                 sharedTransitionScope = sharedTransitionScope,
@@ -125,7 +125,6 @@ private fun AnnouncementsList(
                 onClick = { onAnnouncementClick(item.id) },
                 onDeleteRequest = { pendingDeleteId = item.id },
             )
-            Spacer(Modifier.height(12.dp))
         }
     }
 
