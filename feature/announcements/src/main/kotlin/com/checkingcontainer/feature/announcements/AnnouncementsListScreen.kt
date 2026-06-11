@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.checkingcontainer.core.designsystem.SkeletonCards
 import com.checkingcontainer.core.designsystem.UserAvatarMenu
 import com.checkingcontainer.core.model.User
 
@@ -76,7 +77,14 @@ fun AnnouncementsListRoute(
             )
         },
     ) { innerPadding ->
-        if (!state.isLoading && state.items.isEmpty()) {
+        if (state.isLoading && state.items.isEmpty()) {
+            SkeletonCards(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                cardHeight = 120.dp,
+            )
+        } else if (state.items.isEmpty()) {
             EmptyAnnouncements(
                 modifier = Modifier
                     .fillMaxSize()
