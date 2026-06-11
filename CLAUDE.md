@@ -3,6 +3,10 @@
 App Android offline-first para inspección de contenedores refrigerados (reefer units).
 Toda la UI y la comunicación con el usuario es en **español**.
 
+> **Al iniciar sesión, lee `CONTEXTO_PROYECTO.md`** (memoria técnica del proyecto:
+> arquitectura, convenciones, gotchas) y `PLAN_DEUDA_TECNICA.md` (pendientes
+> priorizados). Con eso retomas el contexto sin re-explorar el repo.
+
 ## Flujo de trabajo Git (IMPORTANTE)
 
 El propietario alterna entre su PC (Windows) y Claude Code desde el móvil. Su PC baja
