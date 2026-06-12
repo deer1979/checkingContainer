@@ -123,3 +123,11 @@
    con cientos de inspecciones (hoy mitigado con 2 + confirmación).
 6. **Renombrar secrets SUPABASE_* → FIREBASE_*** — opcional; coordinar cambio
    simultáneo en GitHub Secrets + ci.yml + BuildConfig (documentado en FIREBASE.md).
+
+## Decisión de arquitectura — Styles API (jun 2026)
+Se intentó adoptar la Styles API de Compose (foundation `1.12.0-alpha03`,
+`Style{}` + `Modifier.styleable`). **Diferida**: esa versión alpha arrastra todo
+Compose a 1.12-alpha y exige `compileSdk 37`, que aún no está publicado en el
+SDK manager. Re-evaluar cuando la API llegue a beta/estable sobre SDK 37 estable
+y Material3 la soporte. La superficie de la API ya está estudiada
+(`Style { background/shape/minHeight; disabled{} }`, `rememberUpdatedStyleState`).

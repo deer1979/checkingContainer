@@ -81,3 +81,14 @@ Optimización de rendimiento en 3 fases + pasada de deuda técnica, todo en `mai
 listener Firestore con lifecycle, caché Coil, anuncios sin parpadeo,
 EstimadoScreen→LazyColumn, fix OOM del OCR, PDF en background, skeletons,
 fix rebote del preview PDF, PIN hasheado, sync visible, 27 tests, CI bloqueante.
+
+## Adaptativo y agentes (jun 2026)
+- Shell adaptativo: `AuthenticatedShell` usa window size class — pill inferior en
+  Compact, `AppNavigationRail` en Medium/Expanded (tablets). NavHost compartido.
+- AppFunctions (`androidx.appfunctions` 1.0.0-alpha07; alpha09 exige compileSdk 37):
+  `app/.../appfunctions/ContainerFunctions.kt` expone `consultarContenedor` y
+  `resumenEstimadosAbiertos` a agentes/sistema (Android 16+). Registradas vía
+  `AppFunctionConfiguration.Provider` en MyApplication (factory Hilt).
+  Probar en dispositivo: `adb shell cmd app_function list-app-functions`.
+- Styles API: DIFERIDA (exige Compose 1.12 alpha + compileSdk 37 inexistente);
+  decisión documentada en PLAN_DEUDA_TECNICA.md.

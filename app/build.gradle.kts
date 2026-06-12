@@ -5,6 +5,11 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
+// AppFunctions: agrega el registro agregado de funciones en el APK
+ksp {
+    arg("appfunctions:aggregateAppFunctions", "true")
+}
+
 composeCompiler {
     stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("compose-stability.conf"))
     // Diagnóstico de recomposiciones: ./gradlew ... -PcomposeMetrics
@@ -103,6 +108,11 @@ dependencies {
     // Coil: ImageLoader global con caché de memoria/disco (ver MyApplication)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+
+    // AppFunctions (alpha): la app como servidor MCP local para agentes (Android 16+)
+    implementation(libs.androidx.appfunctions)
+    implementation(libs.androidx.appfunctions.service)
+    ksp(libs.androidx.appfunctions.compiler)
 
     // Compose (BOM resolves versions)
     implementation(platform(libs.androidx.compose.bom))

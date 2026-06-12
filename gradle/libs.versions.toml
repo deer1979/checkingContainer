@@ -40,6 +40,7 @@ camerax = "1.6.1"
 mlkitTextRecognition = "19.0.1"
 
 # Image loading
+appfunctions = "1.0.0-alpha07"
 coil = "3.1.0"
 
 # Async
@@ -78,6 +79,10 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-material3-windowsizeclass = { group = "androidx.compose.material3", name = "material3-window-size-class" }
+# AppFunctions (alpha): expone funciones de negocio a agentes/AI del sistema (Android 16+)
+androidx-appfunctions          = { group = "androidx.appfunctions", name = "appfunctions", version.ref = "appfunctions" }
+androidx-appfunctions-service  = { group = "androidx.appfunctions", name = "appfunctions-service", version.ref = "appfunctions" }
+androidx-appfunctions-compiler = { group = "androidx.appfunctions", name = "appfunctions-compiler", version.ref = "appfunctions" }
 androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 
 # DI (Hilt)
