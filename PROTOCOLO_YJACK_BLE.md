@@ -90,3 +90,12 @@ neverForLocation. No requiere Firebase ni nube.
   sobrecalentamiento (línea de succión) o subenfriamiento (línea de líquido).
   ⇒ Necesitaremos tablas PT por refrigerante (o ecuaciones de saturación) en el
   módulo de cálculo. La app oficial lo hace en MeasureCalcUtil.java (referencia).
+
+## Auto-cero del TITANMAX (aclaración usuario, jun 2026) — IMPORTANTE
+- El TITANMAX **se auto-calibra**: a presión atmosférica marca **0** y de ahí
+  sube. ⇒ El valor difundido es **presión MANOMÉTRICA ya lista** (referida a la
+  atmósfera). NO restar atmosférica ni convertir desde absoluta.
+- Ojo: en el APK existe `calculatePressureFromPSIA` (PSIA = absoluta), pero según
+  el usuario el dato del advertising ya viene relativo (cero a la atmósfera).
+  ⇒ Tomar sensor1/sensor2 tal cual como presión manométrica. CONFIRMAR igualmente
+  con la lectura real (pantalla del Titan vs sensorN) al validar unidades.
