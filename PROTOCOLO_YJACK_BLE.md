@@ -76,3 +76,17 @@ estimado/PTI añade sección "Mediciones del equipo": botón escanear → snapsh
 presiones/temps/vacío/amperaje con timestamp → persistir en Estimado y volcar al PDF.
 minSdk 26 ya soporta BLE scan; permisos BLUETOOTH_SCAN/CONNECT (Android 12+) +
 neverForLocation. No requiere Firebase ni nube.
+
+## Aclaraciones del usuario (jun 2026) — importantes para el diseño
+- Los **2 sensores de presión** y las **2 pinzas de temperatura** son del MISMO
+  modelo y NO tienen serial que los distinga. El equipo/app los ve como "1" y "2";
+  **el técnico selecciona manualmente** cuál es cuál (alta/baja, posición 1/2).
+  ⇒ En la UI: asignación manual presión1/2 → alta/baja y temp1/2 → posición.
+  Mapea directo a sensor1Reading / sensor2Reading del parser.
+- **Temperatura en CENTÍGRADOS** (no convertir a °F).
+- **Superheat / Subcooling = matemática interna** con tabla PT del refrigerante:
+  de la presión medida + tipo de gas (R-134a, R-404A, R-407C, R-22, etc.) se
+  obtiene la temperatura de saturación; la diferencia con la temp medida da
+  sobrecalentamiento (línea de succión) o subenfriamiento (línea de líquido).
+  ⇒ Necesitaremos tablas PT por refrigerante (o ecuaciones de saturación) en el
+  módulo de cálculo. La app oficial lo hace en MeasureCalcUtil.java (referencia).
