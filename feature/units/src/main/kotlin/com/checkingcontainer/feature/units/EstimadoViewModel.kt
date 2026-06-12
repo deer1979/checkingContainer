@@ -215,9 +215,7 @@ class EstimadoViewModel @Inject constructor(
     private fun uploadPhoto(itemId: String, isDano: Boolean, uri: Uri) {
         viewModelScope.launch {
             _state.update { it.copy(isUploadingPhoto = true, errorMessage = null) }
-            val bytes = withContext(Dispatchers.IO) {
-                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            }
+            val bytes = withContext(Dispatchers.IO) { compressForUpload(uri) }
             if (bytes == null) {
                 _state.update { it.copy(isUploadingPhoto = false, errorMessage = "No se pudo leer la foto") }
                 return@launch
@@ -244,6 +242,51 @@ class EstimadoViewModel @Inject constructor(
     private fun deletePhotoAsync(url: String) {
         viewModelScope.launch(Dispatchers.IO) { estimadosRepo.deletePhoto(url) }
     }
+
+    /**
+     * Reescala (máx 1600px) y comprime a JPEG 80 antes de subir: la cámara entrega
+     * 3-6 MB por foto y sin esto se subían los bytes crudos a Storage. Aplica la
+     * rotación EXIF porque al re-codificar se pierde ese metadato.
+     */
+    private fun compressForUpload(uri: Uri): ByteArray? = runCatching {
+        val resolver = context.contentResolver
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use {
+            android.graphics.BitmapFactory.decodeStream(it, null, bounds)
+        } ?: return null
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_PHOTO_DIM) sample *= 2
+
+        val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+        var bmp = resolver.openInputStream(uri)?.use {
+            android.graphics.BitmapFactory.decodeStream(it, null, opts)
+        } ?: return null
+
+        val orientation = resolver.openInputStream(uri)?.use {
+            android.media.ExifInterface(it).getAttributeInt(
+                android.media.ExifInterface.TAG_ORIENTATION,
+                android.media.ExifInterface.ORIENTATION_NORMAL,
+            )
+        } ?: android.media.ExifInterface.ORIENTATION_NORMAL
+        val degrees = when (orientation) {
+            android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+        if (degrees != 0f) {
+            val matrix = android.graphics.Matrix().apply { postRotate(degrees) }
+            val rotated = android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+            if (rotated !== bmp) bmp.recycle()
+            bmp = rotated
+        }
+
+        java.io.ByteArrayOutputStream().use { out ->
+            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
+            bmp.recycle()
+            out.toByteArray()
+        }
+    }.getOrNull()
 
     fun save() {
         viewModelScope.launch {
@@ -340,3 +383,6 @@ class EstimadoViewModel @Inject constructor(
 
     fun clearPdfPath() = _state.update { it.copy(pdfPreviewPath = null) }
 }
+
+private const val MAX_PHOTO_DIM = 1600
+private const val JPEG_QUALITY = 80
