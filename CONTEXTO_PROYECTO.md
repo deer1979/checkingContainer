@@ -92,3 +92,24 @@ fix rebote del preview PDF, PIN hasheado, sync visible, 27 tests, CI bloqueante.
   Probar en dispositivo: `adb shell cmd app_function list-app-functions`.
 - Styles API: DIFERIDA (exige Compose 1.12 alpha + compileSdk 37 inexistente);
   decisión documentada en PLAN_DEUDA_TECNICA.md.
+
+## Idea futura: lectura automática del manómetro por Bluetooth (investigado jun 2026)
+Equipo del usuario: **Yellow Jacket TITANMAX** (P/N 40881), BLE, anuncia como
+`TITAN-2503-5221` (MAC 60:B6:47:7A:75:9A). Objetivo: capturar presiones/temps
+del PTI sin digitar.
+- Conecta sin emparejar ni cifrado (acceso libre). App oficial: **YJACK VIEW**;
+  measureQuick también lo integra (bajo acuerdo privado, protocolo NO público).
+- Servicio de datos propietario: `1854edbe-c75c-47d7-92ed-71b5f80549f8`.
+  Característica de datos (Notify+Read): `9592d325-ec81-411f-86b2-599984f27589`.
+  Resto del servicio son WRITE (comando/respuesta). `1d14d6ee-...` = DFU Silicon
+  Labs (¡NO tocar, ladrilla el equipo!).
+- Es protocolo **comando/respuesta**: hay que enviar un comando de arranque (aún
+  desconocido) a una característica WRITE para que empiece a notificar. Leer la
+  característica sin comando devuelve fijo `1D-02` (estado, no presión).
+- PENDIENTE para descifrarlo: capturar `btsnoop_hci.log` mientras corre **YJACK
+  VIEW** (no nRF Connect). Orden CRÍTICO en Samsung: activar "Registro Bluetooth
+  HCI" → reiniciar BT UNA vez ANTES → sesión con app oficial 2-3 min → informe de
+  errores SIN volver a tocar BT (reiniciar BT borra el log). Primer intento salió
+  vacío (1.1s, solo control) por reiniciar BT después de la sesión.
+- Implementación eventual: módulo `feature/bluetooth` o `core/` con
+  BluetoothGatt/companion device; integrarlo en el formulario de inspección/PTI.
