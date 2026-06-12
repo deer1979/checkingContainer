@@ -140,17 +140,18 @@ jobs:
             --repo "${{ github.repository }}" \
             --body-file /tmp/lint-comment.md
 
+      # Los unit tests son obligatorios: si fallan, el build falla y no se
+      # publica APK. Corren en todos los módulos (Android + JVM puro).
       - name: Unit tests
         id: unit_tests
         if: steps.compile.outcome == 'success'
-        continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew :app:testDebugUnitTest --stacktrace 2>&1 | tee /tmp/unit-tests.log
+          ./gradlew testDebugUnitTest :core:model:test --stacktrace 2>&1 | tee /tmp/unit-tests.log
 
       - name: Post unit test failure as PR comment
-        if: steps.unit_tests.outcome == 'failure' && github.event_name == 'pull_request'
+        if: failure() && steps.unit_tests.outcome == 'failure' && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

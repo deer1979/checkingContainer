@@ -96,6 +96,7 @@ import java.io.File
 import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.EstimadoStatus
+import com.checkingcontainer.core.model.EstimadoTotals
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
@@ -660,11 +661,11 @@ private fun ValoresSummaryCard(
     onIvaToggle: (Boolean) -> Unit,
     onEditValor: (String) -> Unit,
 ) {
-    val totalLabor = damages.sumOf { it.laborCost ?: 0.0 }
-    val totalMaterial = damages.sumOf { it.materialCost ?: 0.0 }
-    val subtotal = totalLabor + totalMaterial
-    val ivaAmount = if (hasIva) subtotal * 0.12 else 0.0
-    val total = subtotal + ivaAmount
+    val totals = EstimadoTotals.calcular(damages, hasIva)
+    val totalLabor = totals.laborTotal
+    val totalMaterial = totals.materialTotal
+    val ivaAmount = totals.ivaAmount
+    val total = totals.total
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

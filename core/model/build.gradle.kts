@@ -3,5 +3,6 @@ plugins {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     api(libs.kotlinx.collections.immutable)
 }

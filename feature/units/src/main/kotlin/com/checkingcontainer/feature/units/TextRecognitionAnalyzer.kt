@@ -301,7 +301,8 @@ class TextRecognitionAnalyzer(
          * ningún frame individual lo haya leído entero bien (cada uno falla un char
          * distinto). Asume que todas las lecturas tienen longitud 11.
          */
-        private fun majorityVote(reads: List<String>): String {
+        // internal para poder testearlo (junto con correctContainerChars).
+        internal fun majorityVote(reads: List<String>): String {
             val sb = StringBuilder(11)
             for (i in 0 until 11) {
                 val counts = HashMap<Char, Int>()

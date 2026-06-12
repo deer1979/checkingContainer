@@ -16,6 +16,7 @@ import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import com.checkingcontainer.core.model.Estimado
+import com.checkingcontainer.core.model.EstimadoTotals
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -241,11 +242,11 @@ class EstimadoPdfGenerator @Inject constructor(
         checkBreak(90f)
         canvas.drawText("RESUMEN DE VALORES", margin, y, pSection); y += 14f
 
-        val labTotal = estimado.damages.sumOf { it.laborCost ?: 0.0 }
-        val matTotal = estimado.damages.sumOf { it.materialCost ?: 0.0 }
-        val subtotal = labTotal + matTotal
-        val ivaAmt = if (estimado.hasIva) subtotal * 0.12 else 0.0
-        val total = subtotal + ivaAmt
+        val totals = EstimadoTotals.calcular(estimado.damages, estimado.hasIva)
+        val labTotal = totals.laborTotal
+        val matTotal = totals.materialTotal
+        val ivaAmt = totals.ivaAmount
+        val total = totals.total
 
         fun totalRow(label: String, amount: Double, bold: Boolean = false) {
             val p = if (bold) pBold else pBody
