@@ -111,6 +111,9 @@ del PTI sin digitar.
   HCI" → reiniciar BT UNA vez ANTES → sesión con app oficial 2-3 min → informe de
   errores SIN volver a tocar BT (reiniciar BT borra el log). Primer intento salió
   vacío (1.1s, solo control) por reiniciar BT después de la sesión.
+- ✅ PROTOCOLO DESCIFRADO del APK oficial → ver `PROTOCOLO_YJACK_BLE.md`.
+  Datos van en BLE ADVERTISING (sin conexión). UUIDs y fórmulas de todos los
+  sensores ya documentados. Solo falta confirmar unidades con 1 lectura real.
 - Implementación eventual: módulo `feature/bluetooth` o `core/` con
   BluetoothGatt/companion device; integrarlo en el formulario de inspección/PTI.
 
