@@ -2,12 +2,11 @@ package com.checkingcontainer.ui
 
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -96,12 +95,14 @@ fun AuthenticatedShell(user: User) {
                 // recompongan la barra inferior y no el shell completo.
                 val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
                 val openEstimados by shellViewModel.openEstimados.collectAsStateWithLifecycle()
-                // Entrada/salida deslizando: el cambio de altura del Scaffold se
-                // anima en vez de saltar de golpe.
+                // Asimétrico a propósito: al IR al estimado la barra se quita
+                // instantánea (animar su altura hacía que la barra propia del
+                // estimado entrara "bajando" a trompicones); al VOLVER sí entra
+                // deslizando desde abajo.
                 AnimatedVisibility(
                     visible = !hideGlobalNav,
                     enter = slideInVertically { it } + fadeIn(),
-                    exit = slideOutVertically { it } + fadeOut(),
+                    exit = ExitTransition.None,
                 ) {
                     AppBottomBar(
                         destinations = TopLevelDestination.entries,
