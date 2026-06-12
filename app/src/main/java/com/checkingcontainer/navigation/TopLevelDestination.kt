@@ -2,7 +2,7 @@ package com.checkingcontainer.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AcUnit
-import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST_ROUTE
@@ -27,6 +27,6 @@ enum class TopLevelDestination(
     Estimados(
         route = ESTIMADOS_LIST_ROUTE,
         label = "Estimados",
-        icon = Icons.Outlined.Assignment,
+        icon = Icons.AutoMirrored.Outlined.Assignment,
     );
 }

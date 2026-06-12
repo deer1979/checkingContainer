@@ -101,7 +101,7 @@ import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
-private val USD = NumberFormat.getCurrencyInstance(Locale("es", "US")).apply {
+private val USD = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-US")).apply {
     maximumFractionDigits = 2
 }
 

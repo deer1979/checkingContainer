@@ -45,8 +45,12 @@ internal fun UnitTimeline(
             }
 
             inspections.forEachIndexed { index, inspection ->
-                if (index > 0) HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                TimelineItem(inspection = inspection)
+                // key por id: al insertar una inspección nueva al inicio, Compose
+                // reutiliza los items existentes en vez de reasignarlos por posición.
+                androidx.compose.runtime.key(inspection.id) {
+                    if (index > 0) HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    TimelineItem(inspection = inspection)
+                }
             }
 
             if (!hasLoadedAll && remaining > 0) {

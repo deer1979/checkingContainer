@@ -34,7 +34,7 @@ class EstimadoViewModel @Inject constructor(
     private val inspectionRepo: InspectionRepository,
     private val reeferUnitRepo: ReeferEquipmentRepository,
     private val pdfGenerator: EstimadoPdfGenerator,
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val inspectionId: Long = checkNotNull(savedStateHandle[ESTIMADO_INSPECTION_ID_ARG])

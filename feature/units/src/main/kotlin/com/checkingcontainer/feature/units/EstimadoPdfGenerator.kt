@@ -30,11 +30,11 @@ import javax.inject.Singleton
 
 @Singleton
 class EstimadoPdfGenerator @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
 
     private val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-    private val usd = NumberFormat.getCurrencyInstance(Locale("es", "US"))
+    private val usd = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-US"))
         .apply { maximumFractionDigits = 2 }
 
     // Todo el dibujo (Canvas, StaticLayout, bitmaps) fuera del main thread:

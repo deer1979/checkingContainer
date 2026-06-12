@@ -1,9 +1,16 @@
 # Plan de deuda técnica — checkingContainer
 
 > Generado tras la optimización de rendimiento (commits `1e8928a` → `e054214`).
-> Hallazgos verificados en código durante la auditoría de junio 2026.
-> Orden de fases por **riesgo/beneficio**, no por esfuerzo. Cada fase = commit(s)
-> a `main` con `./gradlew :app:compileDebugKotlin` en verde.
+> **ACTUALIZACIÓN jun 2026:** las Fases 1-3 y parte de la 4 se ejecutaron en la
+> pasada única (commits `573ec4c` en adelante). Estado por ítem abajo.
+>
+> ✅ HECHO: PIN hasheado (migración perezosa) · sync visible en Ajustes +
+> timeout de ack (fix del cuelgue offline) · 27 unit tests (Iso6346, OCR,
+> totales, PinHasher) con CI bloqueante · EstimadoTotals única fuente del
+> cálculo · docs (FIREBASE.md, borrado ESTIMADOS_PLAN/SUPABASE) · limpiezas
+> (stateIn directo, keys en timeline, warnings) · compresión de fotos.
+>
+> ⏳ PENDIENTE: ver "Pendientes restantes" al final.
 
 ---
 
@@ -96,11 +103,23 @@
 
 ---
 
-## Sugerencia de orden de ejecución
+## Pendientes restantes (actualizado tras la pasada única)
 
-| Sesión | Contenido | Por qué |
-|---|---|---|
-| 1 | Fase 1.1 + 1.2 (seguridad PIN + sync visible) | Riesgo real de datos/seguridad |
-| 2 | Fase 2.1–2.4 (tests de lógica pura + DAOs) | Red de seguridad antes de seguir tocando |
-| 3 | Fase 3.2 (docs/renombrar Supabase→Firebase) + 3.3 | Rápida, baja fricción |
-| 4 | Fase 4 según necesidad real | Pulido |
+1. **Tests de DAO y migraciones Room** — requieren dispositivo/emulador
+   (`MigrationTestHelper`, Room in-memory). Hacer desde el PC con Android Studio.
+2. **Baseline Profiles** — requiere emulador (no disponible en el contenedor
+   remoto). Receta desde el PC:
+   - Nuevo módulo `:baselineprofile` con plugins `androidx.baselineprofile` +
+     `com.android.test`, managed device `pixel6Api34`.
+   - Journey: arranque → login → anuncios → unidades → abrir estimado.
+   - `./gradlew :app:generateBaselineProfile` → commitear
+     `app/src/release/generated/baselineProfiles/baseline-prof.txt`.
+   - `androidx.profileinstaller` ya quedó añadido en `app/`.
+3. **Strings a recursos** — regla boy-scout: mover a `strings.xml` al tocar
+   cada pantalla (no big-bang).
+4. **Flood-fill de ProjectionCharDetector** — verificado: ya está acotado
+   (stack predimensionado + visited); no requiere cambio.
+5. **Paginación del historial en UnitDetail** — solo si aparecen contenedores
+   con cientos de inspecciones (hoy mitigado con 2 + confirmación).
+6. **Renombrar secrets SUPABASE_* → FIREBASE_*** — opcional; coordinar cambio
+   simultáneo en GitHub Secrets + ci.yml + BuildConfig (documentado en FIREBASE.md).

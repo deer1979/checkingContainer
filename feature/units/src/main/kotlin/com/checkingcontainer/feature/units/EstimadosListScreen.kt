@@ -13,7 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -102,7 +102,7 @@ fun EstimadosListScreen(
                 } else if (list.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Outlined.Assignment, contentDescription = null, modifier = Modifier.padding(bottom = 8.dp))
+                            Icon(Icons.AutoMirrored.Outlined.Assignment, contentDescription = null, modifier = Modifier.padding(bottom = 8.dp))
                             Text(
                                 if (page == 0) "Sin estimados abiertos" else "Sin estimados cerrados",
                                 style = MaterialTheme.typography.bodyLarge,

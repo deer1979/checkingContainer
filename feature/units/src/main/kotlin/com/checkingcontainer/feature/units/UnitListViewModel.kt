@@ -6,10 +6,10 @@ import com.checkingcontainer.core.domain.InspectionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -17,16 +17,9 @@ class UnitListViewModel @Inject constructor(
     private val inspectionRepo: InspectionRepository,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(UnitListUiState())
-    val state: StateFlow<UnitListUiState> = _state.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            inspectionRepo.observeLast24h().collect { items ->
-                _state.update { UnitListUiState(units = items.toImmutableList(), isLoading = false) }
-            }
-        }
-    }
+    val state: StateFlow<UnitListUiState> = inspectionRepo.observeLast24h()
+        .map { items -> UnitListUiState(units = items.toImmutableList(), isLoading = false) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UnitListUiState())
 
     fun onDelete(id: Long) {
         viewModelScope.launch { inspectionRepo.delete(id) }

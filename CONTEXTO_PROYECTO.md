@@ -56,15 +56,28 @@ mal nombrado; vacías ⇒ modo solo-local.
   En contenedor remoto: instalar SDK en `/opt/android-sdk` y crear
   `local.properties` con `sdk.dir=/opt/android-sdk` si no existe.
 
-## Deuda conocida (detalle y orden en `PLAN_DEUDA_TECNICA.md`)
-1. 🔴 PIN en texto plano (`AuthRepositoryImpl.kt:38`).
-2. 🔴 Fallos de sync silenciosos (13 `Log.w/e` en FirestoreService, sin retry visible).
-3. Cero tests (solo ExampleUnitTest); empezar por Iso6346 / correcciones OCR / totales.
-4. Docs: `ESTIMADOS_PLAN.md` obsoleto (ya implementado); renombrar Supabase→Firebase.
-5. Strings hardcodeados (0 `stringResource`); limpiar al tocar cada pantalla.
-6. Opcionales: Baseline Profiles, paginación historial, métricas Compose, smoke release.
+## Seguridad y sync (desde jun 2026)
+- PIN: hash SHA-256+salt (`PinHasher` en core/common, formato `v1:salt:hash` en la
+  columna `pin`); migración perezosa en login. Al editar usuario, PIN vacío = mantener.
+- FirestoreService: todos los writes pasan por `write(op){...}` con timeout de ack
+  de 10s (sin conexión NO se cuelga; el SDK re-envía solo) y registran estado en
+  `SyncStatusRepository` (DataStore) → visible en Ajustes.
+- Fotos: comprimidas a JPEG 80 / máx 1600px con rotación EXIF antes de subir
+  (`compressForUpload` en EstimadoViewModel).
+
+## Tests
+27 unit tests (`./gradlew testDebugUnitTest :core:model:test`, obligatorios en CI):
+Iso6346, correctContainerChars/majorityVote, EstimadoTotals (única fuente del
+cálculo de totales/IVA — usar SIEMPRE esta, no recalcular inline), PinHasher.
+Pendiente: tests de DAO/migraciones (requieren emulador).
+
+## Deuda restante (detalle en `PLAN_DEUDA_TECNICA.md`, sección "Pendientes restantes")
+Baseline Profiles (receta para PC en el plan), tests de DAO, strings a recursos
+(boy-scout), paginación historial si hace falta. Docs: `FIREBASE.md` es la guía del
+backend (los nombres SUPABASE_* son legado intencional — no renombrar sin coordinar).
 
 ## Historia reciente (jun 2026)
-Optimización de rendimiento en 3 fases ya en `main`: listener Firestore con lifecycle,
-caché Coil, anuncios sin parpadeo, EstimadoScreen→LazyColumn, fix OOM del OCR,
-PDF en background, skeletons de carga, fix rebote del preview PDF.
+Optimización de rendimiento en 3 fases + pasada de deuda técnica, todo en `main`:
+listener Firestore con lifecycle, caché Coil, anuncios sin parpadeo,
+EstimadoScreen→LazyColumn, fix OOM del OCR, PDF en background, skeletons,
+fix rebote del preview PDF, PIN hasheado, sync visible, 27 tests, CI bloqueante.
