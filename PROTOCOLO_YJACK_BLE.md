@@ -139,3 +139,12 @@ neverForLocation. No requiere Firebase ni nube.
   registro) integrada al flujo del estimado. El usuario compartirá una ficha de
   estimado de ejemplo para diseñar dónde encajan.
 - Refrigerante seleccionable por el usuario (lista de los 131) para los cálculos.
+
+## Alcance UI confirmado (jun 2026)
+- Pantalla "Mediciones del equipo" moderna en Compose (aprovecha el shell
+  adaptativo ya existente: se ve bien en teléfono y tablet de campo).
+- DEBE incluir el **sensor de corriente (YJAmp)** junto con presiones (alta/baja),
+  temperaturas (pinzas 1/2), vacío y, opcional, superheat/subcooling calculados.
+  Todos los sensores YJACK del usuario presentes en la misma vista de captura.
+- amperímetro YJAmp ya descifrado: corriente = int16_LE/10 (sensor1). Va en la
+  misma sección/registro continuo que el resto.
