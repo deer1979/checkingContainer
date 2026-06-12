@@ -60,6 +60,7 @@ coroutinesTest = "1.10.2"
 # Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
+androidx-profileinstaller  = { group = "androidx.profileinstaller", name = "profileinstaller", version = "1.4.1" }
 androidx-startup = { group = "androidx.startup", name = "startup-runtime", version.ref = "startup" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }

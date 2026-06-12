@@ -7,6 +7,11 @@ plugins {
 
 composeCompiler {
     stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("compose-stability.conf"))
+    // Diagnóstico de recomposiciones: ./gradlew ... -PcomposeMetrics
+    if (providers.gradleProperty("composeMetrics").isPresent) {
+        metricsDestination.set(layout.buildDirectory.dir("compose-metrics"))
+        reportsDestination.set(layout.buildDirectory.dir("compose-reports"))
+    }
 }
 
 android {
@@ -85,6 +90,8 @@ dependencies {
     // AndroidX
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
+    // Instala perfiles de compilación (cloud profiles / baseline) al instalar la app
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.startup)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

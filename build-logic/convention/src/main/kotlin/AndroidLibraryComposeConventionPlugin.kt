@@ -20,6 +20,12 @@ class AndroidLibraryComposeConventionPlugin : Plugin<Project> {
                 stabilityConfigurationFiles.add(
                     rootProject.layout.projectDirectory.file("compose-stability.conf")
                 )
+                // Diagnóstico de recomposiciones: ./gradlew ... -PcomposeMetrics
+                // genera reportes en build/compose-metrics y build/compose-reports.
+                if (providers.gradleProperty("composeMetrics").isPresent) {
+                    metricsDestination.set(layout.buildDirectory.dir("compose-metrics"))
+                    reportsDestination.set(layout.buildDirectory.dir("compose-reports"))
+                }
             }
             dependencies {
                 val bom = libs.findLibrary("androidx-compose-bom").get()
