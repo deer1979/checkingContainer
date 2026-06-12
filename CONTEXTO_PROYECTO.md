@@ -131,3 +131,14 @@ encendidos y captura un snapshot de lecturas (presión, temp, vacío, amperaje)
 con timestamp; se persiste en el Estimado (nuevos campos / tabla de mediciones)
 y se imprime en el PDF. Modelo: ampliar `Estimado`/`DamageItem` o nueva entidad
 `Medicion` (sensorType, valor, unidad, timestamp).
+
+## Corrección de topología BLE (jun 2026) — IMPORTANTE
+El usuario aclaró la conexión real de los sensores:
+- **TITANMAX es el HUB**: el **vacuómetro va conectado AL TITANMAX** (no es BLE
+  propio) y las pinzas de temperatura también las integra el TITANMAX. ⇒ UNA
+  sola conexión BLE al TITANMAX entrega presión + temperaturas + vacío juntos.
+- **Sensor de corriente (amperímetro)**: es BLE INDEPENDIENTE, conexión propia
+  directa al móvil (la app lo reconoce por separado). Segundo dispositivo.
+⇒ Solo 2 conexiones BLE a descifrar: TITANMAX (presión+temp+vacío) y amperímetro.
+Plan A para el protocolo = capturar btsnoop de la app oficial y descifrarlo
+(NO esperar SDK del fabricante: es secreto industrial, improbable que lo den).
