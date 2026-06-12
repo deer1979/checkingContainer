@@ -1,10 +1,16 @@
 package com.checkingcontainer.ui
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -29,10 +35,12 @@ import com.checkingcontainer.feature.users.navigation.USERS_LIST_ROUTE
 import com.checkingcontainer.feature.users.navigation.usersGraph
 
 /**
- * Post-login shell. Barra inferior con Anuncios y Unidades. Ajustes y Usuarios
- * se acceden desde el avatar del usuario en el TopAppBar de cada pantalla raíz.
+ * Post-login shell adaptativo (M3 Adaptive):
+ *  - Ancho Compact (teléfono): barra inferior tipo pill ([AppBottomBar]).
+ *  - Ancho Medium/Expanded (tablet de campo, plegable): rail lateral
+ *    ([AppNavigationRail]) y el contenido ocupa el resto.
+ * Ajustes y Usuarios se acceden desde el avatar del TopAppBar de cada raíz.
  */
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AuthenticatedShell(user: User) {
     val navController = rememberNavController()
@@ -46,62 +54,128 @@ fun AuthenticatedShell(user: User) {
     val onSettingsClick = { navController.navigate(SETTINGS_ROUTE) }
     val onLogout       = { shellViewModel.logout() }
 
-    Scaffold(
-        bottomBar = {
-            // Los badges se colectan aquí dentro para que sus cambios solo
-            // recompongan la barra inferior y no el shell completo.
-            val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
-            val openEstimados by shellViewModel.openEstimados.collectAsStateWithLifecycle()
-            // Ocultar la nav global en pantallas con su propia barra de acciones
-            val hideBottomNav = currentRoute?.startsWith("estimado/") == true
-            if (!hideBottomNav) {
-                AppBottomBar(
-                    destinations = TopLevelDestination.entries,
+    // M3 Adaptive: la clase de tamaño de ventana decide la navegación global.
+    val useRail = rememberUseRail()
+    // Ocultar la nav global en pantallas con su propia barra de acciones
+    val hideGlobalNav = currentRoute?.startsWith("estimado/") == true
+
+    if (useRail) {
+        Row(Modifier.fillMaxSize()) {
+            if (!hideGlobalNav) {
+                ShellRail(
+                    shellViewModel = shellViewModel,
                     currentRoute = currentRoute,
                     onSelect = { dest -> navigateToTopLevel(navController, dest) },
-                    unreadAnnouncements = unreadAnnouncements,
-                    openEstimados = openEstimados,
                 )
             }
-        },
-        modifier = Modifier.fillMaxSize(),
-    ) { innerPadding ->
-        SharedTransitionLayout(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
-            NavHost(
+            Box(Modifier.fillMaxSize()) {
+                ShellNavHost(
+                    navController = navController,
+                    user = user,
+                    onSettingsClick = onSettingsClick,
+                    onLogout = onLogout,
+                )
+            }
+        }
+    } else {
+        Scaffold(
+            bottomBar = {
+                // Los badges se colectan aquí dentro para que sus cambios solo
+                // recompongan la barra inferior y no el shell completo.
+                val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
+                val openEstimados by shellViewModel.openEstimados.collectAsStateWithLifecycle()
+                if (!hideGlobalNav) {
+                    AppBottomBar(
+                        destinations = TopLevelDestination.entries,
+                        currentRoute = currentRoute,
+                        onSelect = { dest -> navigateToTopLevel(navController, dest) },
+                        unreadAnnouncements = unreadAnnouncements,
+                        openEstimados = openEstimados,
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        ) { innerPadding ->
+            ShellNavHost(
                 navController = navController,
-                startDestination = ANNOUNCEMENTS_LIST_ROUTE,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                announcementsGraph(
-                    navController = navController,
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    isAdmin = user.role.isAdmin,
-                    onCreateAnnouncement = { navController.navigate(ADMIN_ROUTE) },
-                    user = user,
-                    onSettingsClick = onSettingsClick,
-                    onLogout = onLogout,
-                )
-                usersGraph(navController = navController)
-                adminScreen(
-                    onBack = { navController.popBackStack() },
-                    onPublished = { navController.popBackStack() },
-                )
-                unitsGraph(
-                    navController = navController,
-                    user = user,
-                    onSettingsClick = onSettingsClick,
-                    onLogout = onLogout,
-                )
-                estimadosGraph(navController = navController)
-                settingsScreen(
-                    isAdmin = user.role.isAdmin,
-                    onUsersClick = { navController.navigate(USERS_LIST_ROUTE) },
-                )
-            }
+                user = user,
+                onSettingsClick = onSettingsClick,
+                onLogout = onLogout,
+                modifier = Modifier.padding(innerPadding),
+            )
+        }
+    }
+}
+
+/** True si la ventana es Medium/Expanded (M3 window size class). */
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
+@Composable
+private fun rememberUseRail(): Boolean {
+    val activity = LocalActivity.current ?: return false
+    val windowSize = calculateWindowSizeClass(activity)
+    return windowSize.widthSizeClass != WindowWidthSizeClass.Compact
+}
+
+/** Rail con badges; recompone solo aquí cuando cambian los contadores. */
+@Composable
+private fun ShellRail(
+    shellViewModel: ShellViewModel,
+    currentRoute: String?,
+    onSelect: (TopLevelDestination) -> Unit,
+) {
+    val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
+    val openEstimados by shellViewModel.openEstimados.collectAsStateWithLifecycle()
+    AppNavigationRail(
+        destinations = TopLevelDestination.entries,
+        currentRoute = currentRoute,
+        onSelect = onSelect,
+        unreadAnnouncements = unreadAnnouncements,
+        openEstimados = openEstimados,
+    )
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun ShellNavHost(
+    navController: NavHostController,
+    user: User,
+    onSettingsClick: () -> Unit,
+    onLogout: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SharedTransitionLayout(
+        modifier = modifier.fillMaxSize(),
+    ) {
+        NavHost(
+            navController = navController,
+            startDestination = ANNOUNCEMENTS_LIST_ROUTE,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            announcementsGraph(
+                navController = navController,
+                sharedTransitionScope = this@SharedTransitionLayout,
+                isAdmin = user.role.isAdmin,
+                onCreateAnnouncement = { navController.navigate(ADMIN_ROUTE) },
+                user = user,
+                onSettingsClick = onSettingsClick,
+                onLogout = onLogout,
+            )
+            usersGraph(navController = navController)
+            adminScreen(
+                onBack = { navController.popBackStack() },
+                onPublished = { navController.popBackStack() },
+            )
+            unitsGraph(
+                navController = navController,
+                user = user,
+                onSettingsClick = onSettingsClick,
+                onLogout = onLogout,
+            )
+            estimadosGraph(navController = navController)
+            settingsScreen(
+                isAdmin = user.role.isAdmin,
+                onUsersClick = { navController.navigate(USERS_LIST_ROUTE) },
+            )
         }
     }
 }

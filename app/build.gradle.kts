@@ -110,6 +110,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    // M3 Adaptive: clase de tamaño de ventana (teléfono vs tablet de campo)
+    implementation(libs.androidx.material3.windowsizeclass)
 
     // Tests
     testImplementation(libs.junit)
