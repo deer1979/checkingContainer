@@ -99,3 +99,14 @@ neverForLocation. No requiere Firebase ni nube.
   el usuario el dato del advertising ya viene relativo (cero a la atmósfera).
   ⇒ Tomar sensor1/sensor2 tal cual como presión manométrica. CONFIRMAR igualmente
   con la lectura real (pantalla del Titan vs sensorN) al validar unidades.
+
+## Manométrica vs absoluta para cálculos (aclaración usuario, jun 2026)
+- MOSTRAR/GUARDAR en el reporte: presión MANOMÉTRICA (la del auto-cero, lo que ve
+  el técnico).
+- CALCULAR (saturación / superheat / subcooling): convertir a ABSOLUTA =
+  manométrica + atmosférica (~14.696 PSI nivel del mar; idealmente ajustable por
+  altitud). Con la absoluta se entra a la tabla PT del refrigerante. Esto explica
+  `calculatePressureFromPSIA` del APK.
+- Flujo: leer manométrica → +atmosférica → absoluta → tabla PT del gas → temp de
+  saturación → comparar con temp medida (pinza) → superheat (succión) /
+  subcooling (líquido).
