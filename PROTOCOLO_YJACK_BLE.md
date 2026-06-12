@@ -110,3 +110,32 @@ neverForLocation. No requiere Firebase ni nube.
 - Flujo: leer manométrica → +atmosférica → absoluta → tabla PT del gas → temp de
   saturación → comparar con temp medida (pinza) → superheat (succión) /
   subcooling (líquido).
+
+## Cálculos y tabla de refrigerantes (extraído del APK, jun 2026)
+- **Tabla PT completa extraída**: `feature_sensores_ref/refrigerant_data.json`
+  (del APK, `R.raw.refrigerant_data`). **131 refrigerantes** (R-134a, R-404A,
+  R-410A, R-22, R-407C, R-507A, etc.), cada uno con `liqSat[128]` y `vapSat[128]`
+  (saturación líquido/vapor) + ejes `vapSatPressures`/`liqSatPressures` (128 ptos,
+  0..~385 PSI). Campo `flammable` por gas. Con esto se obtiene la temp de
+  saturación para una presión dada (interpolando en el array) → base de
+  superheat/subcooling. (Datos termodinámicos = hechos físicos; para producción
+  se pueden regenerar de fuentes públicas tipo CoolProp/NIST si se prefiere.)
+- **Lógica de cálculo de referencia**: `MeasureCalcUtil.java` del APK. Métodos
+  clave: `calculatePressureFromPSIA/PSIG`, `calculatePressureAtCurrentElevation`,
+  `calculatePressureForGivenAlt` (¡ajuste por ALTITUD de la atmosférica!),
+  `getCompensatedPressure`, `calculateVacuum`, `calculateSuperheatTarget`,
+  `calculateTemperature`. Portar a Kotlin en el módulo de sensores.
+- **Vacuómetro**: a presión atmosférica marca ~**760,000 micrones** (=760 mmHg);
+  vacío profundo objetivo ~500 micrones. Confirma unidad = micrones.
+
+## Diseño acordado con el usuario (jun 2026)
+- **Registro continuo**: mientras dura la inspección, captar una lectura cada
+  1–5 min (configurable) de los sensores presentes y guardarla como serie temporal
+  en el estimado/PTI → adjuntar la tendencia al reporte/PDF. NO hace falta abrir
+  YJACK VIEW (los datos llegan por advertising).
+- **Selector manual** presión1/2 → alta/baja y temp pinza1/2 → posición (no hay
+  serial que las distinga).
+- Pantallas nuevas: una para "Mediciones del equipo" (escaneo + lecturas en vivo +
+  registro) integrada al flujo del estimado. El usuario compartirá una ficha de
+  estimado de ejemplo para diseñar dónde encajan.
+- Refrigerante seleccionable por el usuario (lista de los 131) para los cálculos.
