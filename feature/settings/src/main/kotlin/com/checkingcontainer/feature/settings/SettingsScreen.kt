@@ -109,6 +109,7 @@ private fun SettingsScreen(
 
             item { SectionHeader("Sincronizacion") }
             item { CloudStatusItem(state.remoteConnected, state.remoteBackendDescription) }
+            item { SyncStatusItem(state.syncStatus) }
             item { HorizontalDivider() }
             item {
                 SettingsRow(

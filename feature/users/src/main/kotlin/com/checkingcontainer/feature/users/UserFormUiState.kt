@@ -13,6 +13,8 @@ data class UserFormUiState(
     val lastName: String = "",
     val pin: String = "",
     val confirmPin: String = "",
+    /** Hash del PIN ya guardado (al editar). Si los campos quedan vacíos, se conserva. */
+    val storedPin: String = "",
     val pinVisible: Boolean = false,
     val confirmPinVisible: Boolean = false,
     val jobTitle: JobTitle = JobTitle.Tecnico,
@@ -28,8 +30,12 @@ data class UserFormUiState(
     val previewNick: String
         get() = if (firstName.isBlank() || lastName.isBlank()) "" else generateNick(firstName, lastName)
 
+    val isEditing: Boolean
+        get() = id != null
+
+    // Al editar, dejar el PIN vacío significa "no cambiarlo" (se conserva storedPin).
     val pinIsValid: Boolean
-        get() = pin.length == 6 && pin.all(Char::isDigit)
+        get() = (pin.length == 6 && pin.all(Char::isDigit)) || (isEditing && pin.isEmpty())
 
     val pinsMatch: Boolean
         get() = pin == confirmPin
@@ -55,7 +61,7 @@ fun UserFormUiState.toDomain(): User = User(
     firstName = firstName.trim(),
     lastName = lastName.trim(),
     nick = previewNick,
-    pin = pin,
+    pin = pin.ifEmpty { storedPin },
     jobTitle = jobTitle,
     role = role,
     company = company.trim(),
@@ -67,8 +73,10 @@ fun User.toFormState(): UserFormUiState = UserFormUiState(
     id = id,
     firstName = firstName,
     lastName = lastName,
-    pin = pin,
-    confirmPin = pin,
+    // El PIN guardado es un hash: no se muestra. Campos vacíos = mantenerlo.
+    pin = "",
+    confirmPin = "",
+    storedPin = pin,
     jobTitle = jobTitle,
     role = role,
     company = company,

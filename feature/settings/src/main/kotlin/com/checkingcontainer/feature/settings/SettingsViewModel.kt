@@ -3,6 +3,7 @@ package com.checkingcontainer.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.AuthRepository
+import com.checkingcontainer.core.domain.SyncStatusRepository
 import com.checkingcontainer.core.domain.ThemeRepository
 import com.checkingcontainer.core.model.ThemeConfig
 import com.checkingcontainer.core.network.RemoteDataSource
@@ -19,6 +20,7 @@ class SettingsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val themeRepository: ThemeRepository,
     private val remoteDataSource: RemoteDataSource,
+    private val syncStatusRepository: SyncStatusRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -38,6 +40,11 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             themeRepository.dynamicColor.collect { enabled ->
                 _state.update { it.copy(dynamicColor = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            syncStatusRepository.status.collect { status ->
+                _state.update { it.copy(syncStatus = status) }
             }
         }
     }

@@ -10,15 +10,19 @@ import com.checkingcontainer.core.database.entity.ReeferUnitEntity
 import com.checkingcontainer.core.database.entity.UserEntity
 import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.ReeferEquipment
+import com.checkingcontainer.core.domain.SyncStatusRepository
 import com.checkingcontainer.core.network.FirestoreDataSource
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,32 +36,47 @@ private const val COL_ESTIMADOS = "estimados"
 @Singleton
 class FirestoreService @Inject constructor(
     dataSource: FirestoreDataSource,
+    private val syncStatus: SyncStatusRepository,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) {
     private val firestore: FirebaseFirestore = dataSource.firestore
 
-    // ── Announcements ────────────────────────────────────────────────────────
-
-    suspend fun upsertAnnouncement(entity: AnnouncementEntity): Unit = withContext(ioDispatcher) {
+    /**
+     * Ejecuta un write con timeout del ack del servidor y registra el resultado
+     * en [SyncStatusRepository] (visible en Ajustes). Importante: sin conexión,
+     * `set()/delete()` ya quedan en la caché local del SDK y se re-envían solos
+     * al volver la red — el timeout evita que el guardado offline se cuelgue
+     * esperando un ack que no va a llegar (bug previo: spinner infinito).
+     */
+    private suspend fun write(op: String, block: suspend () -> Unit): Unit = withContext(ioDispatcher) {
         try {
-            firestore.collection(COL_ANNOUNCEMENTS)
-                .document(entity.id)
-                .set(entity.toFirestoreMap())
-                .await()
+            withTimeout(WRITE_ACK_TIMEOUT_MS) { block() }
+            syncStatus.recordOk()
+        } catch (e: TimeoutCancellationException) {
+            Log.w(TAG, "$op pendiente de sync (sin conexión)")
+            syncStatus.recordPending(op)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Log.w(TAG, "upsertAnnouncement deferred (offline?): ${e.message}")
+            Log.w(TAG, "$op falló: ${e.message}")
+            syncStatus.recordError(op, e.message)
         }
     }
 
-    suspend fun deleteAnnouncement(id: String): Unit = withContext(ioDispatcher) {
-        try {
-            firestore.collection(COL_ANNOUNCEMENTS)
-                .document(id)
-                .delete()
-                .await()
-        } catch (e: Exception) {
-            Log.w(TAG, "deleteAnnouncement deferred (offline?): ${e.message}")
-        }
+    // ── Announcements ────────────────────────────────────────────────────────
+
+    suspend fun upsertAnnouncement(entity: AnnouncementEntity): Unit = write("upsertAnnouncement") {
+        firestore.collection(COL_ANNOUNCEMENTS)
+            .document(entity.id)
+            .set(entity.toFirestoreMap())
+            .await()
+    }
+
+    suspend fun deleteAnnouncement(id: String): Unit = write("deleteAnnouncement") {
+        firestore.collection(COL_ANNOUNCEMENTS)
+            .document(id)
+            .delete()
+            .await()
     }
 
     suspend fun fetchAllAnnouncements(): List<AnnouncementEntity> = withContext(ioDispatcher) {
@@ -87,15 +106,11 @@ class FirestoreService @Inject constructor(
 
     // ── Equipment (reefer_units/{containerNo}) ───────────────────────────────
 
-    suspend fun upsertEquipment(entity: ReeferUnitEntity): Unit = withContext(ioDispatcher) {
-        try {
-            firestore.collection(COL_REEFER_UNITS)
-                .document(entity.containerNo)
-                .set(entity.toFirestoreMap())
-                .await()
-        } catch (e: Exception) {
-            Log.w(TAG, "upsertEquipment deferred (offline?): ${e.message}")
-        }
+    suspend fun upsertEquipment(entity: ReeferUnitEntity): Unit = write("upsertEquipment") {
+        firestore.collection(COL_REEFER_UNITS)
+            .document(entity.containerNo)
+            .set(entity.toFirestoreMap())
+            .await()
     }
 
     suspend fun fetchEquipment(containerNo: String): ReeferEquipment? = withContext(ioDispatcher) {
@@ -123,43 +138,31 @@ class FirestoreService @Inject constructor(
         }
     }
 
-    suspend fun deleteEquipment(containerNo: String): Unit = withContext(ioDispatcher) {
-        try {
-            firestore.collection(COL_REEFER_UNITS)
-                .document(containerNo)
-                .delete()
-                .await()
-        } catch (e: Exception) {
-            Log.w(TAG, "deleteEquipment deferred (offline?): ${e.message}")
-        }
+    suspend fun deleteEquipment(containerNo: String): Unit = write("deleteEquipment") {
+        firestore.collection(COL_REEFER_UNITS)
+            .document(containerNo)
+            .delete()
+            .await()
     }
 
     // ── Inspections (reefer_units/{containerNo}/inspections/{id}) ────────────
 
-    suspend fun upsertInspection(entity: InspectionEntity): Unit = withContext(ioDispatcher) {
-        try {
-            firestore.collection(COL_REEFER_UNITS)
-                .document(entity.containerNo)
-                .collection(COL_INSPECTIONS)
-                .document(entity.id.toString())
-                .set(entity.toFirestoreMap())
-                .await()
-        } catch (e: Exception) {
-            Log.w(TAG, "upsertInspection deferred (offline?): ${e.message}")
-        }
+    suspend fun upsertInspection(entity: InspectionEntity): Unit = write("upsertInspection") {
+        firestore.collection(COL_REEFER_UNITS)
+            .document(entity.containerNo)
+            .collection(COL_INSPECTIONS)
+            .document(entity.id.toString())
+            .set(entity.toFirestoreMap())
+            .await()
     }
 
-    suspend fun deleteInspection(containerNo: String, id: Long): Unit = withContext(ioDispatcher) {
-        try {
-            firestore.collection(COL_REEFER_UNITS)
-                .document(containerNo)
-                .collection(COL_INSPECTIONS)
-                .document(id.toString())
-                .delete()
-                .await()
-        } catch (e: Exception) {
-            Log.w(TAG, "deleteInspection deferred (offline?): ${e.message}")
-        }
+    suspend fun deleteInspection(containerNo: String, id: Long): Unit = write("deleteInspection") {
+        firestore.collection(COL_REEFER_UNITS)
+            .document(containerNo)
+            .collection(COL_INSPECTIONS)
+            .document(id.toString())
+            .delete()
+            .await()
     }
 
     /** Escucha cambios de digitación en todas las inspecciones vía collectionGroup. */
@@ -192,52 +195,38 @@ class FirestoreService @Inject constructor(
 
     // ── Estimados ────────────────────────────────────────────────────────────
 
-    suspend fun upsertEstimado(entity: EstimadoEntity): Unit = withContext(ioDispatcher) {
-        try {
-            firestore.collection(COL_ESTIMADOS)
-                .document(entity.id.toString())
-                .set(entity.toFirestoreMap())
-                .await()
-        } catch (e: Exception) {
-            Log.w(TAG, "upsertEstimado deferred (offline?): ${e.message}")
-        }
+    suspend fun upsertEstimado(entity: EstimadoEntity): Unit = write("upsertEstimado") {
+        firestore.collection(COL_ESTIMADOS)
+            .document(entity.id.toString())
+            .set(entity.toFirestoreMap())
+            .await()
     }
 
-    suspend fun deleteEstimado(id: Long): Unit = withContext(ioDispatcher) {
-        try {
-            firestore.collection(COL_ESTIMADOS)
-                .document(id.toString())
-                .delete()
-                .await()
-        } catch (e: Exception) {
-            Log.w(TAG, "deleteEstimado deferred (offline?): ${e.message}")
-        }
+    suspend fun deleteEstimado(id: Long): Unit = write("deleteEstimado") {
+        firestore.collection(COL_ESTIMADOS)
+            .document(id.toString())
+            .delete()
+            .await()
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
 
-    suspend fun upsertUser(entity: UserEntity): Unit = withContext(ioDispatcher) {
-        try {
-            firestore.collection(COL_USERS)
-                .document(entity.id.toString())
-                .set(entity.toFirestoreMap())
-                .await()
-        } catch (e: Exception) {
-            Log.w(TAG, "upsertUser deferred (offline?): ${e.message}")
-        }
+    suspend fun upsertUser(entity: UserEntity): Unit = write("upsertUser") {
+        firestore.collection(COL_USERS)
+            .document(entity.id.toString())
+            .set(entity.toFirestoreMap())
+            .await()
     }
 
-    suspend fun deleteUser(id: Long): Unit = withContext(ioDispatcher) {
-        try {
-            firestore.collection(COL_USERS)
-                .document(id.toString())
-                .delete()
-                .await()
-        } catch (e: Exception) {
-            Log.w(TAG, "deleteUser deferred (offline?): ${e.message}")
-        }
+    suspend fun deleteUser(id: Long): Unit = write("deleteUser") {
+        firestore.collection(COL_USERS)
+            .document(id.toString())
+            .delete()
+            .await()
     }
 }
+
+private const val WRITE_ACK_TIMEOUT_MS = 10_000L
 
 // ── Firestore map extensions ─────────────────────────────────────────────────
 

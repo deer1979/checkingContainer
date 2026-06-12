@@ -2,6 +2,7 @@ package com.checkingcontainer.core.data
 
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
+import com.checkingcontainer.core.common.security.PinHasher
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.database.entity.UserEntity
 import com.checkingcontainer.core.database.entity.toEntity
@@ -36,7 +37,8 @@ class UsersRepositoryImpl @Inject constructor(
 
     override suspend fun create(user: User): Result<Long> = withContext(ioDispatcher) {
         runCatching {
-            val entity = user.toEntity()
+            // El PIN nunca se persiste en texto plano (ensureHashed es idempotente).
+            val entity = user.toEntity().run { copy(pin = PinHasher.ensureHashed(pin)) }
             val id = userDao.insert(entity)
             firestoreService.upsertUser(entity.copy(id = id))
             id
@@ -45,7 +47,7 @@ class UsersRepositoryImpl @Inject constructor(
 
     override suspend fun update(user: User): Result<Unit> = withContext(ioDispatcher) {
         runCatching {
-            val entity = user.toEntity()
+            val entity = user.toEntity().run { copy(pin = PinHasher.ensureHashed(pin)) }
             userDao.update(entity)
             firestoreService.upsertUser(entity)
         }

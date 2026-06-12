@@ -80,9 +80,15 @@ internal fun PersonalSection(
                 onToggle = onTogglePin,
                 imeAction = ImeAction.Next,
                 isError = state.showPinError,
-                supportingText = if (state.showPinError) {
-                    { Text("El PIN debe tener exactamente 6 dígitos") }
-                } else null,
+                supportingText = when {
+                    state.showPinError -> {
+                        { Text("El PIN debe tener exactamente 6 dígitos") }
+                    }
+                    state.isEditing && state.pin.isEmpty() -> {
+                        { Text("Déjalo vacío para mantener el PIN actual") }
+                    }
+                    else -> null
+                },
             )
             PinFormField(
                 label = "Confirmar PIN",

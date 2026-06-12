@@ -76,6 +76,47 @@ internal fun ThemeItem(selected: ThemeConfig, onThemeChange: (ThemeConfig) -> Un
 }
 
 @Composable
+internal fun SyncStatusItem(status: com.checkingcontainer.core.domain.SyncStatus?) {
+    val okAt = status?.lastOkAt ?: 0L
+    val pendingAt = status?.lastPendingAt ?: 0L
+    val errorAt = status?.lastErrorAt ?: 0L
+    val latest = maxOf(okAt, pendingAt, errorAt)
+    val (title, detail, isProblem) = when {
+        latest == 0L -> Triple("Sincronización", "Sin actividad registrada aún", false)
+        latest == errorAt -> Triple(
+            "Sincronización: error",
+            status?.lastErrorMessage ?: "Error desconocido",
+            true,
+        )
+        latest == pendingAt -> Triple(
+            "Sincronización: pendiente",
+            "Hay cambios en cola; se subirán al recuperar conexión",
+            false,
+        )
+        else -> Triple(
+            "Sincronización: al día",
+            "Último envío ${SYNC_DATE_FORMAT.format(java.util.Date(okAt))}",
+            false,
+        )
+    }
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(detail) },
+        leadingContent = {
+            Icon(
+                imageVector = if (isProblem) Icons.Outlined.CloudOff else Icons.Outlined.Cloud,
+                contentDescription = null,
+                tint = if (isProblem) MaterialTheme.colorScheme.error
+                       else MaterialTheme.colorScheme.primary,
+            )
+        },
+    )
+}
+
+private val SYNC_DATE_FORMAT =
+    java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.getDefault())
+
+@Composable
 internal fun CloudStatusItem(connected: Boolean, description: String) {
     ListItem(
         headlineContent = {
