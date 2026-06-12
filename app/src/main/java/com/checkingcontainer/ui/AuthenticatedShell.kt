@@ -1,8 +1,13 @@
 package com.checkingcontainer.ui
 
 import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,8 +61,15 @@ fun AuthenticatedShell(user: User) {
 
     // M3 Adaptive: la clase de tamaño de ventana decide la navegación global.
     val useRail = rememberUseRail()
-    // Ocultar la nav global en pantallas con su propia barra de acciones
-    val hideGlobalNav = currentRoute?.startsWith("estimado/") == true
+    // Ocultar la nav global en pantallas con su propia barra de acciones.
+    // Se usa visibleEntries (no la ruta actual): al retroceder, la pantalla del
+    // estimado sigue visible mientras anima su salida; mostrar la barra global
+    // antes de tiempo encogía el contenido y su barra propia "saltaba" arriba
+    // con un parpadeo fantasma.
+    val visibleEntries by navController.visibleEntries.collectAsStateWithLifecycle()
+    val hideGlobalNav = visibleEntries.any {
+        it.destination.route?.startsWith("estimado/") == true
+    }
 
     if (useRail) {
         Row(Modifier.fillMaxSize()) {
@@ -84,7 +96,13 @@ fun AuthenticatedShell(user: User) {
                 // recompongan la barra inferior y no el shell completo.
                 val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
                 val openEstimados by shellViewModel.openEstimados.collectAsStateWithLifecycle()
-                if (!hideGlobalNav) {
+                // Entrada/salida deslizando: el cambio de altura del Scaffold se
+                // anima en vez de saltar de golpe.
+                AnimatedVisibility(
+                    visible = !hideGlobalNav,
+                    enter = slideInVertically { it } + fadeIn(),
+                    exit = slideOutVertically { it } + fadeOut(),
+                ) {
                     AppBottomBar(
                         destinations = TopLevelDestination.entries,
                         currentRoute = currentRoute,

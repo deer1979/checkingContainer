@@ -215,7 +215,11 @@ class EstimadoViewModel @Inject constructor(
     private fun uploadPhoto(itemId: String, isDano: Boolean, uri: Uri) {
         viewModelScope.launch {
             _state.update { it.copy(isUploadingPhoto = true, errorMessage = null) }
-            val bytes = withContext(Dispatchers.IO) { compressForUpload(uri) }
+            val bytes = withContext(Dispatchers.IO) {
+                // Si la compresión falla (formato exótico), suben los bytes originales.
+                compressForUpload(uri)
+                    ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            }
             if (bytes == null) {
                 _state.update { it.copy(isUploadingPhoto = false, errorMessage = "No se pudo leer la foto") }
                 return@launch
@@ -262,12 +266,16 @@ class EstimadoViewModel @Inject constructor(
             android.graphics.BitmapFactory.decodeStream(it, null, opts)
         } ?: return null
 
-        val orientation = resolver.openInputStream(uri)?.use {
-            android.media.ExifInterface(it).getAttributeInt(
-                android.media.ExifInterface.TAG_ORIENTATION,
-                android.media.ExifInterface.ORIENTATION_NORMAL,
-            )
-        } ?: android.media.ExifInterface.ORIENTATION_NORMAL
+        // EXIF es mejor-esfuerzo: PNG/HEIC u otros formatos pueden lanzar al leer
+        // metadatos y eso NO debe descartar la foto (bug: "No se pudo leer la foto").
+        val orientation = runCatching {
+            resolver.openInputStream(uri)?.use {
+                android.media.ExifInterface(it).getAttributeInt(
+                    android.media.ExifInterface.TAG_ORIENTATION,
+                    android.media.ExifInterface.ORIENTATION_NORMAL,
+                )
+            }
+        }.getOrNull() ?: android.media.ExifInterface.ORIENTATION_NORMAL
         val degrees = when (orientation) {
             android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
             android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
