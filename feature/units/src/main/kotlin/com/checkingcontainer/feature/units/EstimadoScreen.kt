@@ -113,15 +113,25 @@ fun EstimadoRoute(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showDiscardDialog by remember { mutableStateOf(false) }
 
-    val hasUnsavedData = !state.isLoading &&
-        state.estimadoId == 0L &&
-        (state.clientName.isNotBlank() || state.damages.isNotEmpty())
+    // Aplica tanto a estimados nuevos como a EDICIONES de uno existente:
+    // cualquier cambio sin guardar dispara el aviso al salir.
+    val hasUnsavedData = !state.isLoading && state.isDirty
 
     val onBackSafe: () -> Unit = {
         if (hasUnsavedData) showDiscardDialog = true else onBack()
     }
 
     BackHandler(enabled = hasUnsavedData) { showDiscardDialog = true }
+
+    // "Guardar y salir": espera a que el guardado termine bien antes de salir
+    // (salir de inmediato cancelaría la corrutina del ViewModel a mitad).
+    var exitAfterSave by remember { mutableStateOf(false) }
+    LaunchedEffect(state.isSaving, state.savedMessage, state.errorMessage) {
+        if (exitAfterSave && !state.isSaving) {
+            if (state.savedMessage != null) onBack()
+            else if (state.errorMessage != null) exitAfterSave = false
+        }
+    }
 
     // Mostrar preview del PDF cuando esté listo
     val context = LocalContext.current
@@ -154,16 +164,20 @@ fun EstimadoRoute(
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
-            title = { Text("¿Salir sin guardar?") },
-            text = { Text("Los datos ingresados se perderán si sales sin guardar el estimado.") },
+            title = { Text("¿Guardar cambios?") },
+            text = { Text("Tienes cambios sin guardar en este estimado. Si sales sin guardar, se perderán.") },
             confirmButton = {
-                Button(onClick = { showDiscardDialog = false; onBack() }) {
-                    Text("Salir")
+                Button(onClick = {
+                    showDiscardDialog = false
+                    exitAfterSave = true
+                    viewModel.save()
+                }) {
+                    Text("Guardar")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDiscardDialog = false }) {
-                    Text("Cancelar")
+                TextButton(onClick = { showDiscardDialog = false; onBack() }) {
+                    Text("Salir sin guardar")
                 }
             },
         )

@@ -207,6 +207,19 @@ class EstimadoViewModel @Inject constructor(
                 }
             }
         }
+
+        // Marca cambios sin guardar para avisar al salir. Los eventos de sheets
+        // y los *Change de campos pendientes no modifican datos confirmados
+        // (los early-return de arriba también evitan marcas falsas).
+        when (event) {
+            is EstimadoEvent.ShowSheet,
+            EstimadoEvent.DismissSheet,
+            is EstimadoEvent.DamageDescriptionChange,
+            is EstimadoEvent.RepairActionChange,
+            is EstimadoEvent.LaborCostChange,
+            is EstimadoEvent.MaterialCostChange -> Unit
+            else -> _state.update { it.copy(isDirty = true) }
+        }
     }
 
     fun addDamagePhoto(itemId: String, uri: Uri) = uploadPhoto(itemId, isDano = true, uri = uri)
@@ -230,6 +243,7 @@ class EstimadoViewModel @Inject constructor(
                 _state.update { s ->
                     s.copy(
                         isUploadingPhoto = false,
+                        isDirty = true,
                         damages = s.damages.map { item ->
                             if (item.id != itemId) item
                             else if (isDano) item.copy(damagePhoto = url)
@@ -329,6 +343,7 @@ class EstimadoViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             isSaving = false,
+                            isDirty = false,
                             estimadoId = if (current.estimadoId == 0L) savedId else current.estimadoId,
                             createdAt = if (current.estimadoId == 0L) now else current.createdAt,
                             status = estimado.status,

@@ -28,6 +28,8 @@ data class EstimadoUiState(
     // Estados de carga
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
+    /** Hay modificaciones desde la última carga/guardado (aviso al salir). */
+    val isDirty: Boolean = false,
     val isUploadingPhoto: Boolean = false,
     val isGeneratingPdf: Boolean = false,
     val errorMessage: String? = null,
