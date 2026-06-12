@@ -113,3 +113,21 @@ del PTI sin digitar.
   vacío (1.1s, solo control) por reiniciar BT después de la sesión.
 - Implementación eventual: módulo `feature/bluetooth` o `core/` con
   BluetoothGatt/companion device; integrarlo en el formulario de inspección/PTI.
+
+## Visión ampliada del feature BLE (jun 2026)
+El objetivo NO es solo el manómetro: capturar TODO el instrumental YJACK del
+usuario dentro del estimado y del reporte de reparación, sin digitar:
+- **TITANMAX** (manómetro): presión alta/baja + temps de saturación.
+- **2 pinzas de temperatura** YJACK: según el log, el TITANMAX ya las integra y
+  reenvía (quizá no requieran conexión aparte).
+- **Vacuómetro** (micrones) YJACK: probablemente dispositivo BLE aparte.
+- **Sensor de corriente / amperímetro** YJACK BLE.
+Todos son de la familia YJACK → muy probable mismo protocolo BLE (servicio
+`1854edbe...`, patrón comando/respuesta). Descifrar UNO sirve para todos.
+Android soporta múltiples conexiones BLE simultáneas (como hace la app oficial).
+Diseño propuesto: sección "Mediciones del equipo" en el formulario de
+estimado/PTI con botón "Conectar instrumentos" → escanea/conecta los sensores
+encendidos y captura un snapshot de lecturas (presión, temp, vacío, amperaje)
+con timestamp; se persiste en el Estimado (nuevos campos / tabla de mediciones)
+y se imprime en el PDF. Modelo: ampliar `Estimado`/`DamageItem` o nueva entidad
+`Medicion` (sensorType, valor, unidad, timestamp).
