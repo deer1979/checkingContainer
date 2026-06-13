@@ -136,6 +136,23 @@ DIFERIDO (NO está hecho — pendientes reales del feature):
 - **Vacuómetro** (micrones) y **pinzas de temperatura** como sensores adicionales.
 - **Persistir el snapshot de mediciones** en el Estimado/PTI e imprimirlo en el PDF.
 
+### Idea futura del usuario: asistente de rendimiento (medido vs objetivo)
+Lo que HOY mostramos (Superheat/Subcooling) es **MEDIDO/REAL = automático**, derivado
+de las presiones+temps del equipo y la tabla PT. Falta su contraparte: el **OBJETIVO
+(target)**. La idea del usuario (jun 2026, "solo una idea", aún sin implementar):
+- Mientras la unidad hala a temperatura (p. ej. setpoint −18 °C), mostrar una **barra
+  de rendimiento** que indique cómo el SH y SC **medidos** se acercan a su **objetivo**;
+  cuando AMBOS entran en rango → la barra se pone verde y se **toma la muestra** (snapshot).
+- ⚠️ El reto NO es el cálculo ni la UI, es **de dónde sale el objetivo**: en reefers no
+  hay tabla universal tipo AC residencial; depende de **marca/modelo/refrigerante/setpoint**
+  (lo fija la TXV/EEV del equipo). "El objetivo lo dicen los datos técnicos del fabricante."
+- Plan recomendado v1: **objetivo/rango configurable** que el técnico ingresa una vez
+  (p. ej. SH 4–8 °C, SC 3–6 °C) + barra + captura auto cuando medido∈rango. Evolución:
+  tabla por modelo/refrigerante; luego hoja de especificación del fabricante.
+- En la pantalla habrá que **etiquetar claramente "medido" vs "objetivo"** cuando exista
+  el target (hoy solo está el medido).
+- Referencia en el APK oficial: método `calculateSuperheatTarget` (MeasureCalcUtil).
+
 ---
 
 ## Idea futura: lectura automática del manómetro por Bluetooth (investigado jun 2026)
