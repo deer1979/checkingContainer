@@ -82,3 +82,12 @@ NO copiarlos al repo a la ligera. Opciones limpias:
    dibujados nosotros) que no infrinjan marcas, y mostrar el nombre del modelo
    en texto. Para una v1 con Yellow Jacket, basta texto + ícono genérico.
 Decidir con el usuario cuando construyamos la UI.
+
+## DECISIÓN FINAL de UI (jun 2026): solo texto, sin íconos ni logos
+El usuario decide NO usar logos ni íconos de marca (ni copiados ni dibujados).
+- Mostrar SOLO **texto**: nombre del dispositivo que anuncia el Bluetooth + modelo.
+  Ej.: el manómetro se anuncia como "TITAN-2503-5221" → mostrar tal cual (modelo
+  TITAN + nº). Es uso nominativo (nombre de marca/modelo en texto) = sin problema
+  legal, y queda más limpio/profesional.
+- NADA de copiar gráficos de measureQuick ni dibujar logos. Botón "Conectar" →
+  lista de dispositivos detectados por nombre/modelo en texto. Punto.
