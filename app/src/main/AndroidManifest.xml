@@ -6,6 +6,16 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- Sensores BLE (manómetro, pinzas, vacuómetro, amperímetro Yellow Jacket).
+         Android 12+: BLUETOOTH_SCAN/CONNECT; previo: BLUETOOTH + ubicación. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
     <!-- Detectar si el dispositivo tiene IA local (AICore / Gemini Nano) para el aviso en Ajustes -->
     <queries>
         <package android:name="com.google.android.aicore" />

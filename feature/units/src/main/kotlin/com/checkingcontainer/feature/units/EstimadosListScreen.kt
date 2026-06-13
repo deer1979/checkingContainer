@@ -14,7 +14,9 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Assignment
+import androidx.compose.material.icons.outlined.Sensors
 import androidx.compose.material3.Badge
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,10 +48,11 @@ import java.util.Locale
 @Composable
 fun EstimadosListRoute(
     onEstimadoClick: (Long) -> Unit,
+    onMeasureClick: (String) -> Unit = {},
     viewModel: EstimadosListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    EstimadosListScreen(state = state, onEstimadoClick = onEstimadoClick)
+    EstimadosListScreen(state = state, onEstimadoClick = onEstimadoClick, onMeasureClick = onMeasureClick)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,6 +60,7 @@ fun EstimadosListRoute(
 fun EstimadosListScreen(
     state: EstimadosListUiState,
     onEstimadoClick: (Long) -> Unit,
+    onMeasureClick: (String) -> Unit = {},
 ) {
     val pagerState = rememberPagerState { 2 }
     val scope = rememberCoroutineScope()
@@ -120,6 +124,7 @@ fun EstimadosListScreen(
                             EstimadoListItem(
                                 estimado = estimado,
                                 onClick = { onEstimadoClick(estimado.inspectionId) },
+                                onMeasureClick = { onMeasureClick(estimado.containerNo) },
                             )
                         }
                     }
@@ -130,7 +135,11 @@ fun EstimadosListScreen(
 }
 
 @Composable
-private fun EstimadoListItem(estimado: Estimado, onClick: () -> Unit) {
+private fun EstimadoListItem(
+    estimado: Estimado,
+    onClick: () -> Unit,
+    onMeasureClick: () -> Unit,
+) {
     ElevatedCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(
             Modifier.fillMaxWidth().padding(16.dp),
@@ -166,22 +175,32 @@ private fun EstimadoListItem(estimado: Estimado, onClick: () -> Unit) {
                     )
                 }
             }
-            Surface(
-                color = if (estimado.status == EstimadoStatus.ABIERTO)
-                    MaterialTheme.colorScheme.tertiaryContainer
-                else
-                    MaterialTheme.colorScheme.primaryContainer,
-                shape = MaterialTheme.shapes.small,
-            ) {
-                Text(
-                    if (estimado.status == EstimadoStatus.ABIERTO) "Abierto" else "Cerrado",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Surface(
                     color = if (estimado.status == EstimadoStatus.ABIERTO)
-                        MaterialTheme.colorScheme.onTertiaryContainer
+                        MaterialTheme.colorScheme.tertiaryContainer
                     else
-                        MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+                        MaterialTheme.colorScheme.primaryContainer,
+                    shape = MaterialTheme.shapes.small,
+                ) {
+                    Text(
+                        if (estimado.status == EstimadoStatus.ABIERTO) "Abierto" else "Cerrado",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (estimado.status == EstimadoStatus.ABIERTO)
+                            MaterialTheme.colorScheme.onTertiaryContainer
+                        else
+                            MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                // Entrada a la pantalla de mediciones BLE, atada a este contenedor.
+                IconButton(onClick = onMeasureClick) {
+                    Icon(
+                        Icons.Outlined.Sensors,
+                        contentDescription = "Mediciones del equipo",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
     }

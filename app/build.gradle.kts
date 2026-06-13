@@ -82,6 +82,7 @@ dependencies {
     implementation(project(":feature:users"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:units"))
+    implementation(project(":feature:sensors"))
     implementation(libs.androidx.material.icons.extended)
 
     // Core modules

@@ -33,6 +33,7 @@ import com.checkingcontainer.feature.announcements.navigation.ANNOUNCEMENTS_LIST
 import com.checkingcontainer.feature.announcements.navigation.announcementsGraph
 import com.checkingcontainer.feature.settings.navigation.SETTINGS_ROUTE
 import com.checkingcontainer.feature.settings.navigation.settingsScreen
+import com.checkingcontainer.feature.sensors.navigation.sensorsGraph
 import com.checkingcontainer.feature.units.navigation.estimadosGraph
 import com.checkingcontainer.feature.units.navigation.unitsGraph
 import com.checkingcontainer.feature.users.navigation.USERS_LIST_ROUTE
@@ -190,7 +191,13 @@ private fun ShellNavHost(
                 onSettingsClick = onSettingsClick,
                 onLogout = onLogout,
             )
-            estimadosGraph(navController = navController)
+            estimadosGraph(
+                navController = navController,
+                onMeasureClick = { containerNo ->
+                    navController.navigate(com.checkingcontainer.feature.sensors.navigation.sensorsRoute(containerNo))
+                },
+            )
+            sensorsGraph(navController = navController)
             settingsScreen(
                 isAdmin = user.role.isAdmin,
                 onUsersClick = { navController.navigate(USERS_LIST_ROUTE) },

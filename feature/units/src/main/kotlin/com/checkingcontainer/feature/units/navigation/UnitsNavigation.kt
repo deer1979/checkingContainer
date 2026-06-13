@@ -88,10 +88,14 @@ fun NavGraphBuilder.unitsGraph(
     }
 }
 
-fun NavGraphBuilder.estimadosGraph(navController: NavHostController) {
+fun NavGraphBuilder.estimadosGraph(
+    navController: NavHostController,
+    onMeasureClick: (String) -> Unit = {},
+) {
     composable(route = ESTIMADOS_LIST_ROUTE) {
         EstimadosListRoute(
             onEstimadoClick = { inspId -> navController.navigate(estimadoRoute(inspId)) },
+            onMeasureClick = onMeasureClick,
         )
     }
 }
