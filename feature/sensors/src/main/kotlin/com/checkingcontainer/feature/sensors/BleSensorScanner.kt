@@ -12,8 +12,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * Escanea el advertising BLE y emite [SensorReading] de los sensores Yellow
@@ -60,18 +63,37 @@ class BleSensorScanner @Inject constructor(
         }
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setLegacy(false)
+            .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+            .setNumOfMatches(ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT)
             .build()
         // Sin filtros por UUID: algunos equipos meten el service data sin anunciarlo
         // en la lista de servicios; filtramos en onScanResult.
-        runCatching { ble.startScan(null, settings, callback) }
-            .onFailure { close(it) }
+        fun arrancar() = runCatching { ble.startScan(null, settings, callback) }
+        fun parar() = runCatching { ble.stopScan(callback) }
+
+        arrancar().onFailure { close(it) }
+
+        // Reinicio periódico cada 7s: Android (sobre todo Samsung) deja de entregar
+        // los anuncios repetidos y la lectura se "congela". Reiniciar el escaneo
+        // fuerza datos frescos. Es exactamente lo que hace la app oficial YJACK VIEW.
+        val reinicio = launch {
+            while (isActive) {
+                delay(REINICIO_MS)
+                parar()
+                arrancar()
+            }
+        }
 
         awaitClose {
-            runCatching { ble.stopScan(callback) }
+            reinicio.cancel()
+            parar()
         }
     }
 
     private companion object {
         const val TAG = "BleSensorScanner"
+        const val REINICIO_MS = 7_000L
     }
 }

@@ -78,7 +78,8 @@ class SensorsViewModel @Inject constructor(
     fun detener() {
         scanJob?.cancel()
         scanJob = null
-        _state.update { it.copy(escaneando = false) }
+        // Limpiar las tarjetas al detener: las lecturas dejan de ser válidas.
+        _state.update { it.copy(escaneando = false, tarjetas = emptyMap()) }
     }
 
     /** Alterna ALTA <-> BAJA para una lectura concreta. */
