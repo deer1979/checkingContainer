@@ -68,7 +68,8 @@ fun AuthenticatedShell(user: User) {
     // con un parpadeo fantasma.
     val visibleEntries by navController.visibleEntries.collectAsStateWithLifecycle()
     val hideGlobalNav = visibleEntries.any {
-        it.destination.route?.startsWith("estimado/") == true
+        val r = it.destination.route
+        r?.startsWith("estimado/") == true || r?.startsWith("sensors/") == true
     }
 
     if (useRail) {
