@@ -148,3 +148,34 @@ neverForLocation. No requiere Firebase ni nube.
   Todos los sensores YJACK del usuario presentes en la misma vista de captura.
 - amperímetro YJAmp ya descifrado: corriente = int16_LE/10 (sensor1). Va en la
   misma sección/registro continuo que el resto.
+
+## DISEÑO UI definido por el usuario (jun 2026) — pantalla de mediciones
+Decisión del dueño sobre cómo presentar el monitoreo:
+
+### Punto de entrada
+- Las lecturas SIEMPRE van atadas a un contenedor/equipo (su identidad = el
+  estimado). En la **lista de estimados**, en cada tarjeta (junto al chip
+  "abierto"), añadir un **ícono** que abre la pantalla de mediciones de ESE
+  estimado. No hay mediciones sueltas sin equipo.
+
+### Cabecera de la pantalla
+- Nº de contenedor · fecha · temperatura ambiente · **selector de refrigerante
+  (gas)**. Datos base para todos los cálculos; siempre visibles arriba.
+
+### Cuerpo: tarjetas en UNA sola columna (NO dos columnas)
+- Tarjeta **Presión de ALTA**: número grande a la izquierda + al lado las
+  **últimas 5 tomas** (muestreo cada ~5 min) en pequeño → tendencia reciente sin
+  abrir el log completo.
+- Tarjeta **Presión de BAJA / succión**: igual formato.
+- Tarjeta(s) **Temperatura**: igual formato (pinzas 1/2).
+- Tarjeta **Consumo de corriente (amperaje)**: igual formato.
+
+### Vacío = sesión SEPARADA
+- El vacuómetro NO va en estas tarjetas. Va en un **chip/botón aparte** que abre
+  su propia sesión/pantalla (el vacío es otro momento del trabajo: el barrido,
+  con su propia lógica y objetivo de micrones).
+
+### Pendiente de definir
+- Superheat/subcooling: dónde mostrarlos (¿tarjeta secundaria?).
+- Formato exacto del PDF/reporte con estas mediciones.
+- Muestreo: cada 5 min fijo o configurable; cuántas tomas guardar.
