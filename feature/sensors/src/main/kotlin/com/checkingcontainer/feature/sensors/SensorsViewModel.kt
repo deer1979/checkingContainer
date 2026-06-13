@@ -30,6 +30,13 @@ data class SensorsUiState(
     val tarjetas: Map<String, TarjetaSensor> = emptyMap(),
     // rol asignado por lectura: clave = deviceName#tipo#índice (0 = valor1, 1 = valor2)
     val roles: Map<String, RolMedicion> = emptyMap(),
+    // Refrigerante seleccionado + su tabla PT (para saturación/superheat/subcooling).
+    val refrigerantes: List<String> = emptyList(),
+    val refrigerante: String = "",
+    val vapSatPressures: List<Double> = emptyList(),
+    val liqSatPressures: List<Double> = emptyList(),
+    val vapSatGas: List<Int> = emptyList(),
+    val liqSatGas: List<Int> = emptyList(),
 ) {
     /** Rol asignado; por defecto el primer sensor es ALTA y el segundo BAJA. */
     fun rolDe(deviceName: String, tipo: SensorType, index: Int): RolMedicion =
@@ -42,12 +49,36 @@ data class SensorsUiState(
     val temperatura get() = temperaturas.firstOrNull()
     val corriente get() = corrientes.firstOrNull()
     val hayDatos get() = tarjetas.isNotEmpty()
+
+    /** Valor crudo (sin convertir) de la lectura [t] cuyo rol es [rol], o SIN_DATO. */
+    private fun valorPorRol(t: TarjetaSensor?, tipo: SensorType, rol: RolMedicion): Double {
+        if (t == null) return SensorReading.SIN_DATO
+        for (idx in 0..1) {
+            if (rolDe(t.deviceName, tipo, idx) == rol) {
+                return if (idx == 0) t.ultima.valor1 else t.ultima.valor2
+            }
+        }
+        return SensorReading.SIN_DATO
+    }
+
+    // Entradas crudas por lado (presión absoluta del equipo, temp en °F).
+    val presionAltaRaw get() = valorPorRol(presion, SensorType.PRESION, RolMedicion.ALTA)
+    val presionBajaRaw get() = valorPorRol(presion, SensorType.PRESION, RolMedicion.BAJA)
+    val tempDescargaRaw get() = valorPorRol(temperatura, SensorType.TEMPERATURA, RolMedicion.ALTA)
+    val tempSuccionRaw get() = valorPorRol(temperatura, SensorType.TEMPERATURA, RolMedicion.BAJA)
+
+    // Saturación, superheat y subcooling (°C) calculados con la tabla del gas.
+    val satVaporC get() = Saturacion.satTempC(vapSatPressures, vapSatGas, YjackParser.aPsig(presionBajaRaw))
+    val satLiquidoC get() = Saturacion.satTempC(liqSatPressures, liqSatGas, YjackParser.aPsig(presionAltaRaw))
+    val superheatC get() = Saturacion.superheat(YjackParser.aCelsius(tempSuccionRaw), satVaporC)
+    val subcoolingC get() = Saturacion.subcooling(satLiquidoC, YjackParser.aCelsius(tempDescargaRaw))
 }
 
 @HiltViewModel
 class SensorsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val scanner: BleSensorScanner,
+    private val refrigerantes: RefrigerantRepo,
 ) : ViewModel() {
 
     private val containerNo: String = savedStateHandle[SENSORS_CONTAINER_ARG] ?: ""
@@ -57,6 +88,27 @@ class SensorsViewModel @Inject constructor(
 
     private var scanJob: Job? = null
     private var muestreoJob: Job? = null
+
+    init {
+        val nombres = refrigerantes.nombres
+        val porDefecto = if ("R-134a" in nombres) "R-134a" else nombres.firstOrNull() ?: ""
+        _state.update { it.copy(refrigerantes = nombres) }
+        seleccionarRefrigerante(porDefecto)
+    }
+
+    /** Cambia el gas seleccionado y carga su tabla PT en el estado. */
+    fun seleccionarRefrigerante(nombre: String) {
+        val gas = refrigerantes.gas(nombre)
+        _state.update {
+            it.copy(
+                refrigerante = nombre,
+                vapSatPressures = refrigerantes.vapSatPressures,
+                liqSatPressures = refrigerantes.liqSatPressures,
+                vapSatGas = gas?.vapSat ?: emptyList(),
+                liqSatGas = gas?.liqSat ?: emptyList(),
+            )
+        }
+    }
 
     fun toggleEscaneo() {
         if (_state.value.escaneando) detener() else iniciar()

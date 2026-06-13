@@ -20,12 +20,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.BluetoothConnected
 import androidx.compose.material.icons.outlined.BluetoothSearching
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,10 +37,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -73,6 +78,7 @@ fun SensorsRoute(
         onBack = onBack,
         onToggleScan = { launcher.launch(permisos) },
         onToggleRol = viewModel::toggleRol,
+        onRefrigeranteChange = viewModel::seleccionarRefrigerante,
     )
 }
 
@@ -83,6 +89,7 @@ private fun SensorsScreen(
     onBack: () -> Unit,
     onToggleScan: () -> Unit,
     onToggleRol: (String, SensorType, Int) -> Unit,
+    onRefrigeranteChange: (String) -> Unit,
 ) {
     Scaffold { innerPadding ->
         LazyColumn(
@@ -144,6 +151,65 @@ private fun SensorsScreen(
                     onToggleRol = onToggleRol,
                 )
             }
+
+            // Saturación / superheat / subcooling según el refrigerante elegido.
+            item(key = "h-rend") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    SeccionTitulo("Saturación y rendimiento")
+                    Spacer(Modifier.weight(1f))
+                    SelectorRefrigerante(state.refrigerantes, state.refrigerante, onRefrigeranteChange)
+                }
+            }
+            item(key = "rend") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CardRendimiento(COLOR_BAJA, "Baja / Succión", "Sat. vapor", state.satVaporC, "Superheat", state.superheatC)
+                    CardRendimiento(COLOR_ALTA, "Alta / Descarga", "Sat. líquido", state.satLiquidoC, "Subcooling", state.subcoolingC)
+                }
+            }
+        }
+    }
+}
+
+/** Desplegable compacto para elegir el refrigerante (alimenta los cálculos). */
+@Composable
+private fun SelectorRefrigerante(
+    opciones: List<String>,
+    seleccionado: String,
+    onSeleccionar: (String) -> Unit,
+) {
+    var abierto by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { abierto = true }) {
+            Text(seleccionado.ifBlank { "Gas" }, fontWeight = FontWeight.Bold)
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = "Elegir refrigerante")
+        }
+        DropdownMenu(expanded = abierto, onDismissRequest = { abierto = false }) {
+            opciones.forEach { gas ->
+                DropdownMenuItem(text = { Text(gas) }, onClick = { onSeleccionar(gas); abierto = false })
+            }
+        }
+    }
+}
+
+/** Tarjeta de rendimiento por lado: temp de saturación + cálculo (superheat/subcooling). */
+@Composable
+private fun RowScope.CardRendimiento(
+    color: Color,
+    titulo: String,
+    etiquetaSat: String,
+    satC: Double,
+    etiquetaCalc: String,
+    calcC: Double,
+) {
+    ElevatedCard(
+        modifier = Modifier.weight(1f),
+        colors = CardDefaults.elevatedCardColors(containerColor = color),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(titulo, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("$etiquetaSat: ${fmt(satC)} °C", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
+            Text(etiquetaCalc, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.9f))
+            Text("${fmt(calcC)} °C", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
         }
     }
 }
