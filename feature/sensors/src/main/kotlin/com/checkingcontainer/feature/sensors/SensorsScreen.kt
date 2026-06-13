@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -85,6 +86,13 @@ private fun SensorsScreen(
 ) {
     Scaffold(
         topBar = {
+            // Acción de conectar/detener como ícono discreto arriba (no un botón
+            // grande abajo que le quite protagonismo a las tarjetas).
+            val (icono, tint) = when {
+                !state.escaneando -> Icons.Outlined.Bluetooth to MaterialTheme.colorScheme.onSurfaceVariant
+                state.hayDatos -> Icons.Outlined.BluetoothConnected to MaterialTheme.colorScheme.primary
+                else -> Icons.Outlined.BluetoothSearching to MaterialTheme.colorScheme.primary
+            }
             TopAppBar(
                 title = { Text("Mediciones") },
                 navigationIcon = {
@@ -92,26 +100,15 @@ private fun SensorsScreen(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Atrás")
                     }
                 },
+                actions = {
+                    IconButton(onClick = onToggleScan) {
+                        Icon(icono, contentDescription = "Conectar o detener sensores", tint = tint)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
             )
-        },
-        bottomBar = {
-            // El escaneo del advertising debe seguir activo para recibir lecturas
-            // nuevas (no hay "conexión" fija). El texto refleja si ya llegan datos.
-            val (icono, texto) = when {
-                !state.escaneando -> Icons.Outlined.Bluetooth to "Conectar sensores"
-                state.hayDatos -> Icons.Outlined.BluetoothConnected to "Conectado · recibiendo (tocar para detener)"
-                else -> Icons.Outlined.BluetoothSearching to "Buscando… (tocar para detener)"
-            }
-            Button(
-                onClick = onToggleScan,
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-            ) {
-                Icon(icono, contentDescription = null)
-                Text(texto, modifier = Modifier.padding(start = 8.dp))
-            }
         },
     ) { innerPadding ->
         LazyColumn(
@@ -119,7 +116,7 @@ private fun SensorsScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(key = "cabecera") { Cabecera(state.containerNo) }
+            item(key = "cabecera") { Cabecera(state.containerNo, state.escaneando, state.hayDatos) }
 
             if (state.bluetoothApagado) {
                 item(key = "bt-off") {
@@ -135,7 +132,7 @@ private fun SensorsScreen(
                 item(key = "vacio") {
                     Text(
                         if (state.escaneando) "Buscando sensores cercanos…"
-                        else "Toca \"Conectar sensores\" y enciende los instrumentos.",
+                        else "Toca el ícono de Bluetooth (arriba) y enciende los instrumentos.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -186,7 +183,7 @@ private fun SensorsScreen(
 }
 
 @Composable
-private fun Cabecera(containerNo: String) {
+private fun Cabecera(containerNo: String, escaneando: Boolean, hayDatos: Boolean) {
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
@@ -199,6 +196,22 @@ private fun Cabecera(containerNo: String) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Estado de conexión (fino), reemplaza al botón grande de antes.
+            val (punto, texto) = when {
+                !escaneando -> MaterialTheme.colorScheme.onSurfaceVariant to "Desconectado"
+                hayDatos -> Color(0xFF2E7D32) to "Recibiendo datos"
+                else -> MaterialTheme.colorScheme.primary to "Buscando sensores…"
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(8.dp).background(punto, androidx.compose.foundation.shape.CircleShape),
+                )
+                Text(
+                    "  $texto",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
