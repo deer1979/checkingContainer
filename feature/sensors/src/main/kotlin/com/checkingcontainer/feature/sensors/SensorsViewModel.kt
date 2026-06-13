@@ -26,7 +26,12 @@ data class SensorsUiState(
     val bluetoothApagado: Boolean = false,
     // clave = deviceName + tipo, para no mezclar sensores distintos
     val tarjetas: Map<String, TarjetaSensor> = emptyMap(),
+    // rol asignado por lectura: clave = deviceName#tipo#índice (0 = valor1, 1 = valor2)
+    val roles: Map<String, RolMedicion> = emptyMap(),
 ) {
+    /** Rol asignado; por defecto el primer sensor es ALTA y el segundo BAJA. */
+    fun rolDe(deviceName: String, tipo: SensorType, index: Int): RolMedicion =
+        roles[claveRol(deviceName, tipo, index)] ?: if (index == 0) RolMedicion.ALTA else RolMedicion.BAJA
     val presiones get() = tarjetas.values.filter { it.ultima.type == SensorType.PRESION }
     val temperaturas get() = tarjetas.values.filter { it.ultima.type == SensorType.TEMPERATURA }
     val corrientes get() = tarjetas.values.filter { it.ultima.type == SensorType.CORRIENTE }
@@ -76,6 +81,16 @@ class SensorsViewModel @Inject constructor(
         _state.update { it.copy(escaneando = false) }
     }
 
+    /** Alterna ALTA <-> BAJA para una lectura concreta. */
+    fun toggleRol(deviceName: String, tipo: SensorType, index: Int) {
+        val clave = claveRol(deviceName, tipo, index)
+        _state.update { s ->
+            val actual = s.rolDe(deviceName, tipo, index)
+            val nuevo = if (actual == RolMedicion.ALTA) RolMedicion.BAJA else RolMedicion.ALTA
+            s.copy(roles = s.roles + (clave to nuevo))
+        }
+    }
+
     override fun onCleared() {
         detener()
         super.onCleared()
@@ -85,3 +100,6 @@ class SensorsViewModel @Inject constructor(
         const val MAX_TOMAS = 5
     }
 }
+
+/** Clave estable de rol por lectura. */
+fun claveRol(deviceName: String, tipo: SensorType, index: Int): String = "$deviceName#$tipo#$index"

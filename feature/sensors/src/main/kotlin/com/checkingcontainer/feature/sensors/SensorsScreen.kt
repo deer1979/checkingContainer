@@ -11,14 +11,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.BluetoothSearching
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,6 +68,7 @@ fun SensorsRoute(
         state = state,
         onBack = onBack,
         onToggleScan = { launcher.launch(permisos) },
+        onToggleRol = viewModel::toggleRol,
     )
 }
 
@@ -71,6 +78,7 @@ private fun SensorsScreen(
     state: SensorsUiState,
     onBack: () -> Unit,
     onToggleScan: () -> Unit,
+    onToggleRol: (String, SensorType, Int) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -132,11 +140,50 @@ private fun SensorsScreen(
 
             if (state.presiones.isNotEmpty()) {
                 item(key = "h-presion") { SeccionTitulo("Presiones") }
-                items(state.presiones, key = { "p-" + it.deviceName }) { TarjetaPresion(it) }
+                state.presiones.forEach { t ->
+                    // Cada presión (puerto) se renderiza por separado y se marca alta/baja.
+                    for (idx in 0..1) {
+                        val valor = if (idx == 0) t.ultima.valor1 else t.ultima.valor2
+                        if (idx == 1 && !t.ultima.tieneValor2) continue
+                        item(key = "p-${t.deviceName}-$idx") {
+                            TarjetaRol(
+                                rol = state.rolDe(t.deviceName, SensorType.PRESION, idx),
+                                etiquetaAlta = "Alta",
+                                etiquetaBaja = "Baja",
+                                valor = fmt(YjackParser.aPsig(valor)),
+                                unidad = "PSIG",
+                                deviceName = t.deviceName,
+                                historial = t.historial.map {
+                                    fmt(YjackParser.aPsig(if (idx == 0) it.valor1 else it.valor2))
+                                },
+                                onToggle = { onToggleRol(t.deviceName, SensorType.PRESION, idx) },
+                            )
+                        }
+                    }
+                }
             }
             if (state.temperaturas.isNotEmpty()) {
                 item(key = "h-temp") { SeccionTitulo("Temperaturas") }
-                items(state.temperaturas, key = { "t-" + it.deviceName }) { TarjetaTemperatura(it) }
+                state.temperaturas.forEach { t ->
+                    for (idx in 0..1) {
+                        val valor = if (idx == 0) t.ultima.valor1 else t.ultima.valor2
+                        if (idx == 1 && !t.ultima.tieneValor2) continue
+                        item(key = "t-${t.deviceName}-$idx") {
+                            TarjetaRol(
+                                rol = state.rolDe(t.deviceName, SensorType.TEMPERATURA, idx),
+                                etiquetaAlta = "Descarga",
+                                etiquetaBaja = "Succión",
+                                valor = fmt(YjackParser.aCelsius(valor)),
+                                unidad = "°C",
+                                deviceName = t.deviceName,
+                                historial = t.historial.map {
+                                    fmt(YjackParser.aCelsius(if (idx == 0) it.valor1 else it.valor2))
+                                },
+                                onToggle = { onToggleRol(t.deviceName, SensorType.TEMPERATURA, idx) },
+                            )
+                        }
+                    }
+                }
             }
             if (state.corrientes.isNotEmpty()) {
                 item(key = "h-amp") { SeccionTitulo("Corriente") }
@@ -174,55 +221,80 @@ private fun SeccionTitulo(t: String) {
     )
 }
 
-/** Tarjeta de una sola columna: número grande izq. + 2º valor + últimas 5 tomas der. */
+// Colores de rol: ALTA (descarga/líquido) rojo · BAJA (succión/vapor) celeste.
+private val COLOR_ALTA = Color(0xFFD32F2F)
+private val COLOR_BAJA = Color(0xFF03A9F4)
+
+/**
+ * Tarjeta compacta coloreada por rol. Chip arriba para alternar ALTA/BAJA;
+ * toda la tarjeta toma el color del rol con texto blanco en negrita.
+ */
 @Composable
-private fun TarjetaMedicion(
-    titulo: String,
-    deviceName: String,
-    valor1: String,
-    valor2: String?,
+private fun TarjetaRol(
+    rol: RolMedicion,
+    etiquetaAlta: String,
+    etiquetaBaja: String,
+    valor: String,
     unidad: String,
+    deviceName: String,
     historial: List<String>,
+    onToggle: () -> Unit,
 ) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
+    val bg = if (rol == RolMedicion.ALTA) COLOR_ALTA else COLOR_BAJA
+    val etiqueta = if (rol == RolMedicion.ALTA) etiquetaAlta else etiquetaBaja
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = bg),
+    ) {
         Row(
-            Modifier.fillMaxWidth().padding(16.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(titulo, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                // Chip selector: tocar para cambiar alta/baja.
+                Surface(
+                    onClick = onToggle,
+                    color = Color.White.copy(alpha = 0.25f),
+                    shape = RoundedCornerShape(50),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Outlined.SwapHoriz,
+                            contentDescription = "Cambiar alta/baja",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            "  $etiqueta",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(valor1, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                    Text(valor, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
                     Text(
                         " $unidad",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 6.dp),
-                    )
-                }
-                if (valor2 != null) {
-                    Text(
-                        "2.º: $valor2 $unidad",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.padding(bottom = 3.dp),
                     )
                 }
                 Text(
                     deviceName,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.8f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    "Últimas tomas",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 historial.takeLast(5).reversed().forEach {
-                    Text(it, style = MaterialTheme.typography.bodySmall)
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
                 }
             }
         }
@@ -232,42 +304,29 @@ private fun TarjetaMedicion(
 private fun fmt(v: Double): String =
     if (v == SensorReading.SIN_DATO) "—" else String.format(Locale.US, "%.1f", v)
 
-@Composable
-private fun TarjetaPresion(t: TarjetaSensor) {
-    // El equipo difunde presión ABSOLUTA → convertir a manométrica (PSIG) como su pantalla.
-    TarjetaMedicion(
-        titulo = "Presión",
-        deviceName = t.deviceName,
-        valor1 = fmt(YjackParser.aPsig(t.ultima.valor1)),
-        valor2 = if (t.ultima.tieneValor2) fmt(YjackParser.aPsig(t.ultima.valor2)) else null,
-        unidad = "PSIG",
-        historial = t.historial.map { fmt(YjackParser.aPsig(it.valor1)) },
-    )
-}
-
-@Composable
-private fun TarjetaTemperatura(t: TarjetaSensor) {
-    // El equipo difunde °F → convertir a °C.
-    TarjetaMedicion(
-        titulo = "Temperatura",
-        deviceName = t.deviceName,
-        valor1 = fmt(YjackParser.aCelsius(t.ultima.valor1)),
-        valor2 = if (t.ultima.tieneValor2) fmt(YjackParser.aCelsius(t.ultima.valor2)) else null,
-        unidad = "°C",
-        historial = t.historial.map { fmt(YjackParser.aCelsius(it.valor1)) },
-    )
-}
-
+/** Corriente: tarjeta compacta neutra (sin rol alta/baja). */
 @Composable
 private fun TarjetaCorriente(t: TarjetaSensor) {
-    TarjetaMedicion(
-        titulo = "Corriente",
-        deviceName = t.deviceName,
-        valor1 = fmt(t.ultima.valor1),
-        valor2 = null,
-        unidad = "A",
-        historial = t.historial.map { fmt(it.valor1) },
-    )
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Corriente", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(fmt(t.ultima.valor1), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text(" A", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 3.dp))
+                }
+                Text(t.deviceName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                t.historial.map { fmt(it.valor1) }.takeLast(5).reversed().forEach {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
 }
 
 private val FECHA = SimpleDateFormat("dd/MM/yyyy · HH:mm", Locale.getDefault())

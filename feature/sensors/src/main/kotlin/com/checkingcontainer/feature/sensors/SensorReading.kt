@@ -1,5 +1,12 @@
 package com.checkingcontainer.feature.sensors
 
+/**
+ * Rol que el técnico asigna a cada lectura (los dos sensores de presión/temperatura
+ * son idénticos y no se distinguen solos). ALTA = descarga/líquido (rojo);
+ * BAJA = succión/vapor (celeste).
+ */
+enum class RolMedicion { ALTA, BAJA }
+
 /** Tipo de medición que entrega un sensor BLE de la familia Yellow Jacket. */
 enum class SensorType {
     /** TITANMAX / P51: las dos presiones (manométricas, PSI). */
