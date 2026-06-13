@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material.icons.outlined.BluetoothConnected
 import androidx.compose.material.icons.outlined.BluetoothSearching
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.Button
@@ -95,18 +96,19 @@ private fun SensorsScreen(
             )
         },
         bottomBar = {
+            // El escaneo del advertising debe seguir activo para recibir lecturas
+            // nuevas (no hay "conexión" fija). El texto refleja si ya llegan datos.
+            val (icono, texto) = when {
+                !state.escaneando -> Icons.Outlined.Bluetooth to "Conectar sensores"
+                state.hayDatos -> Icons.Outlined.BluetoothConnected to "Conectado · recibiendo (tocar para detener)"
+                else -> Icons.Outlined.BluetoothSearching to "Buscando… (tocar para detener)"
+            }
             Button(
                 onClick = onToggleScan,
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
             ) {
-                Icon(
-                    if (state.escaneando) Icons.Outlined.BluetoothSearching else Icons.Outlined.Bluetooth,
-                    contentDescription = null,
-                )
-                Text(
-                    if (state.escaneando) "  Buscando… (tocar para detener)" else "  Conectar sensores",
-                    modifier = Modifier.padding(start = 4.dp),
-                )
+                Icon(icono, contentDescription = null)
+                Text(texto, modifier = Modifier.padding(start = 8.dp))
             }
         },
     ) { innerPadding ->
