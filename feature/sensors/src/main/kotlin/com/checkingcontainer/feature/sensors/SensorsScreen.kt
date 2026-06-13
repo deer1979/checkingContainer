@@ -174,12 +174,13 @@ private fun SeccionTitulo(t: String) {
     )
 }
 
-/** Tarjeta de una sola columna: número grande izq. + últimas 5 tomas der. */
+/** Tarjeta de una sola columna: número grande izq. + 2º valor + últimas 5 tomas der. */
 @Composable
 private fun TarjetaMedicion(
     titulo: String,
     deviceName: String,
-    valor: String,
+    valor1: String,
+    valor2: String?,
     unidad: String,
     historial: List<String>,
 ) {
@@ -191,12 +192,19 @@ private fun TarjetaMedicion(
             Column(Modifier.weight(1f)) {
                 Text(titulo, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(valor, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                    Text(valor1, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
                     Text(
                         " $unidad",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 6.dp),
+                    )
+                }
+                if (valor2 != null) {
+                    Text(
+                        "2.º: $valor2 $unidad",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(
@@ -226,24 +234,27 @@ private fun fmt(v: Double): String =
 
 @Composable
 private fun TarjetaPresion(t: TarjetaSensor) {
-    // valor1 / valor2 = las dos presiones; el técnico decide alta/baja (pendiente UI selector)
+    // El equipo difunde presión ABSOLUTA → convertir a manométrica (PSIG) como su pantalla.
     TarjetaMedicion(
         titulo = "Presión",
         deviceName = t.deviceName,
-        valor = fmt(t.ultima.valor1),
-        unidad = "PSI",
-        historial = t.historial.map { fmt(it.valor1) },
+        valor1 = fmt(YjackParser.aPsig(t.ultima.valor1)),
+        valor2 = if (t.ultima.tieneValor2) fmt(YjackParser.aPsig(t.ultima.valor2)) else null,
+        unidad = "PSIG",
+        historial = t.historial.map { fmt(YjackParser.aPsig(it.valor1)) },
     )
 }
 
 @Composable
 private fun TarjetaTemperatura(t: TarjetaSensor) {
+    // El equipo difunde °F → convertir a °C.
     TarjetaMedicion(
         titulo = "Temperatura",
         deviceName = t.deviceName,
-        valor = fmt(t.ultima.valor1),
+        valor1 = fmt(YjackParser.aCelsius(t.ultima.valor1)),
+        valor2 = if (t.ultima.tieneValor2) fmt(YjackParser.aCelsius(t.ultima.valor2)) else null,
         unidad = "°C",
-        historial = t.historial.map { fmt(it.valor1) },
+        historial = t.historial.map { fmt(YjackParser.aCelsius(it.valor1)) },
     )
 }
 
@@ -252,7 +263,8 @@ private fun TarjetaCorriente(t: TarjetaSensor) {
     TarjetaMedicion(
         titulo = "Corriente",
         deviceName = t.deviceName,
-        valor = fmt(t.ultima.valor1),
+        valor1 = fmt(t.ultima.valor1),
+        valor2 = null,
         unidad = "A",
         historial = t.historial.map { fmt(it.valor1) },
     )

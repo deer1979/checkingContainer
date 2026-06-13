@@ -86,6 +86,22 @@ class YjackParserTest {
         assertEquals(250.0, YjackParser.decodeSFloat(0xFA, 0x00), 0.001)
     }
 
+    @Test
+    fun `aPsig resta la atmosferica (absoluta a manometrica)`() {
+        // 14.3 PSIA a la atmósfera -> ~0 PSIG, como la pantalla del TITANMAX
+        assertEquals(-0.4, YjackParser.aPsig(14.3), 0.01)
+        assertEquals(105.3, YjackParser.aPsig(120.0), 0.01)
+        assertEquals(SensorReading.SIN_DATO, YjackParser.aPsig(SensorReading.SIN_DATO), 0.001)
+    }
+
+    @Test
+    fun `aCelsius convierte de Fahrenheit`() {
+        // 75.2 °F = 24.0 °C (lectura real del equipo)
+        assertEquals(24.0, YjackParser.aCelsius(75.2), 0.05)
+        assertEquals(0.0, YjackParser.aCelsius(32.0), 0.001)
+        assertEquals(SensorReading.SIN_DATO, YjackParser.aCelsius(SensorReading.SIN_DATO), 0.001)
+    }
+
     // Construye un sfloat con mantisa/exponente directos (para los tests de presión/vacío).
     private fun sfloat(mantissa: Int, exponent: Int): ByteArray {
         val b1 = ((exponent and 0x0F) shl 4) or ((mantissa shr 8) and 0x0F)

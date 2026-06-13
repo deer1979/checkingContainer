@@ -30,6 +30,25 @@ object YjackParser {
 
     private const val NO_DATO_RAW = 32767
 
+    /** Atmosférica estándar a nivel del mar (PSI). Restada a la absoluta da manométrica. */
+    const val ATM_PSI = 14.696
+
+    /**
+     * Convierte presión ABSOLUTA (lo que difunde el equipo) a MANOMÉTRICA (lo que
+     * muestra la pantalla del TITANMAX tras su auto-cero). Confirmado con lectura
+     * real: el equipo a la atmósfera difunde ~14.3 PSIA y muestra ~0 PSIG.
+     * TODO: hacer la atmosférica configurable por altitud / botón de tara.
+     */
+    fun aPsig(absoluta: Double): Double =
+        if (absoluta == SensorReading.SIN_DATO) absoluta else absoluta - ATM_PSI
+
+    /**
+     * Convierte °F (lo que difunde el equipo) a °C (lo que pide el usuario y
+     * muestra el equipo). Confirmado: difunde 75.2 °F = 24.0 °C.
+     */
+    fun aCelsius(fahrenheit: Double): Double =
+        if (fahrenheit == SensorReading.SIN_DATO) fahrenheit else (fahrenheit - 32.0) * 5.0 / 9.0
+
     fun tipoDe(uuid: String): SensorType = when (uuid.lowercase()) {
         UUID_TITAN_PRESION, UUID_P51_PRESION -> SensorType.PRESION
         UUID_TITAN_TEMP, UUID_P51_TEMP, UUID_PINZA_TEMP -> SensorType.TEMPERATURA
