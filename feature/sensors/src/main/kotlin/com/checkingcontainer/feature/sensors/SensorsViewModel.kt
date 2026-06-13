@@ -37,6 +37,10 @@ data class SensorsUiState(
     val presiones get() = tarjetas.values.filter { it.ultima.type == SensorType.PRESION }
     val temperaturas get() = tarjetas.values.filter { it.ultima.type == SensorType.TEMPERATURA }
     val corrientes get() = tarjetas.values.filter { it.ultima.type == SensorType.CORRIENTE }
+    // Primer sensor de cada tipo (la pantalla muestra tarjetas fijas; null = sin datos).
+    val presion get() = presiones.firstOrNull()
+    val temperatura get() = temperaturas.firstOrNull()
+    val corriente get() = corrientes.firstOrNull()
     val hayDatos get() = tarjetas.isNotEmpty()
 }
 

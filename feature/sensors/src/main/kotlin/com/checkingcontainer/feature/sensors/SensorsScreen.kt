@@ -128,56 +128,36 @@ private fun SensorsScreen(
                 }
             }
 
-            if (!state.hayDatos) {
-                item(key = "vacio") {
-                    Text(
-                        if (state.escaneando) "Buscando sensores cercanos…"
-                        else "Toca el ícono de Bluetooth (arriba) y enciende los instrumentos.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+            // Tarjetas FIJAS: siempre presentes (grises/vacías sin datos, con color
+            // al conectar). No se reconstruyen al reiniciar el escaneo.
+            item(key = "h-presion") { SeccionTitulo("Presiones") }
+            item(key = "presion") {
+                FilaAltaBaja(
+                    tarjeta = state.presion,
+                    tipo = SensorType.PRESION,
+                    etiquetaAlta = "Alta",
+                    etiquetaBaja = "Baja",
+                    unidad = "PSIG",
+                    convertir = YjackParser::aPsig,
+                    rolDe = state::rolDe,
+                    onToggleRol = onToggleRol,
+                )
             }
-
-            if (state.presiones.isNotEmpty()) {
-                item(key = "h-presion") { SeccionTitulo("Presiones") }
-                state.presiones.forEach { t ->
-                    // Alta y Baja lado a lado en la misma fila.
-                    item(key = "p-${t.deviceName}") {
-                        FilaAltaBaja(
-                            tarjeta = t,
-                            tipo = SensorType.PRESION,
-                            etiquetaAlta = "Alta",
-                            etiquetaBaja = "Baja",
-                            unidad = "PSIG",
-                            convertir = YjackParser::aPsig,
-                            rolDe = state::rolDe,
-                            onToggleRol = onToggleRol,
-                        )
-                    }
-                }
+            item(key = "h-temp") { SeccionTitulo("Temperaturas") }
+            item(key = "temp") {
+                FilaAltaBaja(
+                    tarjeta = state.temperatura,
+                    tipo = SensorType.TEMPERATURA,
+                    etiquetaAlta = "Descarga",
+                    etiquetaBaja = "Succión",
+                    unidad = "°C",
+                    convertir = YjackParser::aCelsius,
+                    rolDe = state::rolDe,
+                    onToggleRol = onToggleRol,
+                )
             }
-            if (state.temperaturas.isNotEmpty()) {
-                item(key = "h-temp") { SeccionTitulo("Temperaturas") }
-                state.temperaturas.forEach { t ->
-                    item(key = "t-${t.deviceName}") {
-                        FilaAltaBaja(
-                            tarjeta = t,
-                            tipo = SensorType.TEMPERATURA,
-                            etiquetaAlta = "Descarga",
-                            etiquetaBaja = "Succión",
-                            unidad = "°C",
-                            convertir = YjackParser::aCelsius,
-                            rolDe = state::rolDe,
-                            onToggleRol = onToggleRol,
-                        )
-                    }
-                }
-            }
-            if (state.corrientes.isNotEmpty()) {
-                item(key = "h-amp") { SeccionTitulo("Corriente") }
-                items(state.corrientes, key = { "a-" + it.deviceName }) { TarjetaCorriente(it) }
-            }
+            item(key = "h-amp") { SeccionTitulo("Corriente") }
+            item(key = "corriente") { TarjetaCorriente(state.corriente) }
         }
     }
 }
@@ -198,7 +178,7 @@ private fun Cabecera(containerNo: String, escaneando: Boolean, hayDatos: Boolean
             )
             // Estado de conexión (fino), reemplaza al botón grande de antes.
             val (punto, texto) = when {
-                !escaneando -> MaterialTheme.colorScheme.onSurfaceVariant to "Desconectado"
+                !escaneando -> MaterialTheme.colorScheme.onSurfaceVariant to "Conecte su dispositivo (ícono arriba)"
                 hayDatos -> Color(0xFF2E7D32) to "Recibiendo datos"
                 else -> MaterialTheme.colorScheme.primary to "Buscando sensores…"
             }
@@ -226,15 +206,30 @@ private fun SeccionTitulo(t: String) {
     )
 }
 
-// Colores de rol: ALTA (descarga/líquido) rojo · BAJA (succión/vapor) celeste.
+// Colores de rol: ALTA (descarga/líquido) rojo · BAJA (succión/vapor) celeste ·
+// corriente verde. Sin datos = gris (surfaceVariant).
 private val COLOR_ALTA = Color(0xFFD32F2F)
 private val COLOR_BAJA = Color(0xFF03A9F4)
+private val COLOR_CORRIENTE = Color(0xFF2E7D32)
 private const val SLOTS = 5
 
-/** Fila con las dos lecturas (valor1/valor2) lado a lado, cada una marcable alta/baja. */
+/** Lista de tomas para mostrar: más reciente primero, rellena a 5 con "·". */
+private fun tomasParaMostrar(
+    historial: List<SensorReading>,
+    selector: (SensorReading) -> Double,
+    convertir: (Double) -> Double,
+): List<String> {
+    val recientesPrimero = historial.asReversed().map { fmt(convertir(selector(it))) }
+    return (recientesPrimero + List(SLOTS) { "·" }).take(SLOTS)
+}
+
+/**
+ * Fila con las dos lecturas (valor1/valor2) lado a lado. Siempre renderiza las dos
+ * tarjetas; si no hay datos las muestra grises/vacías (no se destruyen).
+ */
 @Composable
 private fun FilaAltaBaja(
-    tarjeta: TarjetaSensor,
+    tarjeta: TarjetaSensor?,
     tipo: SensorType,
     etiquetaAlta: String,
     etiquetaBaja: String,
@@ -245,71 +240,85 @@ private fun FilaAltaBaja(
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         for (idx in 0..1) {
-            val tieneValor = if (idx == 0) true else tarjeta.ultima.tieneValor2
-            if (!tieneValor) {
-                Spacer(Modifier.weight(1f))
-                continue
-            }
-            val valorActual = if (idx == 0) tarjeta.ultima.valor1 else tarjeta.ultima.valor2
+            val activo = tarjeta != null && (idx == 0 || tarjeta.ultima.tieneValor2)
+            val rol = if (tarjeta != null) rolDe(tarjeta.deviceName, tipo, idx)
+                      else if (idx == 0) RolMedicion.ALTA else RolMedicion.BAJA
+            val valorActual = if (activo) {
+                if (idx == 0) tarjeta!!.ultima.valor1 else tarjeta!!.ultima.valor2
+            } else SensorReading.SIN_DATO
+            val tomas = if (activo) {
+                tomasParaMostrar(tarjeta!!.historial, { if (idx == 0) it.valor1 else it.valor2 }, convertir)
+            } else List(SLOTS) { "·" }
             TarjetaRol(
-                rol = rolDe(tarjeta.deviceName, tipo, idx),
+                activo = activo,
+                rol = rol,
                 etiquetaAlta = etiquetaAlta,
                 etiquetaBaja = etiquetaBaja,
-                valor = fmt(convertir(valorActual)),
+                valor = if (activo) fmt(convertir(valorActual)) else "—",
                 unidad = unidad,
-                tomas = tarjeta.historial.map { fmt(convertir(if (idx == 0) it.valor1 else it.valor2)) },
-                onToggle = { onToggleRol(tarjeta.deviceName, tipo, idx) },
+                deviceName = if (activo) tarjeta!!.deviceName else "",
+                tomas = tomas,
+                onToggle = { if (tarjeta != null) onToggleRol(tarjeta.deviceName, tipo, idx) },
             )
         }
     }
 }
 
 /**
- * Tarjeta compacta coloreada por rol (media columna). Chip para alternar ALTA/BAJA;
- * número grande en vivo; abajo 5 slots con las tomas cada 5 s (vacíos al inicio).
+ * Tarjeta compacta (media columna). Color por rol (rojo/celeste) cuando hay datos,
+ * gris cuando no. Chip para alternar ALTA/BAJA; número en vivo; tomas en columna a
+ * la derecha (la más reciente arriba).
  */
 @Composable
 private fun RowScope.TarjetaRol(
+    activo: Boolean,
     rol: RolMedicion,
     etiquetaAlta: String,
     etiquetaBaja: String,
     valor: String,
     unidad: String,
+    deviceName: String,
     tomas: List<String>,
     onToggle: () -> Unit,
 ) {
-    val bg = if (rol == RolMedicion.ALTA) COLOR_ALTA else COLOR_BAJA
+    val bg = when {
+        !activo -> MaterialTheme.colorScheme.surfaceVariant
+        rol == RolMedicion.ALTA -> COLOR_ALTA
+        else -> COLOR_BAJA
+    }
+    val fg = if (activo) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
     val etiqueta = if (rol == RolMedicion.ALTA) etiquetaAlta else etiquetaBaja
     ElevatedCard(
         modifier = Modifier.weight(1f),
         colors = CardDefaults.elevatedCardColors(containerColor = bg),
     ) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Surface(
-                onClick = onToggle,
-                color = Color.White.copy(alpha = 0.25f),
-                shape = RoundedCornerShape(50),
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+        Row(Modifier.fillMaxWidth().padding(12.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Surface(
+                    onClick = onToggle,
+                    color = fg.copy(alpha = 0.18f),
+                    shape = RoundedCornerShape(50),
                 ) {
-                    Icon(Icons.Outlined.SwapHoriz, contentDescription = "Cambiar alta/baja", tint = Color.White, modifier = Modifier.size(16.dp))
-                    Text("  $etiqueta", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
+                    Row(
+                        Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.SwapHoriz, contentDescription = "Cambiar alta/baja", tint = fg, modifier = Modifier.size(16.dp))
+                        Text("  $etiqueta", style = MaterialTheme.typography.labelMedium, color = fg, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(valor, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = fg)
+                    Text(" $unidad", style = MaterialTheme.typography.bodySmall, color = fg.copy(alpha = 0.9f), modifier = Modifier.padding(bottom = 3.dp))
+                }
+                if (deviceName.isNotEmpty()) {
+                    Text(deviceName, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(valor, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                Text(" $unidad", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f), modifier = Modifier.padding(bottom = 3.dp))
-            }
-            // 5 tomas (cada 5 s). Slots no llenos en blanco ("·").
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (i in 0 until SLOTS) {
-                    Text(
-                        tomas.getOrNull(i) ?: "·",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.85f),
-                    )
+            // Tomas cada 5 s, columna vertical, la más reciente arriba.
+            Column(horizontalAlignment = Alignment.End) {
+                tomas.forEach {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.85f))
                 }
             }
         }
@@ -319,25 +328,33 @@ private fun RowScope.TarjetaRol(
 private fun fmt(v: Double): String =
     if (v == SensorReading.SIN_DATO) "—" else String.format(Locale.US, "%.1f", v)
 
-/** Corriente: tarjeta compacta neutra (sin rol alta/baja). */
+/** Corriente: tarjeta de ancho completo, verde con datos, gris sin datos. */
 @Composable
-private fun TarjetaCorriente(t: TarjetaSensor) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
+private fun TarjetaCorriente(tarjeta: TarjetaSensor?) {
+    val activo = tarjeta != null
+    val bg = if (activo) COLOR_CORRIENTE else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (activo) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+    val tomas = if (activo) tomasParaMostrar(tarjeta!!.historial, { it.valor1 }, { it }) else List(SLOTS) { "·" }
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = bg),
+    ) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f)) {
-                Text("Corriente", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Corriente", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = fg)
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(fmt(t.ultima.valor1), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    Text(" A", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 3.dp))
+                    Text(if (activo) fmt(tarjeta!!.ultima.valor1) else "—", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = fg)
+                    Text(" A", style = MaterialTheme.typography.bodyMedium, color = fg.copy(alpha = 0.9f), modifier = Modifier.padding(bottom = 3.dp))
                 }
-                Text(t.deviceName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (activo) {
+                    Text(tarjeta!!.deviceName, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
-                t.historial.map { fmt(it.valor1) }.takeLast(5).reversed().forEach {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                tomas.forEach {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.85f))
                 }
             }
         }
