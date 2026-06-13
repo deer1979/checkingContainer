@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -143,47 +145,35 @@ private fun SensorsScreen(
             if (state.presiones.isNotEmpty()) {
                 item(key = "h-presion") { SeccionTitulo("Presiones") }
                 state.presiones.forEach { t ->
-                    // Cada presión (puerto) se renderiza por separado y se marca alta/baja.
-                    for (idx in 0..1) {
-                        val valor = if (idx == 0) t.ultima.valor1 else t.ultima.valor2
-                        if (idx == 1 && !t.ultima.tieneValor2) continue
-                        item(key = "p-${t.deviceName}-$idx") {
-                            TarjetaRol(
-                                rol = state.rolDe(t.deviceName, SensorType.PRESION, idx),
-                                etiquetaAlta = "Alta",
-                                etiquetaBaja = "Baja",
-                                valor = fmt(YjackParser.aPsig(valor)),
-                                unidad = "PSIG",
-                                deviceName = t.deviceName,
-                                historial = t.historial.map {
-                                    fmt(YjackParser.aPsig(if (idx == 0) it.valor1 else it.valor2))
-                                },
-                                onToggle = { onToggleRol(t.deviceName, SensorType.PRESION, idx) },
-                            )
-                        }
+                    // Alta y Baja lado a lado en la misma fila.
+                    item(key = "p-${t.deviceName}") {
+                        FilaAltaBaja(
+                            tarjeta = t,
+                            tipo = SensorType.PRESION,
+                            etiquetaAlta = "Alta",
+                            etiquetaBaja = "Baja",
+                            unidad = "PSIG",
+                            convertir = YjackParser::aPsig,
+                            rolDe = state::rolDe,
+                            onToggleRol = onToggleRol,
+                        )
                     }
                 }
             }
             if (state.temperaturas.isNotEmpty()) {
                 item(key = "h-temp") { SeccionTitulo("Temperaturas") }
                 state.temperaturas.forEach { t ->
-                    for (idx in 0..1) {
-                        val valor = if (idx == 0) t.ultima.valor1 else t.ultima.valor2
-                        if (idx == 1 && !t.ultima.tieneValor2) continue
-                        item(key = "t-${t.deviceName}-$idx") {
-                            TarjetaRol(
-                                rol = state.rolDe(t.deviceName, SensorType.TEMPERATURA, idx),
-                                etiquetaAlta = "Descarga",
-                                etiquetaBaja = "Succión",
-                                valor = fmt(YjackParser.aCelsius(valor)),
-                                unidad = "°C",
-                                deviceName = t.deviceName,
-                                historial = t.historial.map {
-                                    fmt(YjackParser.aCelsius(if (idx == 0) it.valor1 else it.valor2))
-                                },
-                                onToggle = { onToggleRol(t.deviceName, SensorType.TEMPERATURA, idx) },
-                            )
-                        }
+                    item(key = "t-${t.deviceName}") {
+                        FilaAltaBaja(
+                            tarjeta = t,
+                            tipo = SensorType.TEMPERATURA,
+                            etiquetaAlta = "Descarga",
+                            etiquetaBaja = "Succión",
+                            unidad = "°C",
+                            convertir = YjackParser::aCelsius,
+                            rolDe = state::rolDe,
+                            onToggleRol = onToggleRol,
+                        )
                     }
                 }
             }
@@ -226,77 +216,87 @@ private fun SeccionTitulo(t: String) {
 // Colores de rol: ALTA (descarga/líquido) rojo · BAJA (succión/vapor) celeste.
 private val COLOR_ALTA = Color(0xFFD32F2F)
 private val COLOR_BAJA = Color(0xFF03A9F4)
+private const val SLOTS = 5
+
+/** Fila con las dos lecturas (valor1/valor2) lado a lado, cada una marcable alta/baja. */
+@Composable
+private fun FilaAltaBaja(
+    tarjeta: TarjetaSensor,
+    tipo: SensorType,
+    etiquetaAlta: String,
+    etiquetaBaja: String,
+    unidad: String,
+    convertir: (Double) -> Double,
+    rolDe: (String, SensorType, Int) -> RolMedicion,
+    onToggleRol: (String, SensorType, Int) -> Unit,
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        for (idx in 0..1) {
+            val tieneValor = if (idx == 0) true else tarjeta.ultima.tieneValor2
+            if (!tieneValor) {
+                Spacer(Modifier.weight(1f))
+                continue
+            }
+            val valorActual = if (idx == 0) tarjeta.ultima.valor1 else tarjeta.ultima.valor2
+            TarjetaRol(
+                rol = rolDe(tarjeta.deviceName, tipo, idx),
+                etiquetaAlta = etiquetaAlta,
+                etiquetaBaja = etiquetaBaja,
+                valor = fmt(convertir(valorActual)),
+                unidad = unidad,
+                tomas = tarjeta.historial.map { fmt(convertir(if (idx == 0) it.valor1 else it.valor2)) },
+                onToggle = { onToggleRol(tarjeta.deviceName, tipo, idx) },
+            )
+        }
+    }
+}
 
 /**
- * Tarjeta compacta coloreada por rol. Chip arriba para alternar ALTA/BAJA;
- * toda la tarjeta toma el color del rol con texto blanco en negrita.
+ * Tarjeta compacta coloreada por rol (media columna). Chip para alternar ALTA/BAJA;
+ * número grande en vivo; abajo 5 slots con las tomas cada 5 s (vacíos al inicio).
  */
 @Composable
-private fun TarjetaRol(
+private fun RowScope.TarjetaRol(
     rol: RolMedicion,
     etiquetaAlta: String,
     etiquetaBaja: String,
     valor: String,
     unidad: String,
-    deviceName: String,
-    historial: List<String>,
+    tomas: List<String>,
     onToggle: () -> Unit,
 ) {
     val bg = if (rol == RolMedicion.ALTA) COLOR_ALTA else COLOR_BAJA
     val etiqueta = if (rol == RolMedicion.ALTA) etiquetaAlta else etiquetaBaja
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.weight(1f),
         colors = CardDefaults.elevatedCardColors(containerColor = bg),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                // Chip selector: tocar para cambiar alta/baja.
-                Surface(
-                    onClick = onToggle,
-                    color = Color.White.copy(alpha = 0.25f),
-                    shape = RoundedCornerShape(50),
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Surface(
+                onClick = onToggle,
+                color = Color.White.copy(alpha = 0.25f),
+                shape = RoundedCornerShape(50),
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Outlined.SwapHoriz,
-                            contentDescription = "Cambiar alta/baja",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text(
-                            "  $etiqueta",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                    Icon(Icons.Outlined.SwapHoriz, contentDescription = "Cambiar alta/baja", tint = Color.White, modifier = Modifier.size(16.dp))
+                    Text("  $etiqueta", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
                 }
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(valor, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text(
-                        " $unidad",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.padding(bottom = 3.dp),
-                    )
-                }
-                Text(
-                    deviceName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.8f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                historial.takeLast(5).reversed().forEach {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(valor, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(" $unidad", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f), modifier = Modifier.padding(bottom = 3.dp))
+            }
+            // 5 tomas (cada 5 s). Slots no llenos en blanco ("·").
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (i in 0 until SLOTS) {
+                    Text(
+                        tomas.getOrNull(i) ?: "·",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.85f),
+                    )
                 }
             }
         }

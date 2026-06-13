@@ -7,6 +7,8 @@ import com.checkingcontainer.feature.sensors.navigation.SENSORS_CONTAINER_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +52,7 @@ class SensorsViewModel @Inject constructor(
     val state: StateFlow<SensorsUiState> = _state.asStateFlow()
 
     private var scanJob: Job? = null
+    private var muestreoJob: Job? = null
 
     fun toggleEscaneo() {
         if (_state.value.escaneando) detener() else iniciar()
@@ -63,12 +66,26 @@ class SensorsViewModel @Inject constructor(
         _state.update { it.copy(escaneando = true, bluetoothApagado = false) }
         scanJob = viewModelScope.launch {
             scanner.observe().collect { lectura ->
+                // Cada anuncio actualiza solo el valor EN VIVO (número grande).
                 _state.update { s ->
                     val clave = "${lectura.deviceName}-${lectura.type}"
                     val previa = s.tarjetas[clave]
-                    val historial = ((previa?.historial ?: emptyList()) + lectura).takeLast(MAX_TOMAS)
+                    val tarjeta = previa?.copy(ultima = lectura)
+                        ?: TarjetaSensor(lectura.deviceName, lectura, emptyList())
+                    s.copy(tarjetas = s.tarjetas + (clave to tarjeta))
+                }
+            }
+        }
+        // Muestreo cada 5 s: registra la lectura actual en el historial (5 tomas = 25 s).
+        // Empieza vacío y se va llenando una muestra a la vez.
+        muestreoJob = viewModelScope.launch {
+            while (isActive) {
+                delay(INTERVALO_MUESTREO_MS)
+                _state.update { s ->
                     s.copy(
-                        tarjetas = s.tarjetas + (clave to TarjetaSensor(lectura.deviceName, lectura, historial)),
+                        tarjetas = s.tarjetas.mapValues { (_, t) ->
+                            t.copy(historial = (t.historial + t.ultima).takeLast(MAX_TOMAS))
+                        },
                     )
                 }
             }
@@ -78,6 +95,8 @@ class SensorsViewModel @Inject constructor(
     fun detener() {
         scanJob?.cancel()
         scanJob = null
+        muestreoJob?.cancel()
+        muestreoJob = null
         // Limpiar las tarjetas al detener: las lecturas dejan de ser válidas.
         _state.update { it.copy(escaneando = false, tarjetas = emptyMap()) }
     }
@@ -99,6 +118,7 @@ class SensorsViewModel @Inject constructor(
 
     private companion object {
         const val MAX_TOMAS = 5
+        const val INTERVALO_MUESTREO_MS = 5_000L
     }
 }
 
