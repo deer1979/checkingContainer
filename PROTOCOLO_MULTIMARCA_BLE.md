@@ -59,3 +59,26 @@ hex2dec(A){ return parseInt(A,16) }
   (conectar + suscribir notificaciones). El módulo debe soportar ambos.
 - Empezar por Yellow Jacket (ya resuelto, es el equipo del usuario). Añadir otras
   marcas es incremental cuando el usuario las tenga.
+
+## Recursos gráficos reutilizables de measureQuick (jun 2026)
+El APK trae 485 imágenes; clave para nuestra UI de detección de dispositivos:
+- `assets/www/assets/img/tool-pins/` → **93 íconos**: uno por INSTRUMENTO
+  (testo-557s, testo-550i, navac-nx4, navac-nsm1, cps-btm200, jb-manometer,
+  fp-sman, bluvac-pro, sauermann-th4, sporlan-pressure, seitron-temp-clamp...)
+  + logos `brand-*` por marca (brand-yj, brand-fp, brand-testo_logo, etc.).
+- `assets/www/assets/img/*_logo.png` → logos de marca a mayor tamaño.
+
+### Idea de UI (recordatorio del usuario)
+- La pantalla de mediciones lleva un **botón de Conexión** que escanea y
+  **detecta marca/modelo** del dispositivo; mostrar el ícono de la marca/equipo
+  detectado (reutilizando estos gráficos) hace la UX mucho más clara.
+
+### ⚠️ Nota legal antes de copiar al repo
+Los logos de marca (Testo, Yellow Jacket, etc.) y los íconos de producto son
+material con copyright/marca registrada de measureQuick y de cada fabricante.
+NO copiarlos al repo a la ligera. Opciones limpias:
+1. Usar SOLO los de las marcas que el usuario realmente posee/usa, o
+2. Crear íconos genéricos propios (un manómetro, una pinza, un vacuómetro
+   dibujados nosotros) que no infrinjan marcas, y mostrar el nombre del modelo
+   en texto. Para una v1 con Yellow Jacket, basta texto + ícono genérico.
+Decidir con el usuario cuando construyamos la UI.
