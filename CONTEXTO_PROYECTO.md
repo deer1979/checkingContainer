@@ -2,7 +2,13 @@
 
 > **Leer esto primero en cada sesión nueva.** Brief escrito por/para un ingeniero
 > Android senior (Kotlin + Jetpack Compose). Evita re-explorar el repo.
-> Última actualización: jun 2026, tras commits `1e8928a`…`3b83c79`.
+> Última actualización: jun 2026, tras commits `1e8928a`…`80e8ecc`.
+>
+> ⚡ **LO MÁS RECIENTE (no re-explorar): el feature de sensores BLE YA ESTÁ
+> IMPLEMENTADO.** Ver la sección **"Feature de sensores BLE — ESTADO ACTUAL"**
+> más abajo. Las secciones posteriores ("Idea futura", "Visión ampliada",
+> "Corrección de topología") son el trasfondo de investigación que llevó a esa
+> implementación; consúltalas solo si necesitas el porqué, no para saber qué hay.
 
 ## Qué es
 App Android **offline-first** para inspección de contenedores refrigerados (reefers).
@@ -93,7 +99,47 @@ fix rebote del preview PDF, PIN hasheado, sync visible, 27 tests, CI bloqueante.
 - Styles API: DIFERIDA (exige Compose 1.12 alpha + compileSdk 37 inexistente);
   decisión documentada en PLAN_DEUDA_TECNICA.md.
 
+## Feature de sensores BLE — ESTADO ACTUAL (jun 2026, commits hasta `80e8ecc`)
+**Implementado y en `main`.** Módulo **`feature/sensors/`** (la implementación viva;
+si existe un viejo `feature_sensores_ref/` es solo material de referencia copiado de
+los APK oficiales, no es código del app). Lectura de instrumentos Yellow Jacket YJACK
+**por BLE ADVERTISING (sin conexión GATT)**: los sensores emiten Service Data y la app
+los lee al vuelo.
+
+Qué hay ya hecho:
+- **`BleSensorScanner`** — escanea con `ScanSettings` (legacy=false, MATCH_AGGRESSIVE,
+  CALLBACK_ALL_MATCHES) y **reinicia el escaneo cada 7 s** para evitar el congelamiento
+  conocido de Android (mismo truco que la app oficial). Emite `SensorReading` por anuncio.
+- **`YjackParser`** — parseo LITTLE_ENDIAN. ⚠️ La presión del anuncio es **ABSOLUTA
+  (PSIA)** → `aPsig()` resta 14.696 para dar manométrica. La temperatura viene en **°F**
+  → `aCelsius()`. Centinela "sin dato" = `SensorReading.SIN_DATO = 3276.7`. (Verificado
+  contra lecturas reales del equipo.)
+- **`SensorsScreen` / `SensorsViewModel`** — pantalla LIMPIA: sin barra inferior global
+  (se oculta en `AuthenticatedShell` para rutas `sensors/`), sin encabezado; `BarraSuperior`
+  con volver + identidad + estado + botón Bluetooth. Tarjeta **Corriente arriba**, luego
+  **Presiones** y **Temperaturas** como `FilaAltaBaja`. Roles **ALTA (rojo) / BAJA (celeste)**
+  se alternan por lectura con un chip (`toggleRol`). Muestreo cada 5 s al historial
+  (5 tomas). `detener()` limpia las tarjetas.
+- **Tabla PT incrustada + cálculos**: `res/raw/refrigerant_data.json` (131 gases extraídos
+  de YJACK VIEW) → `RefrigerantRepo` la carga; `Saturacion.kt` interpola la temp de
+  saturación e calcula **superheat** y **subcooling** (funciones puras, 6 tests en
+  `SaturacionTest`). En pantalla: `SelectorRefrigerante` (desplegable, por defecto
+  **R-134a**) + sección **"Saturación y rendimiento"** con dos tarjetas: Baja/Succión
+  (sat. vapor + superheat) y Alta/Descarga (sat. líquido + subcooling).
+
+DIFERIDO (NO está hecho — pendientes reales del feature):
+- Layout: hoy es una **sección separada** "Saturación y rendimiento". El usuario quería
+  evaluar fusionar todo en **una sola columna por lado** (presión→temp→sat→SH/SC); quedó
+  pendiente de decidir tras probar.
+- **Auto-desconexión por inactividad** (timeout).
+- **Corrección de altitud por GPS** (`gauge = (psia−14.7) + elev_ft×0.49/1000`).
+- **Vacuómetro** (micrones) y **pinzas de temperatura** como sensores adicionales.
+- **Persistir el snapshot de mediciones** en el Estimado/PTI e imprimirlo en el PDF.
+
+---
+
 ## Idea futura: lectura automática del manómetro por Bluetooth (investigado jun 2026)
+> Trasfondo histórico de la investigación. El resultado está arriba en "ESTADO ACTUAL".
 Equipo del usuario: **Yellow Jacket TITANMAX** (P/N 40881), BLE, anuncia como
 `TITAN-2503-5221` (MAC 60:B6:47:7A:75:9A). Objetivo: capturar presiones/temps
 del PTI sin digitar.
