@@ -146,9 +146,13 @@ de las presiones+temps del equipo y la tabla PT. Falta su contraparte: el **OBJE
 - ⚠️ El reto NO es el cálculo ni la UI, es **de dónde sale el objetivo**: en reefers no
   hay tabla universal tipo AC residencial; depende de **marca/modelo/refrigerante/setpoint**
   (lo fija la TXV/EEV del equipo). "El objetivo lo dicen los datos técnicos del fabricante."
-- Plan recomendado v1: **objetivo/rango configurable** que el técnico ingresa una vez
-  (p. ej. SH 4–8 °C, SC 3–6 °C) + barra + captura auto cuando medido∈rango. Evolución:
-  tabla por modelo/refrigerante; luego hoja de especificación del fabricante.
+- **SOLUCIÓN DEFINIDA por el usuario (jun 2026):** el objetivo lo **ingresa el técnico
+  manualmente**, no lo deduce la app. La pantalla muestra un **aviso/ayuda** del tipo
+  *"Consulta en el manual del equipo o en la web el superheat y subcooling objetivo para
+  tu setpoint (p. ej. −18 °C) e ingrésalos aquí"*. Así NO importa marca/modelo: el dato
+  técnico lo aporta el usuario una sola vez. ⇒ Campos **"SH objetivo"** y **"SC objetivo"**
+  (con rango opcional) + el aviso; la app compara medido vs objetivo y pinta la barra.
+  (Evolución opcional a futuro: recordar el objetivo por equipo/modelo para no re-teclear.)
 - En la pantalla habrá que **etiquetar claramente "medido" vs "objetivo"** cuando exista
   el target (hoy solo está el medido).
 - Referencia en el APK oficial: método `calculateSuperheatTarget` (MeasureCalcUtil).
