@@ -47,6 +47,13 @@ mal nombrado; vacías ⇒ modo solo-local.
   compartidos a nivel pantalla con `rememberSaveable`; `EstimadoPdfGenerator` corre
   en `Dispatchers.Default`, fotos a 700px; `PdfPreviewSheet` con
   `sheetGesturesEnabled = false` para que no rebote).
+  **Fotos por ítem (jun 2026): `DamageItem` guarda `damagePhotos`/`repairPhotos`
+  como LISTAS (antes era una sola foto por lado), máx `MAX_FOTOS_POR_GRUPO`=6.
+  Migración perezosa en `EstimadoEntity.parsePhotos` lee el formato viejo (campo
+  único `damagePhoto`/`repairPhoto`) y el nuevo (array) sin perder datos; los
+  damages se sincronizan como string JSON, así que NO hubo migración de esquema
+  Room. Storage usa ruta única por foto (sufijo UUID). UI: galería horizontal
+  (`LazyRow`) por grupo con miniaturas + botón agregar; PDF en cuadrícula 3/fila.**
 - `feature/{login,announcements,users,admin,settings,splash}` — login email+PIN 6
   dígitos; anuncios con adjuntos; users CRUD (admin); settings con tema.
 - `MyApplication` implementa `SingletonImageLoader.Factory`: Coil con memCache 20% +
