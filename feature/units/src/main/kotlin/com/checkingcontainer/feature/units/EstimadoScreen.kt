@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.shape.CircleShape
@@ -97,6 +99,7 @@ import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.EstimadoTotals
+import com.checkingcontainer.core.model.MAX_FOTOS_POR_GRUPO
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
@@ -419,8 +422,8 @@ fun EstimadoScreen(
                             onEditDescriptionClick = { onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.EditDamage(item.id))) },
                             onRepairClick = { onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.RepairItem(item.id))) },
                             onRemoveClick = { onEvent(EstimadoEvent.RemoveDamageItem(item.id)) },
-                            onRemoveDamagePhoto = { onEvent(EstimadoEvent.RemoveDamagePhoto(item.id)) },
-                            onRemoveRepairPhoto = { onEvent(EstimadoEvent.RemoveRepairPhoto(item.id)) },
+                            onRemoveDamagePhoto = { url -> onEvent(EstimadoEvent.RemoveDamagePhoto(item.id, url)) },
+                            onRemoveRepairPhoto = { url -> onEvent(EstimadoEvent.RemoveRepairPhoto(item.id, url)) },
                             onRequestGalleryPhoto = { isRepair -> requestGalleryPhoto(item.id, isRepair) },
                             onRequestCameraPhoto = { isRepair -> requestCameraPhoto(item.id, isRepair) },
                         )
@@ -545,8 +548,8 @@ private fun DamageItemCard(
     onEditDescriptionClick: () -> Unit,
     onRepairClick: () -> Unit,
     onRemoveClick: () -> Unit,
-    onRemoveDamagePhoto: () -> Unit,
-    onRemoveRepairPhoto: () -> Unit,
+    onRemoveDamagePhoto: (String) -> Unit,
+    onRemoveRepairPhoto: (String) -> Unit,
     // isRepair: false = foto del daño (antes), true = foto de la reparación (después)
     onRequestGalleryPhoto: (Boolean) -> Unit,
     onRequestCameraPhoto: (Boolean) -> Unit,
@@ -587,61 +590,30 @@ private fun DamageItemCard(
 
         Text(item.damageDescription, style = MaterialTheme.typography.bodyMedium)
 
-        // Fotos lado a lado: daño (izq) / reparación (der)
-        val damagePhoto = item.damagePhoto
-        val repairPhoto = item.repairPhoto
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Foto daño — izquierda
-            Box(Modifier.weight(1f)) {
-                if (damagePhoto != null) {
-                    PhotoThumbnail(
-                        url = damagePhoto,
-                        label = "ANTES",
-                        canRemove = !isClosed,
-                        onRemove = onRemoveDamagePhoto,
-                    )
-                } else if (!isClosed) {
-                    PhotoPickerButton(
-                        label = "Foto del daño",
-                        isUploading = isUploading,
-                        onGallery = { onRequestGalleryPhoto(false) },
-                        onCamera = { onRequestCameraPhoto(false) },
-                    )
-                }
-            }
-            // Foto reparación — derecha
-            Box(Modifier.weight(1f)) {
-                if (repairPhoto != null) {
-                    PhotoThumbnail(
-                        url = repairPhoto,
-                        label = "DESPUÉS",
-                        canRemove = !isClosed,
-                        onRemove = onRemoveRepairPhoto,
-                    )
-                } else if (item.status == DamageItemStatus.REPARADO && !isClosed) {
-                    PhotoPickerButton(
-                        label = "Foto reparación",
-                        isUploading = isUploading,
-                        onGallery = { onRequestGalleryPhoto(true) },
-                        onCamera = { onRequestCameraPhoto(true) },
-                    )
-                } else if (item.status == DamageItemStatus.PENDIENTE) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            "DESPUÉS",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        )
-                    }
-                }
-            }
+        // Fotos del daño (antes): varias por ítem, en galería horizontal.
+        PhotoGroup(
+            titulo = "Daño (antes)",
+            fotos = item.damagePhotos,
+            isUploading = isUploading,
+            puedeAgregar = !isClosed && item.damagePhotos.size < MAX_FOTOS_POR_GRUPO,
+            puedeEliminar = !isClosed,
+            onRemove = onRemoveDamagePhoto,
+            onGallery = { onRequestGalleryPhoto(false) },
+            onCamera = { onRequestCameraPhoto(false) },
+        )
+
+        // Fotos de la reparación (después): solo una vez reparado el ítem.
+        if (item.status == DamageItemStatus.REPARADO) {
+            PhotoGroup(
+                titulo = "Reparación (después)",
+                fotos = item.repairPhotos,
+                isUploading = isUploading,
+                puedeAgregar = !isClosed && item.repairPhotos.size < MAX_FOTOS_POR_GRUPO,
+                puedeEliminar = !isClosed,
+                onRemove = onRemoveRepairPhoto,
+                onGallery = { onRequestGalleryPhoto(true) },
+                onCamera = { onRequestCameraPhoto(true) },
+            )
         }
 
         if (item.status == DamageItemStatus.REPARADO && item.repairAction.isNotEmpty()) {
@@ -882,39 +854,74 @@ private fun EditValorSheet(
 
 // ── Componentes auxiliares ────────────────────────────────────────────────────
 
+/**
+ * Grupo de fotos (daño o reparación) de un ítem: galería horizontal con las
+ * miniaturas existentes y, al final, el botón para agregar otra (hasta el máximo).
+ */
 @Composable
-private fun PhotoThumbnail(url: String, label: String, canRemove: Boolean, onRemove: () -> Unit = {}) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(8.dp)),
-    ) {
-        // Thumbnail cuadrado de media pantalla: decodificar a 600px en vez de
-        // la resolución completa de la cámara ahorra memoria y carga más rápido.
+private fun PhotoGroup(
+    titulo: String,
+    fotos: List<String>,
+    isUploading: Boolean,
+    puedeAgregar: Boolean,
+    puedeEliminar: Boolean,
+    onRemove: (String) -> Unit,
+    onGallery: () -> Unit,
+    onCamera: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            "$titulo · ${fotos.size}/$MAX_FOTOS_POR_GRUPO",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (fotos.isEmpty() && !puedeAgregar) {
+            Text(
+                "Sin fotos",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+        } else {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(fotos, key = { it }) { url ->
+                    PhotoThumbnail(
+                        url = url,
+                        canRemove = puedeEliminar,
+                        onRemove = { onRemove(url) },
+                        modifier = Modifier.size(110.dp),
+                    )
+                }
+                if (puedeAgregar) {
+                    item(key = "add-$titulo") {
+                        PhotoPickerButton(
+                            isUploading = isUploading,
+                            onGallery = onGallery,
+                            onCamera = onCamera,
+                            modifier = Modifier.size(110.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhotoThumbnail(url: String, canRemove: Boolean, onRemove: () -> Unit = {}, modifier: Modifier = Modifier) {
+    Box(modifier.clip(RoundedCornerShape(8.dp))) {
+        // Decodificar a 600px en vez de la resolución completa de la cámara ahorra
+        // memoria y carga más rápido.
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(url)
                 .size(600)
                 .build(),
-            contentDescription = label,
+            contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         )
-        Surface(
-            modifier = Modifier.align(Alignment.BottomStart).padding(4.dp),
-            color = Color.Black.copy(alpha = 0.55f),
-            shape = RoundedCornerShape(4.dp),
-        ) {
-            Text(
-                label,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
-            )
-        }
         if (canRemove) {
             IconButton(
                 onClick = onRemove,
@@ -931,11 +938,9 @@ private fun PhotoThumbnail(url: String, label: String, canRemove: Boolean, onRem
 }
 
 @Composable
-private fun PhotoPickerButton(label: String, isUploading: Boolean, onGallery: () -> Unit, onCamera: () -> Unit) {
+private fun PhotoPickerButton(isUploading: Boolean, onGallery: () -> Unit, onCamera: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
+        modifier
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -944,14 +949,12 @@ private fun PhotoPickerButton(label: String, isUploading: Boolean, onGallery: ()
         if (isUploading) {
             CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
         } else {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                IconButton(onClick = onCamera, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Outlined.AddAPhoto, contentDescription = "Cámara", modifier = Modifier.size(26.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = onCamera, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Outlined.AddAPhoto, contentDescription = "Cámara", modifier = Modifier.size(24.dp))
                 }
-                IconButton(onClick = onGallery, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Outlined.Image, contentDescription = "Galería", modifier = Modifier.size(26.dp))
+                IconButton(onClick = onGallery, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Outlined.Image, contentDescription = "Galería", modifier = Modifier.size(24.dp))
                 }
             }
         }

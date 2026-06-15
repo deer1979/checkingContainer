@@ -58,8 +58,8 @@ sealed interface EstimadoEvent {
     data object ConfirmAddDamage : EstimadoEvent
     data class ConfirmEditDamage(val itemId: String) : EstimadoEvent
     data class RemoveDamageItem(val itemId: String) : EstimadoEvent
-    data class RemoveDamagePhoto(val itemId: String) : EstimadoEvent
-    data class RemoveRepairPhoto(val itemId: String) : EstimadoEvent
+    data class RemoveDamagePhoto(val itemId: String, val url: String) : EstimadoEvent
+    data class RemoveRepairPhoto(val itemId: String, val url: String) : EstimadoEvent
     // Reparación
     data class RepairActionChange(val itemId: String, val value: String) : EstimadoEvent
     data class ConfirmRepair(val itemId: String) : EstimadoEvent

@@ -55,7 +55,10 @@ class EstimadosRepositoryImpl @Inject constructor(
         bytes: ByteArray,
     ): String = withContext(ioDispatcher) {
         val phase = if (isDano) "dano" else "reparacion"
-        storageService.uploadToPath("estimados/$inspectionId/items/$itemId/$phase.jpg", bytes)
+        // Sufijo único: cada ítem admite varias fotos por fase; un nombre fijo
+        // sobrescribiría la anterior.
+        val unico = java.util.UUID.randomUUID().toString().take(8)
+        storageService.uploadToPath("estimados/$inspectionId/items/$itemId/$phase-$unico.jpg", bytes)
     }
 
     override suspend fun deletePhoto(url: String): Unit = withContext(ioDispatcher) {

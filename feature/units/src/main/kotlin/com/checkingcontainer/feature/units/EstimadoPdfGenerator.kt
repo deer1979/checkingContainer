@@ -45,8 +45,9 @@ class EstimadoPdfGenerator @Inject constructor(
         // Pre-cargar todas las fotos antes de empezar a dibujar
         val photos = mutableMapOf<String, Bitmap?>()
         estimado.damages.forEach { item ->
-            item.damagePhoto?.let { url -> photos.getOrPut(url) { loadBitmap(loader, url) } }
-            item.repairPhoto?.let { url -> photos.getOrPut(url) { loadBitmap(loader, url) } }
+            (item.damagePhotos + item.repairPhotos).forEach { url ->
+                photos.getOrPut(url) { loadBitmap(loader, url) }
+            }
         }
 
         val doc = PdfDocument()
@@ -129,12 +130,38 @@ class EstimadoPdfGenerator @Inject constructor(
                     pLabel,
                 )
             }
-            canvas.drawText(
-                caption,
-                px + (size - pLabel.measureText(caption)) / 2,
-                py + size + 11f,
-                pLabel,
-            )
+            if (caption.isNotEmpty()) {
+                canvas.drawText(
+                    caption,
+                    px + (size - pLabel.measureText(caption)) / 2,
+                    py + size + 11f,
+                    pLabel,
+                )
+            }
+        }
+
+        // Dibuja un grupo de fotos en cuadrícula (3 por fila), precedido de su
+        // etiqueta ("Daño" / "Reparación"). Salta de página si no caben.
+        fun photoGrid(label: String, urls: List<String>) {
+            if (urls.isEmpty()) return
+            checkBreak(18f)
+            canvas.drawText(label, margin, y, pLabel); y += 14f
+            val perRow = 3
+            val gap = 8f
+            val size = (contentW - (perRow - 1) * gap) / perRow
+            var i = 0
+            while (i < urls.size) {
+                val rowCount = minOf(perRow, urls.size - i)
+                checkBreak(size + 10f)
+                val rowY = y
+                for (c in 0 until rowCount) {
+                    val px = margin + c * (size + gap)
+                    photoBox(photos[urls[i + c]], px, rowY, size, "")
+                }
+                y += size + 10f
+                i += rowCount
+            }
+            y += 4f
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -196,21 +223,9 @@ class EstimadoPdfGenerator @Inject constructor(
 
             y += drawMultiline(item.damageDescription, pBody, contentW); y += 8f
 
-            // Fotos lado a lado
-            val photoSz = 175f
-            val gap = (contentW - 2 * photoSz) / 3
-            val lx = margin + gap
-            val rx = lx + photoSz + gap
-
-            val hasDano = item.damagePhoto != null
-            val hasRep = item.repairPhoto != null
-            if (hasDano || hasRep) {
-                checkBreak(photoSz + 24f)
-                val py = y
-                photoBox(item.damagePhoto?.let { photos[it] }, lx, py, photoSz, "ANTES")
-                photoBox(item.repairPhoto?.let { photos[it] }, rx, py, photoSz, "DESPUÉS")
-                y += photoSz + 32f
-            }
+            // Fotos: grupo de daño (antes) y grupo de reparación (después).
+            photoGrid("Daño (antes):", item.damagePhotos)
+            photoGrid("Reparación (después):", item.repairPhotos)
 
             // Acción de reparación
             if (item.repairAction.isNotEmpty()) {

@@ -12,6 +12,7 @@ import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoStatus
+import com.checkingcontainer.core.model.MAX_FOTOS_POR_GRUPO
 import com.checkingcontainer.feature.units.navigation.ESTIMADO_INSPECTION_ID_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -147,24 +148,21 @@ class EstimadoViewModel @Inject constructor(
             is EstimadoEvent.RemoveDamageItem -> {
                 val item = _state.value.damages.find { it.id == event.itemId } ?: return
                 _state.update { it.copy(damages = it.damages - item) }
-                item.damagePhoto?.let { url -> deletePhotoAsync(url) }
-                item.repairPhoto?.let { url -> deletePhotoAsync(url) }
+                (item.damagePhotos + item.repairPhotos).forEach { url -> deletePhotoAsync(url) }
             }
             is EstimadoEvent.RemoveDamagePhoto -> {
-                val item = _state.value.damages.find { it.id == event.itemId } ?: return
-                item.damagePhoto?.let { deletePhotoAsync(it) }
+                deletePhotoAsync(event.url)
                 _state.update { s ->
                     s.copy(damages = s.damages.map {
-                        if (it.id == event.itemId) it.copy(damagePhoto = null) else it
+                        if (it.id == event.itemId) it.copy(damagePhotos = it.damagePhotos - event.url) else it
                     })
                 }
             }
             is EstimadoEvent.RemoveRepairPhoto -> {
-                val item = _state.value.damages.find { it.id == event.itemId } ?: return
-                item.repairPhoto?.let { deletePhotoAsync(it) }
+                deletePhotoAsync(event.url)
                 _state.update { s ->
                     s.copy(damages = s.damages.map {
-                        if (it.id == event.itemId) it.copy(repairPhoto = null) else it
+                        if (it.id == event.itemId) it.copy(repairPhotos = it.repairPhotos - event.url) else it
                     })
                 }
             }
@@ -246,8 +244,13 @@ class EstimadoViewModel @Inject constructor(
                         isDirty = true,
                         damages = s.damages.map { item ->
                             if (item.id != itemId) item
-                            else if (isDano) item.copy(damagePhoto = url)
-                            else item.copy(repairPhoto = url)
+                            // Ignora la foto si el grupo ya llegó al máximo (defensa extra;
+                            // la UI ya oculta el botón al alcanzar MAX_FOTOS_POR_GRUPO).
+                            else if (isDano && item.damagePhotos.size < MAX_FOTOS_POR_GRUPO)
+                                item.copy(damagePhotos = item.damagePhotos + url)
+                            else if (!isDano && item.repairPhotos.size < MAX_FOTOS_POR_GRUPO)
+                                item.copy(repairPhotos = item.repairPhotos + url)
+                            else item
                         },
                     )
                 }

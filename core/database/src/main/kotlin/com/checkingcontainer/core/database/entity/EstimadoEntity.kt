@@ -64,9 +64,11 @@ private fun parseDamages(json: String): List<DamageItem> = buildList {
             DamageItem(
                 id = obj.optString("id"),
                 damageDescription = obj.optString("damageDescription"),
-                damagePhoto = obj.optString("damagePhoto").ifEmpty { null },
+                // Lee la lista nueva (damagePhotos) y, si no existe, migra desde el
+                // campo único legado (damagePhoto). Igual para reparación.
+                damagePhotos = parsePhotos(obj, "damagePhotos", "damagePhoto"),
                 repairAction = obj.optString("repairAction"),
-                repairPhoto = obj.optString("repairPhoto").ifEmpty { null },
+                repairPhotos = parsePhotos(obj, "repairPhotos", "repairPhoto"),
                 status = runCatching { DamageItemStatus.valueOf(obj.optString("status")) }
                     .getOrDefault(DamageItemStatus.PENDIENTE),
                 laborCost = if (obj.has("laborCost") && !obj.isNull("laborCost")) obj.getDouble("laborCost") else null,
@@ -76,6 +78,20 @@ private fun parseDamages(json: String): List<DamageItem> = buildList {
     }
 }
 
+/**
+ * Lee las fotos de un ítem aceptando ambos formatos: el array nuevo [arrayKey]
+ * y, como respaldo, el campo único legado [legacyKey] (estimados creados antes
+ * de soportar varias fotos por ítem).
+ */
+private fun parsePhotos(obj: JSONObject, arrayKey: String, legacyKey: String): List<String> {
+    obj.optJSONArray(arrayKey)?.let { arr ->
+        return buildList {
+            repeat(arr.length()) { i -> arr.optString(i).takeIf { it.isNotEmpty() }?.let { add(it) } }
+        }
+    }
+    return obj.optString(legacyKey).takeIf { it.isNotEmpty() }?.let { listOf(it) } ?: emptyList()
+}
+
 private fun List<DamageItem>.toJson(): String {
     val arr = JSONArray()
     forEach { item ->
@@ -83,9 +99,9 @@ private fun List<DamageItem>.toJson(): String {
             JSONObject().apply {
                 put("id", item.id)
                 put("damageDescription", item.damageDescription)
-                put("damagePhoto", item.damagePhoto ?: "")
+                put("damagePhotos", JSONArray(item.damagePhotos))
                 put("repairAction", item.repairAction)
-                put("repairPhoto", item.repairPhoto ?: "")
+                put("repairPhotos", JSONArray(item.repairPhotos))
                 put("status", item.status.name)
                 if (item.laborCost != null) put("laborCost", item.laborCost) else put("laborCost", JSONObject.NULL)
                 if (item.materialCost != null) put("materialCost", item.materialCost) else put("materialCost", JSONObject.NULL)

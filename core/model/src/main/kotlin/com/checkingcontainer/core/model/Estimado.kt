@@ -5,13 +5,16 @@ import java.util.UUID
 data class DamageItem(
     val id: String = UUID.randomUUID().toString(),
     val damageDescription: String = "",
-    val damagePhoto: String? = null,
+    val damagePhotos: List<String> = emptyList(),
     val repairAction: String = "",
-    val repairPhoto: String? = null,
+    val repairPhotos: List<String> = emptyList(),
     val status: DamageItemStatus = DamageItemStatus.PENDIENTE,
     val laborCost: Double? = null,
     val materialCost: Double? = null,
 )
+
+/** Máximo de fotos por grupo (daño / reparación) en cada ítem. */
+const val MAX_FOTOS_POR_GRUPO = 6
 
 enum class DamageItemStatus { PENDIENTE, REPARADO }
 
