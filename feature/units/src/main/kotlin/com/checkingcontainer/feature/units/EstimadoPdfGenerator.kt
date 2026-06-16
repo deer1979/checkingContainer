@@ -110,6 +110,17 @@ class EstimadoPdfGenerator @Inject constructor(
             return sl.height.toFloat()
         }
 
+        // Alto que ocuparía un texto multilínea (sin dibujarlo): se usa para decidir
+        // saltos de página antes de empezar a escribir.
+        fun measureHeight(text: String, paint: TextPaint, width: Float): Float {
+            if (text.isEmpty()) return 0f
+            return StaticLayout.Builder
+                .obtain(text, 0, text.length, paint, width.toInt())
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(2f, 1f)
+                .build().height.toFloat()
+        }
+
         fun infoRow(label: String, value: String) {
             canvas.drawText(label, margin, y, pLabel)
             canvas.drawText(value, margin + 110f, y, pBody)
@@ -220,7 +231,16 @@ class EstimadoPdfGenerator @Inject constructor(
         // ÍTEMS DE DAÑO
         // ════════════════════════════════════════════════════════════════════
         estimado.damages.forEachIndexed { idx, item ->
-            checkBreak(50f)
+            // Mantener el ítem junto: reservar encabezado + descripción + (si hay
+            // fotos) la etiqueta y la primera fila, para que la imagen no quede
+            // separada de su texto al pie de página. Si todo eso no cabe en lo que
+            // resta, saltamos a una página nueva antes de empezar el ítem. Tope al
+            // alto útil de página para no quedar en bucle con ítems muy altos.
+            val descH = measureHeight(item.damageDescription, pBody, contentW)
+            val primerasFotos = item.damagePhotos.ifEmpty { item.repairPhotos }
+            val filaFotosH = if (primerasFotos.isNotEmpty()) 14f + (contentW - 16f) / 3 + 10f else 0f
+            val bloqueInicial = (16f + descH + 8f + filaFotosH).coerceAtMost(pageH - 2 * margin)
+            checkBreak(bloqueInicial)
 
             canvas.drawText("ÍTEM ${idx + 1}", margin, y, pSection); y += 4f
 
