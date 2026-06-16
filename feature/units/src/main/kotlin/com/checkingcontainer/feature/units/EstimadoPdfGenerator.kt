@@ -144,11 +144,14 @@ class EstimadoPdfGenerator @Inject constructor(
         // etiqueta ("Daño" / "Reparación"). Salta de página si no caben.
         fun photoGrid(label: String, urls: List<String>) {
             if (urls.isEmpty()) return
-            checkBreak(18f)
-            canvas.drawText(label, margin, y, pLabel); y += 14f
             val perRow = 3
             val gap = 8f
             val size = (contentW - (perRow - 1) * gap) / perRow
+            // Reserva la etiqueta + la primera fila JUNTAS: si no caben, salta de
+            // página antes de dibujar el rótulo. Así la imagen queda pegada debajo
+            // de su etiqueta y no se estorba un rótulo huérfano al pie de página.
+            checkBreak(14f + size + 10f)
+            canvas.drawText(label, margin, y, pLabel); y += 14f
             var i = 0
             while (i < urls.size) {
                 val rowCount = minOf(perRow, urls.size - i)
