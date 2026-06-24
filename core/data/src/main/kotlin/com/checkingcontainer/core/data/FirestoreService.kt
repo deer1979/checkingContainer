@@ -18,6 +18,7 @@ import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.core.domain.SyncStatusRepository
 import com.checkingcontainer.core.network.FirestoreDataSource
 import com.google.firebase.firestore.DocumentChange
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -327,6 +328,47 @@ class FirestoreService @Inject constructor(
             }
         } catch (e: Exception) {
             Log.w(TAG, "fetchAllEstimados: ${e.message}")
+            emptyList()
+        }
+    }
+
+    suspend fun fetchEstimadosByContainerNo(containerNo: String): List<EstimadoEntity> = withContext(ioDispatcher) {
+        try {
+            firestore.collection(COL_ESTIMADOS)
+                .whereEqualTo("containerNo", containerNo)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { doc ->
+                    val id = doc.safeLong("id") ?: return@mapNotNull null
+                    val inspectionId = doc.safeLong("inspectionId") ?: return@mapNotNull null
+                    EstimadoEntity(
+                        id = id,
+                        inspectionId = inspectionId,
+                        containerNo = doc.getString("containerNo") ?: "",
+                        manufacturer = doc.getString("manufacturer") ?: "",
+                        unitModel = doc.getString("unitModel") ?: "",
+                        unitModelNo = doc.getString("unitModelNo") ?: "",
+                        unitSerialNo = doc.getString("unitSerialNo") ?: "",
+                        yearOfBuilt = doc.getString("yearOfBuilt") ?: "",
+                        unitType = doc.getString("unitType") ?: "",
+                        clientName = doc.getString("clientName") ?: "",
+                        location = doc.getString("location") ?: "",
+                        technicianId = doc.safeLong("technicianId") ?: 0L,
+                        technicianName = doc.getString("technicianName") ?: "",
+                        createdAt = doc.safeLong("createdAt") ?: 0L,
+                        approvedAt = doc.safeLong("approvedAt"),
+                        closedAt = doc.safeLong("closedAt"),
+                        status = runCatching { EstimadoStatus.valueOf(doc.getString("status") ?: "") }
+                            .getOrDefault(EstimadoStatus.ABIERTO),
+                        damages = doc.getString("damages") ?: "[]",
+                        hasIva = doc.safeInt("hasIva") ?: 0,
+                        reportUrl = doc.getString("reportUrl"),
+                    )
+                }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchEstimadosByContainerNo: ${e.message}")
             emptyList()
         }
     }

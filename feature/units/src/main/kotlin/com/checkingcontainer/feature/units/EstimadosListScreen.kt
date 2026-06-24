@@ -15,6 +15,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.Sensors
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ElevatedCard
@@ -49,10 +50,16 @@ import java.util.Locale
 fun EstimadosListRoute(
     onEstimadoClick: (Long) -> Unit,
     onMeasureClick: (String) -> Unit = {},
+    onSearchClick: () -> Unit = {},
     viewModel: EstimadosListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    EstimadosListScreen(state = state, onEstimadoClick = onEstimadoClick, onMeasureClick = onMeasureClick)
+    EstimadosListScreen(
+        state = state,
+        onEstimadoClick = onEstimadoClick,
+        onMeasureClick = onMeasureClick,
+        onSearchClick = onSearchClick,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,6 +68,7 @@ fun EstimadosListScreen(
     state: EstimadosListUiState,
     onEstimadoClick: (Long) -> Unit,
     onMeasureClick: (String) -> Unit = {},
+    onSearchClick: () -> Unit = {},
 ) {
     val pagerState = rememberPagerState { 2 }
     val scope = rememberCoroutineScope()
@@ -69,6 +77,11 @@ fun EstimadosListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Estimados") },
+                actions = {
+                    IconButton(onClick = onSearchClick) {
+                        Icon(Icons.Outlined.Search, contentDescription = "Buscar contenedor")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),

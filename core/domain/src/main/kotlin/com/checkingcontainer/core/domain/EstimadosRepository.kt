@@ -14,4 +14,5 @@ interface EstimadosRepository {
     suspend fun uploadItemPhoto(inspectionId: Long, itemId: String, isDano: Boolean, bytes: ByteArray): String
     suspend fun deletePhoto(url: String)
     suspend fun uploadPdf(inspectionId: Long, bytes: ByteArray): String
+    suspend fun searchByContainerNo(containerNo: String): List<Estimado>
 }

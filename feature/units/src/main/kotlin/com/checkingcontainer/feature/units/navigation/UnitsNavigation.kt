@@ -6,6 +6,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.checkingcontainer.core.model.User
+import com.checkingcontainer.feature.units.ContainerSearchRoute
 import com.checkingcontainer.feature.units.EstimadoRoute
 import com.checkingcontainer.feature.units.EstimadosListRoute
 import com.checkingcontainer.feature.units.ReeferSearchRoute
@@ -15,6 +16,7 @@ import com.checkingcontainer.feature.units.UnitListRoute
 
 const val UNITS_ROUTE = "units"
 const val ESTIMADOS_LIST_ROUTE = "estimados"
+private const val ESTIMADOS_SEARCH_ROUTE = "estimados/buscar"
 private const val UNITS_ENTRY_BASE = "units/entry"
 private const val UNITS_ENTRY_ROUTE = "$UNITS_ENTRY_BASE?unitId={unitId}"
 private const val UNITS_SEARCH_ROUTE = "units/search"
@@ -96,6 +98,17 @@ fun NavGraphBuilder.estimadosGraph(
         EstimadosListRoute(
             onEstimadoClick = { inspId -> navController.navigate(estimadoRoute(inspId)) },
             onMeasureClick = onMeasureClick,
+            onSearchClick = { navController.navigate(ESTIMADOS_SEARCH_ROUTE) },
+        )
+    }
+    composable(route = ESTIMADOS_SEARCH_ROUTE) {
+        ContainerSearchRoute(
+            onEstimadoClick = { inspId ->
+                navController.navigate(estimadoRoute(inspId)) {
+                    popUpTo(ESTIMADOS_LIST_ROUTE)
+                }
+            },
+            onBack = { navController.popBackStack() },
         )
     }
 }

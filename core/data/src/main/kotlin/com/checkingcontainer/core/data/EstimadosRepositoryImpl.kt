@@ -73,4 +73,13 @@ class EstimadosRepositoryImpl @Inject constructor(
                 contentType = "application/pdf",
             )
         }
+
+    override suspend fun searchByContainerNo(containerNo: String): List<Estimado> =
+        withContext(ioDispatcher) {
+            val local = dao.findByContainerNo(containerNo)
+            if (local.isNotEmpty()) return@withContext local.map { it.toDomain() }
+            val remote = firestoreService.fetchEstimadosByContainerNo(containerNo)
+            remote.forEach { dao.upsert(it) }
+            remote.map { it.toDomain() }
+        }
 }
