@@ -3,6 +3,7 @@ package com.checkingcontainer.feature.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.AuthRepository
+import com.checkingcontainer.core.domain.BootstrapRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,10 +15,17 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val bootstrapRepository: BootstrapRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LoginUiState())
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
+
+    init {
+        // Primera instalación: si Room está vacío, descarga todos los datos de
+        // Firestore antes de que el usuario intente hacer login.
+        viewModelScope.launch { bootstrapRepository.syncIfNeeded() }
+    }
 
     fun onNickChange(value: String) {
         _state.update { it.copy(nick = value.trim().lowercase(), errorMessage = null) }

@@ -35,6 +35,9 @@ interface InspectionDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(inspection: InspectionEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(inspection: InspectionEntity): Long
+
     @Update
     suspend fun update(inspection: InspectionEntity)
 

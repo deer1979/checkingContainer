@@ -9,7 +9,12 @@ import com.checkingcontainer.core.database.entity.InspectionEntity
 import com.checkingcontainer.core.database.entity.ReeferUnitEntity
 import com.checkingcontainer.core.database.entity.UserEntity
 import com.checkingcontainer.core.model.Brand
+import com.checkingcontainer.core.model.EstimadoStatus
+import com.checkingcontainer.core.model.InspStatus
+import com.checkingcontainer.core.model.JobTitle
+import com.checkingcontainer.core.model.PtiInstruction
 import com.checkingcontainer.core.model.ReeferEquipment
+import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.core.domain.SyncStatusRepository
 import com.checkingcontainer.core.network.FirestoreDataSource
 import com.google.firebase.firestore.DocumentChange
@@ -207,6 +212,123 @@ class FirestoreService @Inject constructor(
             .document(id.toString())
             .delete()
             .await()
+    }
+
+    // ── Bootstrap fetch-all (nuevo dispositivo) ──────────────────────────────
+
+    suspend fun fetchAllUsers(): List<UserEntity> = withContext(ioDispatcher) {
+        try {
+            firestore.collection(COL_USERS).get().await().documents.mapNotNull { doc ->
+                val id = doc.safeLong("id") ?: return@mapNotNull null
+                UserEntity(
+                    id = id,
+                    firstName = doc.getString("firstName") ?: "",
+                    lastName = doc.getString("lastName") ?: "",
+                    nick = doc.getString("nick") ?: return@mapNotNull null,
+                    pin = doc.getString("pin") ?: "",
+                    jobTitle = runCatching { JobTitle.valueOf(doc.getString("jobTitle") ?: "") }
+                        .getOrDefault(JobTitle.Tecnico),
+                    role = runCatching { UserRole.valueOf(doc.getString("role") ?: "") }
+                        .getOrDefault(UserRole.Viewer),
+                    company = doc.getString("company") ?: "",
+                    location = doc.getString("location") ?: "",
+                    isActive = doc.getBoolean("isActive") ?: true,
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchAllUsers: ${e.message}")
+            emptyList()
+        }
+    }
+
+    suspend fun fetchAllReeferUnits(): List<ReeferUnitEntity> = withContext(ioDispatcher) {
+        try {
+            firestore.collection(COL_REEFER_UNITS).get().await().documents.mapNotNull { doc ->
+                val containerNo = doc.getString("containerNo") ?: doc.id
+                ReeferUnitEntity(
+                    containerNo = containerNo,
+                    manufacturer = doc.getString("manufacturer") ?: "",
+                    unitModel = doc.getString("unitModel") ?: "",
+                    unitModelNo = doc.getString("unitModelNo") ?: "",
+                    unitSerialNo = doc.getString("unitSerialNo") ?: "",
+                    yearOfBuilt = doc.getString("yearOfBuilt") ?: "",
+                    brand = runCatching { Brand.valueOf(doc.getString("brand") ?: "") }
+                        .getOrDefault(Brand.CARRIER),
+                    unitType = doc.getString("unitType") ?: "",
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchAllReeferUnits: ${e.message}")
+            emptyList()
+        }
+    }
+
+    suspend fun fetchAllInspections(): List<InspectionEntity> = withContext(ioDispatcher) {
+        try {
+            firestore.collectionGroup(COL_INSPECTIONS).get().await().documents.mapNotNull { doc ->
+                val id = doc.safeLong("id") ?: return@mapNotNull null
+                val containerNo = doc.getString("containerNo") ?: return@mapNotNull null
+                val createdAt = doc.safeLong("createdAt") ?: return@mapNotNull null
+                InspectionEntity(
+                    id = id,
+                    containerNo = containerNo,
+                    createdAt = createdAt,
+                    status = runCatching { InspStatus.valueOf(doc.getString("status") ?: "") }
+                        .getOrDefault(InspStatus.INSP),
+                    ptiInstruction = doc.getString("ptiInstruction")
+                        ?.let { runCatching { PtiInstruction.valueOf(it) }.getOrNull() },
+                    deployedAs = doc.getString("deployedAs"),
+                    technicianId = doc.safeLong("technicianId") ?: 0L,
+                    technicianName = doc.getString("technicianName") ?: "",
+                    location = doc.getString("location") ?: "",
+                    observations = doc.getString("observations") ?: "",
+                    idDigitador = doc.getString("idDigitador"),
+                    timestampDigitador = doc.safeLong("timestampDigitador"),
+                    statusDigitacion = doc.getString("statusDigitacion"),
+                    noteDigitacion = doc.getString("noteDigitacion"),
+                    avisoDigitacion = doc.getString("avisoDigitacion"),
+                    diasPendiente = doc.safeInt("diasPendiente"),
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchAllInspections: ${e.message}")
+            emptyList()
+        }
+    }
+
+    suspend fun fetchAllEstimados(): List<EstimadoEntity> = withContext(ioDispatcher) {
+        try {
+            firestore.collection(COL_ESTIMADOS).get().await().documents.mapNotNull { doc ->
+                val id = doc.safeLong("id") ?: return@mapNotNull null
+                val inspectionId = doc.safeLong("inspectionId") ?: return@mapNotNull null
+                EstimadoEntity(
+                    id = id,
+                    inspectionId = inspectionId,
+                    containerNo = doc.getString("containerNo") ?: "",
+                    manufacturer = doc.getString("manufacturer") ?: "",
+                    unitModel = doc.getString("unitModel") ?: "",
+                    unitModelNo = doc.getString("unitModelNo") ?: "",
+                    unitSerialNo = doc.getString("unitSerialNo") ?: "",
+                    yearOfBuilt = doc.getString("yearOfBuilt") ?: "",
+                    unitType = doc.getString("unitType") ?: "",
+                    clientName = doc.getString("clientName") ?: "",
+                    location = doc.getString("location") ?: "",
+                    technicianId = doc.safeLong("technicianId") ?: 0L,
+                    technicianName = doc.getString("technicianName") ?: "",
+                    createdAt = doc.safeLong("createdAt") ?: 0L,
+                    approvedAt = doc.safeLong("approvedAt"),
+                    closedAt = doc.safeLong("closedAt"),
+                    status = runCatching { EstimadoStatus.valueOf(doc.getString("status") ?: "") }
+                        .getOrDefault(EstimadoStatus.ABIERTO),
+                    damages = doc.getString("damages") ?: "[]",
+                    hasIva = doc.safeInt("hasIva") ?: 0,
+                    reportUrl = doc.getString("reportUrl"),
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchAllEstimados: ${e.message}")
+            emptyList()
+        }
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
