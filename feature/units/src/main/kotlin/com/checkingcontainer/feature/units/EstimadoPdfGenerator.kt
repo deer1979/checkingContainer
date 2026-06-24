@@ -231,16 +231,10 @@ class EstimadoPdfGenerator @Inject constructor(
         // ÍTEMS DE DAÑO
         // ════════════════════════════════════════════════════════════════════
         estimado.damages.forEachIndexed { idx, item ->
-            // Mantener el ítem junto: reservar encabezado + descripción + (si hay
-            // fotos) la etiqueta y la primera fila, para que la imagen no quede
-            // separada de su texto al pie de página. Si todo eso no cabe en lo que
-            // resta, saltamos a una página nueva antes de empezar el ítem. Tope al
-            // alto útil de página para no quedar en bucle con ítems muy altos.
+            // Mantener encabezado + descripción juntos. Las fotos se gestionan
+            // solas dentro de photoGrid (que también evita rótulos huérfanos).
             val descH = measureHeight(item.damageDescription, pBody, contentW)
-            val primerasFotos = item.damagePhotos.ifEmpty { item.repairPhotos }
-            val filaFotosH = if (primerasFotos.isNotEmpty()) 14f + (contentW - 16f) / 3 + 10f else 0f
-            val bloqueInicial = (16f + descH + 8f + filaFotosH).coerceAtMost(pageH - 2 * margin)
-            checkBreak(bloqueInicial)
+            checkBreak((16f + descH + 8f).coerceAtMost(pageH - 2 * margin))
 
             canvas.drawText("ÍTEM ${idx + 1}", margin, y, pSection); y += 4f
 
