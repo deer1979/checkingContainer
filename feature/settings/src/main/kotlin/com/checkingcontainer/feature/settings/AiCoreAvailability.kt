@@ -1,39 +1,56 @@
 package com.checkingcontainer.feature.settings
 
-import android.content.Context
+import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.prompt.Generation
 
-/** Estado (aproximado) de la IA local — AICore / Gemini Nano — en el dispositivo. */
+/** Estado de la IA local — Gemini Nano vía ML Kit GenAI — en el dispositivo. */
 internal data class AiCoreInfo(
     val available: Boolean,
     val statusLabel: String,
     val description: String,
 )
 
-/**
- * Detecta si el dispositivo tiene **AICore** (el servicio del sistema que ejecuta Gemini
- * Nano). Comprueba la presencia del paquete del sistema; requiere el `<queries>` de
- * `com.google.android.aicore` en el manifest para que sea visible en Android 11+.
- *
- * Es un AVISO informativo: la presencia del paquete indica que el equipo SOPORTA la IA
- * local, aunque no garantiza por sí sola que esté operativa para todo uso. Sirve para
- * explicar por qué en unos equipos (gama alta) el OCR podrá afinarse con IA y en otros no.
- */
-internal fun aiCoreInfo(context: Context): AiCoreInfo {
-    val present = runCatching {
-        context.packageManager.getApplicationInfo("com.google.android.aicore", 0).enabled
-    }.getOrDefault(false)
+internal val AI_CORE_CHECKING = AiCoreInfo(
+    available = false,
+    statusLabel = "Comprobando…",
+    description = "Consultando la disponibilidad de Gemini Nano en este equipo.",
+)
 
-    return if (present) {
-        AiCoreInfo(
+/**
+ * Consulta REAL de disponibilidad: pregunta a la Prompt API de ML Kit GenAI
+ * (beta) el estado de Gemini Nano en este equipo. A diferencia del chequeo
+ * anterior (presencia del paquete AICore), esto confirma que el modelo puede
+ * ejecutarse: AVAILABLE (listo), DOWNLOADABLE/DOWNLOADING (compatible, el
+ * modelo se descarga al primer uso) o UNAVAILABLE (equipo no soportado).
+ *
+ * En equipos sin AICore la llamada puede fallar con excepción → se trata
+ * como no disponible.
+ */
+internal suspend fun aiCoreInfo(): AiCoreInfo {
+    val model = Generation.getClient()
+    val status = try {
+        model.checkStatus()
+    } catch (_: Exception) {
+        FeatureStatus.UNAVAILABLE
+    } finally {
+        runCatching { model.close() }
+    }
+
+    return when (status) {
+        FeatureStatus.AVAILABLE -> AiCoreInfo(
             available = true,
             statusLabel = "Disponible",
-            description = "Este equipo soporta IA local: a futuro podrá afinar el reconocimiento del número.",
+            description = "Gemini Nano está listo en este equipo: se pueden usar funciones de IA local sin internet.",
         )
-    } else {
-        AiCoreInfo(
+        FeatureStatus.DOWNLOADABLE, FeatureStatus.DOWNLOADING -> AiCoreInfo(
+            available = true,
+            statusLabel = "Compatible",
+            description = "Este equipo soporta Gemini Nano; el modelo se descargará la primera vez que se use.",
+        )
+        else -> AiCoreInfo(
             available = false,
             statusLabel = "No disponible",
-            description = "Este equipo no tiene IA local (AICore). El OCR usa el modelo estándar.",
+            description = "Este equipo no soporta IA local (Gemini Nano). El OCR usa el modelo estándar.",
         )
     }
 }

@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -74,7 +75,10 @@ private fun SettingsScreen(
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "—"
         }.getOrDefault("—")
     }
-    val aiCore = remember(context) { aiCoreInfo(context) }
+    // Estado real de Gemini Nano (llamada async al servicio AICore del sistema).
+    val aiCore by produceState(initialValue = AI_CORE_CHECKING) {
+        value = aiCoreInfo()
+    }
 
     Scaffold(
         topBar = {
