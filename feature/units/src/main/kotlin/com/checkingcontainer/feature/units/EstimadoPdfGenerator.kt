@@ -34,6 +34,7 @@ class EstimadoPdfGenerator @Inject constructor(
 ) {
 
     private val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    private val sdfHora = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
     private val usd = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-US"))
         .apply { maximumFractionDigits = 2 }
 
@@ -223,6 +224,39 @@ class EstimadoPdfGenerator @Inject constructor(
                 equipRow("No. Serie:", estimado.unitSerialNo, "No. Modelo:", estimado.unitModelNo)
             if (estimado.yearOfBuilt.isNotEmpty())
                 equipRow("Año:", estimado.yearOfBuilt, "Tipo:", estimado.unitType)
+
+            y += 4f; hLine(); y += 12f
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // MEDICIONES DEL EQUIPO (capturas BLE: presiones, SH/SC, corriente)
+        // ════════════════════════════════════════════════════════════════════
+        if (estimado.mediciones.isNotEmpty()) {
+            fun num(v: Double?, dec: Int = 1): String =
+                v?.let { String.format(Locale.US, "%.${dec}f", it) } ?: "—"
+
+            checkBreak(12f + estimado.mediciones.size.coerceAtMost(2) * 52f)
+            canvas.drawText("MEDICIONES DEL EQUIPO", margin, y, pSection); y += 12f
+
+            estimado.mediciones.forEach { m ->
+                // Bloque de una captura: cabecera + 3 líneas. Se mantiene junto.
+                checkBreak(52f)
+                val cab = sdfHora.format(Date(m.timestamp)) +
+                    (if (m.refrigerante.isNotEmpty()) "  ·  ${m.refrigerante}" else "") +
+                    (if (m.dispositivos.isNotEmpty()) "  ·  ${m.dispositivos.joinToString(", ")}" else "")
+                canvas.drawText(cab, margin, y, pLabel); y += 12f
+                canvas.drawText(
+                    "ALTA  ${num(m.presionAltaPsig, 0)} psig    Sat. líquido ${num(m.satLiquidoC)} °C    " +
+                        "Subcooling ${num(m.subcoolingC)} K",
+                    margin + 8f, y, pBody,
+                ); y += 12f
+                canvas.drawText(
+                    "BAJA  ${num(m.presionBajaPsig, 0)} psig    Sat. vapor ${num(m.satVaporC)} °C    " +
+                        "Superheat ${num(m.superheatC)} K",
+                    margin + 8f, y, pBody,
+                ); y += 12f
+                canvas.drawText("Corriente  ${num(m.corrienteA)} A", margin + 8f, y, pBody); y += 16f
+            }
 
             y += 4f; hLine(); y += 12f
         }

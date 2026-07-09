@@ -167,6 +167,17 @@ Qué hay ya hecho:
   **R-134a**) + sección **"Saturación y rendimiento"** con dos tarjetas: Baja/Succión
   (sat. vapor + superheat) y Alta/Descarga (sat. líquido + subcooling).
 
+HECHO (jul 2026) — **captura de mediciones al estimado**: botón "Capturar para
+el estimado" en la pantalla de sensores (activo con ≥1 sensor conectado);
+congela un `MedicionSnapshot` (PSIG/°C/A, SH/SC, refrigerante, dispositivos;
+campos null = sin dato, captura parcial válida) y lo agrega al estimado
+ABIERTO del contenedor (`EstimadosRepository.addMedicion`). Persistencia:
+columna `mediciones` JSON en estimados (migración 14→15), campo espejo en
+Firestore. UI: sección "Mediciones" en EstimadoScreen (borrable mientras esté
+abierto — ojo: el borrado se persiste con el botón Guardar del estimado, la
+captura desde sensores se persiste sola). PDF: sección "MEDICIONES DEL EQUIPO"
+bajo los datos del equipo; sin mediciones la sección no aparece.
+
 DIFERIDO (NO está hecho — pendientes reales del feature):
 - Layout: hoy es una **sección separada** "Saturación y rendimiento". El usuario quería
   evaluar fusionar todo en **una sola columna por lado** (presión→temp→sat→SH/SC); quedó

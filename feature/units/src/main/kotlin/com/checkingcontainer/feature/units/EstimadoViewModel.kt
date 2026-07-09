@@ -75,6 +75,7 @@ class EstimadoViewModel @Inject constructor(
                     approvedAt = existing?.approvedAt,
                     status = existing?.status ?: EstimadoStatus.ABIERTO,
                     damages = existing?.damages ?: emptyList(),
+                    mediciones = existing?.mediciones ?: emptyList(),
                     hasIva = existing?.hasIva ?: false,
                 )
             }
@@ -149,6 +150,15 @@ class EstimadoViewModel @Inject constructor(
                 val item = _state.value.damages.find { it.id == event.itemId } ?: return
                 _state.update { it.copy(damages = it.damages - item) }
                 (item.damagePhotos + item.repairPhotos).forEach { url -> deletePhotoAsync(url) }
+            }
+            is EstimadoEvent.RemoveMedicion -> {
+                _state.update { s ->
+                    s.copy(
+                        mediciones = s.mediciones.filterNot { it.timestamp == event.timestamp },
+                        isDirty = true,
+                        savedMessage = null,
+                    )
+                }
             }
             is EstimadoEvent.RemoveDamagePhoto -> {
                 deletePhotoAsync(event.url)
@@ -361,6 +371,7 @@ class EstimadoViewModel @Inject constructor(
                 closedAt = if (allReparado) now else null,
                 status = if (allReparado) EstimadoStatus.CERRADO else EstimadoStatus.ABIERTO,
                 damages = current.damages,
+                mediciones = current.mediciones,
                 hasIva = current.hasIva,
             )
             runCatching { estimadosRepo.save(estimado) }
@@ -409,6 +420,7 @@ class EstimadoViewModel @Inject constructor(
                 approvedAt = current.approvedAt,
                 status = current.status,
                 damages = current.damages,
+                mediciones = current.mediciones,
                 hasIva = current.hasIva,
             )
             runCatching { pdfGenerator.generate(estimado) }

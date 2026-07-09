@@ -6,6 +6,7 @@ import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoStatus
+import com.checkingcontainer.core.model.MedicionSnapshot
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -29,6 +30,7 @@ data class EstimadoEntity(
     val closedAt: Long? = null,
     val status: EstimadoStatus = EstimadoStatus.ABIERTO,
     val damages: String = "[]",
+    val mediciones: String = "[]",
     val hasIva: Int = 0,
     val reportUrl: String? = null,
 ) {
@@ -51,6 +53,7 @@ data class EstimadoEntity(
         closedAt = closedAt,
         status = status,
         damages = parseDamages(damages),
+        mediciones = parseMediciones(mediciones),
         hasIva = hasIva != 0,
         reportUrl = reportUrl,
     )
@@ -130,6 +133,58 @@ fun Estimado.toEntity(): EstimadoEntity = EstimadoEntity(
     closedAt = closedAt,
     status = status,
     damages = damages.toJson(),
+    mediciones = mediciones.medicionesToJson(),
     hasIva = if (hasIva) 1 else 0,
     reportUrl = reportUrl,
 )
+
+private fun parseMediciones(json: String): List<MedicionSnapshot> = buildList {
+    val arr = runCatching { JSONArray(json) }.getOrNull() ?: return@buildList
+    repeat(arr.length()) { i ->
+        val obj = arr.getJSONObject(i)
+        add(
+            MedicionSnapshot(
+                timestamp = obj.optLong("timestamp"),
+                refrigerante = obj.optString("refrigerante"),
+                presionAltaPsig = obj.optDoubleOrNull("presionAltaPsig"),
+                presionBajaPsig = obj.optDoubleOrNull("presionBajaPsig"),
+                satLiquidoC = obj.optDoubleOrNull("satLiquidoC"),
+                satVaporC = obj.optDoubleOrNull("satVaporC"),
+                superheatC = obj.optDoubleOrNull("superheatC"),
+                subcoolingC = obj.optDoubleOrNull("subcoolingC"),
+                tempSuccionC = obj.optDoubleOrNull("tempSuccionC"),
+                tempDescargaC = obj.optDoubleOrNull("tempDescargaC"),
+                corrienteA = obj.optDoubleOrNull("corrienteA"),
+                dispositivos = obj.optJSONArray("dispositivos")?.let { d ->
+                    buildList { repeat(d.length()) { j -> d.optString(j).takeIf { it.isNotEmpty() }?.let { add(it) } } }
+                } ?: emptyList(),
+            ),
+        )
+    }
+}
+
+private fun JSONObject.optDoubleOrNull(key: String): Double? =
+    if (has(key) && !isNull(key)) optDouble(key).takeUnless { it.isNaN() } else null
+
+private fun List<MedicionSnapshot>.medicionesToJson(): String {
+    val arr = JSONArray()
+    forEach { m ->
+        arr.put(
+            JSONObject().apply {
+                put("timestamp", m.timestamp)
+                put("refrigerante", m.refrigerante)
+                put("presionAltaPsig", m.presionAltaPsig ?: JSONObject.NULL)
+                put("presionBajaPsig", m.presionBajaPsig ?: JSONObject.NULL)
+                put("satLiquidoC", m.satLiquidoC ?: JSONObject.NULL)
+                put("satVaporC", m.satVaporC ?: JSONObject.NULL)
+                put("superheatC", m.superheatC ?: JSONObject.NULL)
+                put("subcoolingC", m.subcoolingC ?: JSONObject.NULL)
+                put("tempSuccionC", m.tempSuccionC ?: JSONObject.NULL)
+                put("tempDescargaC", m.tempDescargaC ?: JSONObject.NULL)
+                put("corrienteA", m.corrienteA ?: JSONObject.NULL)
+                put("dispositivos", JSONArray(m.dispositivos))
+            },
+        )
+    }
+    return arr.toString()
+}

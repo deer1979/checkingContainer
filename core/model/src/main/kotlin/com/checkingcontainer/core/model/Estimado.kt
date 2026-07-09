@@ -40,6 +40,8 @@ data class Estimado(
     val status: EstimadoStatus = EstimadoStatus.ABIERTO,
     // Ítems
     val damages: List<DamageItem> = emptyList(),
+    // Mediciones BLE capturadas (presiones, SH/SC, corriente) — ver MedicionSnapshot
+    val mediciones: List<MedicionSnapshot> = emptyList(),
     // Configuración
     val hasIva: Boolean = false,
     val reportUrl: String? = null,

@@ -3,6 +3,8 @@ package com.checkingcontainer.feature.sensors
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.checkingcontainer.core.domain.EstimadosRepository
+import com.checkingcontainer.core.model.MedicionSnapshot
 import com.checkingcontainer.feature.sensors.navigation.SENSORS_CONTAINER_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -37,6 +39,9 @@ data class SensorsUiState(
     val liqSatPressures: List<Double> = emptyList(),
     val vapSatGas: List<Int> = emptyList(),
     val liqSatGas: List<Int> = emptyList(),
+    // Captura hacia el estimado abierto del contenedor
+    val capturando: Boolean = false,
+    val capturaMensaje: String? = null,
 ) {
     /** Rol asignado; por defecto el primer sensor es ALTA y el segundo BAJA. */
     fun rolDe(deviceName: String, tipo: SensorType, index: Int): RolMedicion =
@@ -79,6 +84,7 @@ class SensorsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val scanner: BleSensorScanner,
     private val refrigerantes: RefrigerantRepo,
+    private val estimadosRepo: EstimadosRepository,
 ) : ViewModel() {
 
     private val containerNo: String = savedStateHandle[SENSORS_CONTAINER_ARG] ?: ""
@@ -157,6 +163,49 @@ class SensorsViewModel @Inject constructor(
         _state.update { it.copy(escaneando = false, tarjetas = emptyMap()) }
     }
 
+    /**
+     * Congela las lecturas actuales en un [MedicionSnapshot] y lo agrega al
+     * estimado ABIERTO del contenedor. Captura parcial válida: lo que no esté
+     * midiendo queda como null ("—" en el PDF).
+     */
+    fun capturarParaEstimado() {
+        val s = _state.value
+        if (!s.hayDatos || s.containerNo.isEmpty() || s.capturando) return
+        viewModelScope.launch {
+            _state.update { it.copy(capturando = true) }
+            val snapshot = MedicionSnapshot(
+                timestamp = System.currentTimeMillis(),
+                refrigerante = s.refrigerante,
+                presionAltaPsig = YjackParser.aPsig(s.presionAltaRaw).oNull(),
+                presionBajaPsig = YjackParser.aPsig(s.presionBajaRaw).oNull(),
+                satLiquidoC = s.satLiquidoC.oNull(),
+                satVaporC = s.satVaporC.oNull(),
+                superheatC = s.superheatC.oNull(),
+                subcoolingC = s.subcoolingC.oNull(),
+                tempSuccionC = YjackParser.aCelsius(s.tempSuccionRaw).oNull(),
+                tempDescargaC = YjackParser.aCelsius(s.tempDescargaRaw).oNull(),
+                corrienteA = s.corriente?.ultima?.valor1.oNull(),
+                dispositivos = s.tarjetas.values.map { it.deviceName }.distinct(),
+            )
+            val ok = runCatching { estimadosRepo.addMedicion(s.containerNo, snapshot) }
+                .getOrDefault(false)
+            _state.update {
+                it.copy(
+                    capturando = false,
+                    capturaMensaje = if (ok) {
+                        "Medición capturada en el estimado"
+                    } else {
+                        "No hay estimado abierto para ${s.containerNo}"
+                    },
+                )
+            }
+        }
+    }
+
+    fun consumirMensajeCaptura() {
+        _state.update { it.copy(capturaMensaje = null) }
+    }
+
     /** Alterna ALTA <-> BAJA para una lectura concreta. */
     fun toggleRol(deviceName: String, tipo: SensorType, index: Int) {
         val clave = claveRol(deviceName, tipo, index)
@@ -177,6 +226,10 @@ class SensorsViewModel @Inject constructor(
         const val INTERVALO_MUESTREO_MS = 5_000L
     }
 }
+
+/** SIN_DATO/NaN → null (el snapshot guarda solo lo realmente medido). */
+private fun Double?.oNull(): Double? =
+    this?.takeUnless { it == SensorReading.SIN_DATO || it.isNaN() }
 
 /** Clave estable de rol por lectura. */
 fun claveRol(deviceName: String, tipo: SensorType, index: Int): String = "$deviceName#$tipo#$index"

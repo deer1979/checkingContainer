@@ -1,6 +1,7 @@
 package com.checkingcontainer.feature.units
 
 import com.checkingcontainer.core.model.DamageItem
+import com.checkingcontainer.core.model.MedicionSnapshot
 import com.checkingcontainer.core.model.EstimadoStatus
 
 data class EstimadoUiState(
@@ -23,6 +24,7 @@ data class EstimadoUiState(
     val status: EstimadoStatus = EstimadoStatus.ABIERTO,
     // Ítems
     val damages: List<DamageItem> = emptyList(),
+    val mediciones: List<MedicionSnapshot> = emptyList(),
     // Configuración
     val hasIva: Boolean = false,
     // Estados de carga
@@ -60,6 +62,8 @@ sealed interface EstimadoEvent {
     data class RemoveDamageItem(val itemId: String) : EstimadoEvent
     data class RemoveDamagePhoto(val itemId: String, val url: String) : EstimadoEvent
     data class RemoveRepairPhoto(val itemId: String, val url: String) : EstimadoEvent
+    // Mediciones BLE
+    data class RemoveMedicion(val timestamp: Long) : EstimadoEvent
     // Reparación
     data class RepairActionChange(val itemId: String, val value: String) : EstimadoEvent
     data class ConfirmRepair(val itemId: String) : EstimadoEvent

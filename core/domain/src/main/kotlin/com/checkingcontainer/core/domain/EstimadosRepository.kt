@@ -1,6 +1,7 @@
 package com.checkingcontainer.core.domain
 
 import com.checkingcontainer.core.model.Estimado
+import com.checkingcontainer.core.model.MedicionSnapshot
 import kotlinx.coroutines.flow.Flow
 
 interface EstimadosRepository {
@@ -15,4 +16,10 @@ interface EstimadosRepository {
     suspend fun deletePhoto(url: String)
     suspend fun uploadPdf(inspectionId: Long, bytes: ByteArray): String
     suspend fun searchByContainerNo(containerNo: String): List<Estimado>
+
+    /**
+     * Agrega una medición BLE al estimado ABIERTO de [containerNo].
+     * @return true si se guardó; false si no hay estimado abierto para ese contenedor.
+     */
+    suspend fun addMedicion(containerNo: String, medicion: MedicionSnapshot): Boolean
 }

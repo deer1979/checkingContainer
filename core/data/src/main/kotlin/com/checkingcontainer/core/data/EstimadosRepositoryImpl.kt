@@ -6,6 +6,8 @@ import com.checkingcontainer.core.database.dao.EstimadoDao
 import com.checkingcontainer.core.database.entity.toEntity
 import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.model.Estimado
+import com.checkingcontainer.core.model.EstimadoStatus
+import com.checkingcontainer.core.model.MedicionSnapshot
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -20,6 +22,16 @@ class EstimadosRepositoryImpl @Inject constructor(
     private val storageService: StorageService,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : EstimadosRepository {
+
+    override suspend fun addMedicion(containerNo: String, medicion: MedicionSnapshot): Boolean =
+        withContext(ioDispatcher) {
+            val abierto = dao.findByContainerNo(containerNo)
+                .firstOrNull { it.status == EstimadoStatus.ABIERTO }
+                ?.toDomain()
+                ?: return@withContext false
+            save(abierto.copy(mediciones = abierto.mediciones + medicion))
+            true
+        }
 
     override suspend fun save(estimado: Estimado): Long = withContext(ioDispatcher) {
         val entity = estimado.toEntity()

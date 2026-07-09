@@ -36,9 +36,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +82,8 @@ fun SensorsRoute(
         onToggleScan = { launcher.launch(permisos) },
         onToggleRol = viewModel::toggleRol,
         onRefrigeranteChange = viewModel::seleccionarRefrigerante,
+        onCapturar = viewModel::capturarParaEstimado,
+        onMensajeMostrado = viewModel::consumirMensajeCaptura,
     )
 }
 
@@ -90,8 +95,17 @@ private fun SensorsScreen(
     onToggleScan: () -> Unit,
     onToggleRol: (String, SensorType, Int) -> Unit,
     onRefrigeranteChange: (String) -> Unit,
+    onCapturar: () -> Unit = {},
+    onMensajeMostrado: () -> Unit = {},
 ) {
-    Scaffold { innerPadding ->
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(state.capturaMensaje) {
+        state.capturaMensaje?.let {
+            snackbarHostState.showSnackbar(it)
+            onMensajeMostrado()
+        }
+    }
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 8.dp),
@@ -107,6 +121,20 @@ private fun SensorsScreen(
                     onBack = onBack,
                     onToggleScan = onToggleScan,
                 )
+            }
+
+            // Captura hacia el estimado: congela lo que están midiendo los sensores
+            // conectados y lo guarda en el estimado abierto de este contenedor.
+            if (state.containerNo.isNotEmpty()) {
+                item(key = "capturar") {
+                    Button(
+                        onClick = onCapturar,
+                        enabled = state.hayDatos && !state.capturando,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (state.capturando) "Capturando…" else "Capturar para el estimado")
+                    }
+                }
             }
 
             if (state.bluetoothApagado) {

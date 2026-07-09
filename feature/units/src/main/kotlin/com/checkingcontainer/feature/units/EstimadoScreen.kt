@@ -101,8 +101,11 @@ import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.EstimadoTotals
 import com.checkingcontainer.core.model.MAX_FOTOS_POR_GRUPO
+import com.checkingcontainer.core.model.MedicionSnapshot
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 private val USD = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-US")).apply {
@@ -387,6 +390,24 @@ fun EstimadoScreen(
                         if (state.unitModelNo.isNotEmpty()) InfoRow("No. Modelo", state.unitModelNo)
                         if (state.yearOfBuilt.isNotEmpty()) InfoRow("Año", state.yearOfBuilt)
                         if (state.unitType.isNotEmpty()) InfoRow("Tipo", state.unitType)
+                    }
+                }
+            }
+
+            // ── MEDICIONES BLE (capturadas desde la pantalla de sensores) ────────
+            if (state.mediciones.isNotEmpty()) {
+                item(key = "mediciones", contentType = "card") {
+                    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SectionTitle("Mediciones")
+                            state.mediciones.forEach { m ->
+                                MedicionRow(
+                                    medicion = m,
+                                    canRemove = state.status != EstimadoStatus.CERRADO,
+                                    onRemove = { onEvent(EstimadoEvent.RemoveMedicion(m.timestamp)) },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1148,5 +1169,69 @@ private fun PdfPreviewSheet(
                 }
             }
         }
+    }
+}
+
+// ── Mediciones BLE ──────────────────────────────────────────────────────────────
+
+private val MEDICION_FECHA_FMT = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+private fun Double?.fmtMedicion(decimales: Int = 1): String =
+    this?.let { String.format(Locale.US, "%.${decimales}f", it) } ?: "—"
+
+/** Tarjeta compacta de una captura de sensores: fecha, gas, ALTA/BAJA, SH/SC, corriente. */
+@Composable
+private fun MedicionRow(
+    medicion: MedicionSnapshot,
+    canRemove: Boolean,
+    onRemove: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerHigh,
+                RoundedCornerShape(8.dp),
+            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                MEDICION_FECHA_FMT.format(Date(medicion.timestamp)) +
+                    if (medicion.refrigerante.isNotEmpty()) "  ·  ${medicion.refrigerante}" else "",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (canRemove) {
+                IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Eliminar medición",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        Text(
+            "ALTA ${medicion.presionAltaPsig.fmtMedicion(0)} psig · sat ${medicion.satLiquidoC.fmtMedicion()} °C" +
+                " · SC ${medicion.subcoolingC.fmtMedicion()} K",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(
+            "BAJA ${medicion.presionBajaPsig.fmtMedicion(0)} psig · sat ${medicion.satVaporC.fmtMedicion()} °C" +
+                " · SH ${medicion.superheatC.fmtMedicion()} K",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(
+            "Corriente ${medicion.corrienteA.fmtMedicion()} A" +
+                if (medicion.dispositivos.isNotEmpty()) " · ${medicion.dispositivos.joinToString(", ")}" else "",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
