@@ -31,6 +31,43 @@ Storage para fotos/adjuntos), configurado vía `app/google-services.json`.
 | `estimados` | `{id}` | estimado con ítems de daño (JSON) y costos |
 | `announcements` | `{id}` | anuncios con adjuntos (URLs de Storage) |
 
+## Seguridad: autenticación anónima + reglas (jul 2026)
+
+La app obtiene una **sesión anónima de Firebase** al arrancar
+(`AnonymousAuth` en `core:network`; reintento en cada login vía
+`BootstrapRepositoryImpl`). Las reglas de producción exigen esa sesión:
+
+```
+// Firestore (consola → Firestore Database → Reglas)
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+
+// Storage (consola → Storage → Rules, bucket checking-container.firebasestorage.app)
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+Requisitos en la consola (una sola vez):
+1. **Authentication → Sign-in method → Anonymous → habilitar.**
+2. Publicar las reglas de arriba **solo después** de que todos los
+   dispositivos tengan el APK con sesión anónima — un APK viejo sin auth
+   quedaría bloqueado.
+
+La sesión anónima persiste entre arranques (solo el primer arranque necesita
+red). Nunca caduca, a diferencia de las reglas del modo de prueba.
+
 ## Comportamiento offline-first
 
 - Todo se guarda primero en Room; luego se hace upsert a Firestore.

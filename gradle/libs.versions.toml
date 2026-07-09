@@ -140,6 +140,7 @@ kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "ko
 firebase-bom      = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-storage   = { group = "com.google.firebase", name = "firebase-storage" }
+firebase-auth      = { group = "com.google.firebase", name = "firebase-auth" }
 
 # Build-logic accessors — needed inside convention plugins so they can reference
 # AGP / Kotlin / KSP / Hilt Gradle plugins as runtime dependencies.

@@ -12,6 +12,7 @@ dependencies {
     api(platform(libs.firebase.bom))
     api(libs.firebase.firestore)
     api(libs.firebase.storage)
+    api(libs.firebase.auth)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.kotlinx.coroutines.android)
 }

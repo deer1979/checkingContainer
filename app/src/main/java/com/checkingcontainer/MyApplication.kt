@@ -10,6 +10,7 @@ import coil3.disk.directory
 import coil3.memory.MemoryCache
 import coil3.request.crossfade
 import com.checkingcontainer.appfunctions.ContainerFunctions
+import com.checkingcontainer.core.network.AnonymousAuth
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -21,6 +22,17 @@ class MyApplication :
 
     @Inject
     lateinit var containerFunctions: ContainerFunctions
+
+    @Inject
+    lateinit var anonymousAuth: AnonymousAuth
+
+    override fun onCreate() {
+        super.onCreate()
+        // Sesión anónima de Firebase: requerida por las reglas de seguridad
+        // (request.auth != null). Persiste entre arranques; sin red se
+        // reintenta en el próximo arranque o login.
+        anonymousAuth.ensureSignedInAsync()
+    }
 
     // AppFunctions: las funciones se construyen vía Hilt para reutilizar los
     // repositorios reales (offline-first) cuando un agente las invoca.

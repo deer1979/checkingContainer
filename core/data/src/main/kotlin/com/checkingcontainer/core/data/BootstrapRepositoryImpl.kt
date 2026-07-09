@@ -8,6 +8,7 @@ import com.checkingcontainer.core.database.dao.InspectionDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.domain.BootstrapRepository
+import com.checkingcontainer.core.network.AnonymousAuth
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -22,10 +23,15 @@ class BootstrapRepositoryImpl @Inject constructor(
     private val inspectionDao: InspectionDao,
     private val reeferUnitDao: ReeferUnitDao,
     private val firestoreService: FirestoreService,
+    private val anonymousAuth: AnonymousAuth,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : BootstrapRepository {
 
     override suspend fun syncIfNeeded(): Unit = withContext(ioDispatcher) {
+        // Reintento de la sesión anónima en cada login: las reglas de
+        // Firestore/Storage exigen auth y el arranque pudo estar offline.
+        anonymousAuth.ensureSignedIn()
+
         if (userDao.count() > 0) return@withContext  // ya hay datos locales
 
         Log.i(BOOT_TAG, "Primera instalación — descargando datos de Firestore...")
