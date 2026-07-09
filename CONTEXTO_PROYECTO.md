@@ -129,9 +129,14 @@ Clientes (Ajustes → Catálogos → Clientes; `clientesGraph`), y en el estimad
 selector con búsqueda + creación rápida (`ClientPickerSheet`, formulario
 compartido `ClientFormFields`). El estimado congela snapshot (clientIdNumber/
 dirección/teléfono/email) al asignar; el PDF imprime RUC/dirección/teléfono.
-Cualquier usuario puede crear clientes. PENDIENTE (fase 3): escaneo de
-factura con Gemini Nano y pegado de texto (WhatsApp) para pre-llenar el
-formulario.
+Cualquier usuario puede crear clientes. Fase 3 HECHA: `ClientDataExtractor`
+(pegar texto WhatsApp o foto de factura desde galería → pre-llenado del
+formulario vía `ClientAssistRow`, presente en formulario y creación rápida).
+Capas anti-inventos: Gemini Nano con prompt estricto → RUC/cédula SIEMPRE
+revalidados con IdentificacionEc → extractor determinista por regex como
+respaldo/sin-IA (OCR ML Kit para fotos) → el usuario revisa antes de guardar.
+PENDIENTE menor: botón de captura directa con cámara en el formulario
+(hoy: tomar foto con la cámara del sistema y elegirla de galería).
 
 ## Sync post-login (jul 2026)
 `BootstrapRepository.syncRecentAsync(user)` — disparado por `MainViewModel` en

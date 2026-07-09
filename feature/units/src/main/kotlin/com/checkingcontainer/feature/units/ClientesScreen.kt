@@ -247,6 +247,8 @@ internal fun ClientFormFields(
 ) {
     val idValida = IdentificacionEc.valida(client.idType, client.idNumber)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Asistente: pegar texto (WhatsApp) o foto de factura → pre-llenar.
+        ClientAssistRow(client = client, onChange = onChange)
         OutlinedTextField(
             value = client.razonSocial,
             onValueChange = { onChange(client.copy(razonSocial = it)) },
