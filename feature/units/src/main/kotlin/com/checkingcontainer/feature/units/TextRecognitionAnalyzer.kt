@@ -29,11 +29,16 @@ class TextRecognitionAnalyzer(
     private val onTrackingUpdated: (List<DetectedCharacter>) -> Unit = {},
     private val onValidContainerIdFound: (String) -> Unit = {},
     private val onSuccess: (Map<String, String>) -> Unit,
+    // Respaldo de IA local: se invoca con (frame, lecturaCrudaOpcional) cuando el
+    // usuario disparó la captura y el OCR normal no pudo leer. El receptor es dueño
+    // del bitmap (debe reciclarlo) y debe llamar a nanoFinished() si no hubo éxito.
+    private val onNanoFallback: ((Bitmap, String?) -> Unit)? = null,
 ) : ImageAnalysis.Analyzer {
 
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val captureRequested = AtomicBoolean(false)
     private val done = AtomicBoolean(false)
+    private val nanoInFlight = AtomicBoolean(false)
     private val lastFrameTimestamp = AtomicLong(0L)
 
     // Lecturas verticales recientes (solo de 11 chars) para el voto por posición.
@@ -42,9 +47,15 @@ class TextRecognitionAnalyzer(
 
     fun triggerCapture() { captureRequested.set(true) }
 
+    /** La IA local terminó sin resultado: reanuda el escaneo en vivo. */
+    fun nanoFinished() {
+        captureRequested.set(false)
+        nanoInFlight.set(false)
+    }
+
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        if (done.get()) { imageProxy.close(); return }
+        if (done.get() || nanoInFlight.get()) { imageProxy.close(); return }
 
         val now = System.currentTimeMillis()
         if (now - lastFrameTimestamp.get() < FRAME_INTERVAL_MS) {
@@ -106,18 +117,37 @@ class TextRecognitionAnalyzer(
             },
         )
 
+        // Copia del frame para el respaldo de IA local: solo si el usuario disparó
+        // la captura y hay gancho. Quien la recibe es dueño de reciclarla.
+        val nanoFrame = if (captureRequested.get() && onNanoFallback != null) {
+            crop.copy(Bitmap.Config.ARGB_8888, false)
+        } else {
+            null
+        }
+
         // Compuerta: solo intentamos reconocer si el nº de glifos es plausible (~11).
         // Si hay mucha basura (20+ cajas) no perseguimos ruido ni hacemos esperar al
         // usuario; las cajas igual se dibujan arriba (debug) para ver qué detectó.
         if (glyphs.size !in PLAUSIBLE_GLYPH_RANGE) {
             crop.recycle()
+            // El OCR ni siquiera intentará leer este frame: es justo el caso donde
+            // la IA local más aporta (números sucios/verticales que la proyección
+            // no logra segmentar).
+            if (nanoFrame != null && nanoInFlight.compareAndSet(false, true)) {
+                onNanoFallback?.invoke(nanoFrame, null)
+            } else {
+                nanoFrame?.recycle()
+            }
             return
         }
 
         val strip = composeStrip(crop, glyphs)
         // composeStrip ya copió los glifos a la tira: el crop no se necesita más.
         crop.recycle()
-        if (strip == null) return
+        if (strip == null) {
+            nanoFrame?.recycle()
+            return
+        }
         recognizer.process(InputImage.fromBitmap(strip, 0))
             .addOnSuccessListener { visionText ->
                 val raw = visionText.text.filter { it.isLetterOrDigit() }.uppercase()
@@ -137,17 +167,28 @@ class TextRecognitionAnalyzer(
                 for (cand in candidates) {
                     val corrected = correctContainerChars(cand)
                     if (Iso6346.isValid(corrected) && done.compareAndSet(false, true)) {
+                        nanoFrame?.recycle()
                         onValidContainerIdFound(corrected)
                         return@addOnSuccessListener
                     }
                 }
 
-                // MODO PRUEBA: al pulsar el disparador devuelve el texto CRUDO de la tira
-                // sintética, para medir la precisión real antes de exigir validación.
-                if (captureRequested.get() && raw.isNotEmpty() && done.compareAndSet(false, true)) {
-                    onValidContainerIdFound(raw)
+                // Captura manual sin lectura válida: primero la IA local (si hay);
+                // la lectura cruda viaja como respaldo del respaldo (modo prueba).
+                if (captureRequested.get()) {
+                    if (nanoFrame != null && nanoInFlight.compareAndSet(false, true)) {
+                        onNanoFallback?.invoke(nanoFrame, raw.takeIf { it.isNotEmpty() })
+                        return@addOnSuccessListener
+                    }
+                    // MODO PRUEBA (sin IA local): devuelve el texto CRUDO de la tira
+                    // sintética, para medir la precisión real antes de exigir validación.
+                    if (raw.isNotEmpty() && done.compareAndSet(false, true)) {
+                        onValidContainerIdFound(raw)
+                    }
                 }
+                nanoFrame?.recycle()
             }
+            .addOnFailureListener { nanoFrame?.recycle() }
             // Se ejecuta tras éxito O fallo de ML Kit: la tira ya no está en uso.
             // (Antes un fallo del recognizer dejaba el bitmap colgado para siempre.)
             .addOnCompleteListener { strip.recycle() }
@@ -215,10 +256,13 @@ class TextRecognitionAnalyzer(
                     ScannerMode.CONTAINER  -> parseContainer(visionText.text)
                     ScannerMode.DATA_PLATE -> parseDataPlate(visionText.text)
                 }
-                if (result != null && done.compareAndSet(false, true)) {
-                    onSuccess(result)
-                } else {
-                    captureRequested.set(false)
+                when {
+                    result != null && done.compareAndSet(false, true) -> onSuccess(result)
+                    // El OCR normal no pudo: se pasa el frame a la IA local (si hay).
+                    // El crop lo recicla el completeListener; el respaldo lleva copia.
+                    onNanoFallback != null && nanoInFlight.compareAndSet(false, true) ->
+                        onNanoFallback.invoke(crop.copy(Bitmap.Config.ARGB_8888, false), null)
+                    else -> captureRequested.set(false)
                 }
             }
             // Se ejecuta tras éxito O fallo de ML Kit: el crop ya no está en uso.

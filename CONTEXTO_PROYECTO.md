@@ -106,6 +106,17 @@ fix rebote del preview PDF, PIN hasheado, sync visible, 27 tests, CI bloqueante.
   Probar en dispositivo: `adb shell cmd app_function list-app-functions`.
 - Styles API: DIFERIDA (exige Compose foundation 1.12, aún en beta02; el BOM
   estable 2026.06.01 trae 1.11.4); decisión documentada en PLAN_DEUDA_TECNICA.md.
+- **IA local (Gemini Nano, jul 2026)**: `mlkit-genai-prompt 1.0.0-beta2`.
+  Detección real en Ajustes (`AiCoreAvailability.kt`, checkStatus). Respaldo de
+  OCR en `GeminiNanoOcr.kt` (feature:units): cuando el usuario dispara la captura
+  y ML Kit no lee (vertical sucio, placa de datos), el frame pasa a Gemini Nano
+  que SOLO transcribe; la salida se valida con los mismos filtros duros del OCR
+  (correctContainerChars + Iso6346.isValid; regex de parseDataPlate) — nada
+  inventado puede pasar. En equipos sin IA todo devuelve null y el flujo previo
+  queda intacto (vertical: modo prueba con texto crudo). Gancho en
+  `TextRecognitionAnalyzer.onNanoFallback` + `nanoFinished()` para reanudar;
+  cableado e indicador "Leyendo con IA local…" en `OcrScannerBottomSheet`.
+  Probado en Xiaomi 17 Ultra (estado "Disponible").
 
 ## Actualización de versiones (jul 2026)
 - compileSdk **37** (plataforma `android-37.0`; targetSdk sigue en 36 a propósito —
