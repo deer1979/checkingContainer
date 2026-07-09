@@ -303,7 +303,12 @@ class EstimadoPdfGenerator @Inject constructor(
         }
     }
 
+    // Un fallo puntual de red dejaba "Sin foto" en el PDF de forma definitiva:
+    // se reintenta una vez antes de rendirse.
     private suspend fun loadBitmap(loader: coil3.ImageLoader, url: String): Bitmap? =
+        loadBitmapOnce(loader, url) ?: loadBitmapOnce(loader, url)
+
+    private suspend fun loadBitmapOnce(loader: coil3.ImageLoader, url: String): Bitmap? =
         runCatching {
             // Las fotos se dibujan a ~175pt en el PDF: decodificar a 700px en vez
             // de la resolución completa de la cámara baja ~10x el pico de memoria

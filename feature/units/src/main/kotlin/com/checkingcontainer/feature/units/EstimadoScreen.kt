@@ -46,6 +46,7 @@ import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
@@ -909,19 +910,45 @@ private fun PhotoGroup(
 @Composable
 private fun PhotoThumbnail(url: String, canRemove: Boolean, onRemove: () -> Unit = {}, modifier: Modifier = Modifier) {
     Box(modifier.clip(RoundedCornerShape(8.dp))) {
+        // Si la descarga falla (datos móviles flojos, foto pesada), antes quedaba
+        // un cuadro gris mudo: ahora se avisa y un toque reintenta la carga.
+        var reintento by remember(url) { mutableStateOf(0) }
+        var fallo by remember(url) { mutableStateOf(false) }
         // Decodificar a 600px en vez de la resolución completa de la cámara ahorra
         // memoria y carga más rápido.
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(url)
                 .size(600)
+                .memoryCacheKey("$url#r$reintento")
                 .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            onState = { state -> fallo = state is coil3.compose.AsyncImagePainter.State.Error },
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         )
+        if (fallo) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { reintento++ },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Refresh,
+                    contentDescription = "Reintentar carga de foto",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "Reintentar",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         if (canRemove) {
             IconButton(
                 onClick = onRemove,

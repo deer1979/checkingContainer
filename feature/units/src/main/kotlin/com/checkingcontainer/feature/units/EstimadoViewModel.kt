@@ -238,6 +238,12 @@ class EstimadoViewModel @Inject constructor(
             runCatching {
                 estimadosRepo.uploadItemPhoto(inspectionId, itemId, isDano, bytes)
             }.onSuccess { url ->
+                // Precalienta la caché de disco de Coil con la conexión aún viva:
+                // la foto recién subida queda visible offline y tras reiniciar la
+                // app, sin depender de una re-descarga posterior.
+                coil3.SingletonImageLoader.get(context).enqueue(
+                    coil3.request.ImageRequest.Builder(context).data(url).build(),
+                )
                 _state.update { s ->
                     s.copy(
                         isUploadingPhoto = false,
@@ -304,6 +310,22 @@ class EstimadoViewModel @Inject constructor(
             val rotated = android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
             if (rotated !== bmp) bmp.recycle()
             bmp = rotated
+        }
+
+        // inSampleSize solo reduce por potencias de 2: una foto de 4000px quedaba en
+        // 2000px y pesaba 1-3 MB (lento de subir Y de volver a bajar — fotos "que no
+        // se ven" con datos móviles). Escalado final exacto: garantiza ≤1600px.
+        val mayor = maxOf(bmp.width, bmp.height)
+        if (mayor > MAX_PHOTO_DIM) {
+            val factor = MAX_PHOTO_DIM.toFloat() / mayor
+            val scaled = android.graphics.Bitmap.createScaledBitmap(
+                bmp,
+                (bmp.width * factor).toInt().coerceAtLeast(1),
+                (bmp.height * factor).toInt().coerceAtLeast(1),
+                true,
+            )
+            if (scaled !== bmp) bmp.recycle()
+            bmp = scaled
         }
 
         java.io.ByteArrayOutputStream().use { out ->
