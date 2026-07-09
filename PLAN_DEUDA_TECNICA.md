@@ -123,11 +123,16 @@
    con cientos de inspecciones (hoy mitigado con 2 + confirmación).
 6. **Renombrar secrets SUPABASE_* → FIREBASE_*** — opcional; coordinar cambio
    simultáneo en GitHub Secrets + ci.yml + BuildConfig (documentado en FIREBASE.md).
+7. **Gradle wrapper 9.5.1 → 9.6.1** — hacerlo desde el PC (`./gradlew wrapper
+   --gradle-version 9.6.1`); el contenedor remoto no puede descargar la
+   distribución (bloqueo de red a github.com).
+8. **Kotlin 2.4.0 y AGP 9.3.0** — diferidos jul 2026: validar compatibilidad de
+   KSP con Kotlin 2.4 y esperar AGP 9.3.0 estable (hoy rc02).
 
 ## Decisión de arquitectura — Styles API (jun 2026)
 Se intentó adoptar la Styles API de Compose (foundation `1.12.0-alpha03`,
-`Style{}` + `Modifier.styleable`). **Diferida**: esa versión alpha arrastra todo
-Compose a 1.12-alpha y exige `compileSdk 37`, que aún no está publicado en el
-SDK manager. Re-evaluar cuando la API llegue a beta/estable sobre SDK 37 estable
-y Material3 la soporte. La superficie de la API ya está estudiada
+`Style{}` + `Modifier.styleable`). **Diferida**: arrastra todo Compose a la
+línea 1.12, que sigue en beta (beta02 a jul 2026; el BOM estable trae 1.11.4).
+`compileSdk 37` ya NO es bloqueador (adoptado jul 2026). Re-evaluar cuando
+Compose 1.12 llegue a estable en el BOM y Material3 la soporte. La superficie de la API ya está estudiada
 (`Style { background/shape/minHeight; disabled{} }`, `rememberUpdatedStyleState`).

@@ -23,7 +23,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.BluetoothConnected
-import androidx.compose.material.icons.outlined.BluetoothSearching
+import androidx.compose.material.icons.automirrored.outlined.BluetoothSearching
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
@@ -226,7 +226,7 @@ private fun BarraSuperior(
     val (icono, tint) = when {
         !escaneando -> Icons.Outlined.Bluetooth to MaterialTheme.colorScheme.onSurfaceVariant
         hayDatos -> Icons.Outlined.BluetoothConnected to MaterialTheme.colorScheme.primary
-        else -> Icons.Outlined.BluetoothSearching to MaterialTheme.colorScheme.primary
+        else -> Icons.AutoMirrored.Outlined.BluetoothSearching to MaterialTheme.colorScheme.primary
     }
     val (punto, estado) = when {
         !escaneando -> MaterialTheme.colorScheme.onSurfaceVariant to "Conecte su dispositivo →"
@@ -308,10 +308,10 @@ private fun FilaAltaBaja(
             val rol = if (tarjeta != null) rolDe(tarjeta.deviceName, tipo, idx)
                       else if (idx == 0) RolMedicion.ALTA else RolMedicion.BAJA
             val valorActual = if (activo) {
-                if (idx == 0) tarjeta!!.ultima.valor1 else tarjeta!!.ultima.valor2
+                if (idx == 0) tarjeta.ultima.valor1 else tarjeta.ultima.valor2
             } else SensorReading.SIN_DATO
             val tomas = if (activo) {
-                tomasParaMostrar(tarjeta!!.historial, { if (idx == 0) it.valor1 else it.valor2 }, convertir)
+                tomasParaMostrar(tarjeta.historial, { if (idx == 0) it.valor1 else it.valor2 }, convertir)
             } else List(SLOTS) { "·" }
             TarjetaRol(
                 activo = activo,
@@ -320,7 +320,7 @@ private fun FilaAltaBaja(
                 etiquetaBaja = etiquetaBaja,
                 valor = if (activo) fmt(convertir(valorActual)) else "—",
                 unidad = unidad,
-                deviceName = if (activo) tarjeta!!.deviceName else "",
+                deviceName = if (activo) tarjeta.deviceName else "",
                 tomas = tomas,
                 onToggle = { if (tarjeta != null) onToggleRol(tarjeta.deviceName, tipo, idx) },
             )
@@ -398,7 +398,7 @@ private fun TarjetaCorriente(tarjeta: TarjetaSensor?) {
     val activo = tarjeta != null
     val bg = if (activo) COLOR_CORRIENTE else MaterialTheme.colorScheme.surfaceVariant
     val fg = if (activo) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-    val tomas = if (activo) tomasParaMostrar(tarjeta!!.historial, { it.valor1 }, { it }) else List(SLOTS) { "·" }
+    val tomas = if (activo) tomasParaMostrar(tarjeta.historial, { it.valor1 }, { it }) else List(SLOTS) { "·" }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = bg),
@@ -409,11 +409,11 @@ private fun TarjetaCorriente(tarjeta: TarjetaSensor?) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Corriente", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = fg)
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(if (activo) fmt(tarjeta!!.ultima.valor1) else "—", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = fg)
+                    Text(if (activo) fmt(tarjeta.ultima.valor1) else "—", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = fg)
                     Text(" A", style = MaterialTheme.typography.bodyMedium, color = fg.copy(alpha = 0.9f), modifier = Modifier.padding(bottom = 3.dp))
                 }
                 if (activo) {
-                    Text(tarjeta!!.deviceName, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(tarjeta.deviceName, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Column(horizontalAlignment = Alignment.End) {

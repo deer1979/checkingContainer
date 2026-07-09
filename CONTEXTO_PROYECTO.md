@@ -98,13 +98,24 @@ fix rebote del preview PDF, PIN hasheado, sync visible, 27 tests, CI bloqueante.
 ## Adaptativo y agentes (jun 2026)
 - Shell adaptativo: `AuthenticatedShell` usa window size class — pill inferior en
   Compact, `AppNavigationRail` en Medium/Expanded (tablets). NavHost compartido.
-- AppFunctions (`androidx.appfunctions` 1.0.0-alpha07; alpha09 exige compileSdk 37):
+- AppFunctions (`androidx.appfunctions` 1.0.0-alpha09; alpha10 existe pero
+  `appfunctions-service` solo llega a alpha09 — mantener los 3 artefactos parejos):
   `app/.../appfunctions/ContainerFunctions.kt` expone `consultarContenedor` y
   `resumenEstimadosAbiertos` a agentes/sistema (Android 16+). Registradas vía
   `AppFunctionConfiguration.Provider` en MyApplication (factory Hilt).
   Probar en dispositivo: `adb shell cmd app_function list-app-functions`.
-- Styles API: DIFERIDA (exige Compose 1.12 alpha + compileSdk 37 inexistente);
-  decisión documentada en PLAN_DEUDA_TECNICA.md.
+- Styles API: DIFERIDA (exige Compose foundation 1.12, aún en beta02; el BOM
+  estable 2026.06.01 trae 1.11.4); decisión documentada en PLAN_DEUDA_TECNICA.md.
+
+## Actualización de versiones (jul 2026)
+- compileSdk **37** (plataforma `android-37.0`; targetSdk sigue en 36 a propósito —
+  subirlo cambia comportamiento runtime y requiere probar en dispositivo).
+- Al día: Kotlin 2.3.21, Compose BOM 2026.06.01, Hilt 2.60.1, lifecycle 2.11.0,
+  coroutines 1.11.0, core-ktx 1.19.0, Coil 3.5.0, Firebase BOM 34.15.0,
+  google-services 4.5.0, MockK 1.14.11, AppFunctions alpha09.
+- DIFERIDO: Gradle wrapper 9.6.1 (el contenedor remoto no puede descargar la
+  distribución — bloqueo de red a github.com; hacerlo desde el PC), Kotlin 2.4.0
+  (validar KSP antes), AGP 9.3.0 (esperar estable; hoy en rc02).
 
 ## Feature de sensores BLE — ESTADO ACTUAL (jun 2026, commits hasta `80e8ecc`)
 **Implementado y en `main`.** Módulo **`feature/sensors/`** (la implementación viva;
