@@ -118,6 +118,17 @@ fix rebote del preview PDF, PIN hasheado, sync visible, 27 tests, CI bloqueante.
   cableado e indicador "Leyendo con IA local…" en `OcrScannerBottomSheet`.
   Probado en Xiaomi 17 Ultra (estado "Disponible").
 
+## Sync post-login (jul 2026)
+`BootstrapRepository.syncRecentAsync(user)` — disparado por `MainViewModel` en
+cada transición a `AuthState.Authenticated` (distinct por user.id), corre en
+`@ApplicationScope` (no muere al navegar). Estrategia de costo mínimo:
+2 consultas (estimados ABIERTOS + `createdAt > 24h`, ambas single-field, sin
+índice compuesto) + reconciliación puntual de cierres (abiertos locales que ya
+no están abiertos en remoto → fetch por id, 0-2 docs típico; si el doc no
+existe en remoto — creado offline sin subir — no se toca). Filtro por rol en
+cliente: Admin/SuperAdmin ven todo, técnico solo `technicianId == user.id`.
+El bootstrap completo sigue siendo solo para Room vacío (primera instalación).
+
 ## Actualización de versiones (jul 2026)
 - compileSdk **37** (plataforma `android-37.0`; targetSdk sigue en 36 a propósito —
   subirlo cambia comportamiento runtime y requiere probar en dispositivo).

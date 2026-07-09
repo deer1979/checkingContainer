@@ -4,18 +4,23 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.AuthRepository
 import com.checkingcontainer.core.domain.AuthState
+import com.checkingcontainer.core.domain.BootstrapRepository
 import com.checkingcontainer.core.domain.ThemeRepository
 import com.checkingcontainer.core.model.ThemeConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
     authRepository: AuthRepository,
     themeRepository: ThemeRepository,
+    bootstrapRepository: BootstrapRepository,
 ) : ViewModel() {
 
     val authState: StateFlow<AuthState> = authRepository.state.stateIn(
@@ -23,6 +28,17 @@ class MainViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = AuthState.Loading,
     )
+
+    init {
+        // Sync ligero al autenticarse: estimados abiertos + últimas 24h.
+        // Corre en scope de aplicación (no se cancela al navegar).
+        viewModelScope.launch {
+            authRepository.state
+                .filterIsInstance<AuthState.Authenticated>()
+                .distinctUntilChangedBy { it.user.id }
+                .collect { bootstrapRepository.syncRecentAsync(it.user) }
+        }
+    }
 
     val themeConfig: StateFlow<ThemeConfig> = themeRepository.themeConfig.stateIn(
         scope = viewModelScope,

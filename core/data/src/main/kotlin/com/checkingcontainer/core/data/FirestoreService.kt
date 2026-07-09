@@ -18,6 +18,7 @@ import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.core.domain.SyncStatusRepository
 import com.checkingcontainer.core.network.FirestoreDataSource
 import com.google.firebase.firestore.DocumentChange
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CancellationException
@@ -299,33 +300,8 @@ class FirestoreService @Inject constructor(
 
     suspend fun fetchAllEstimados(): List<EstimadoEntity> = withContext(ioDispatcher) {
         try {
-            firestore.collection(COL_ESTIMADOS).get().await().documents.mapNotNull { doc ->
-                val id = doc.safeLong("id") ?: return@mapNotNull null
-                val inspectionId = doc.safeLong("inspectionId") ?: return@mapNotNull null
-                EstimadoEntity(
-                    id = id,
-                    inspectionId = inspectionId,
-                    containerNo = doc.getString("containerNo") ?: "",
-                    manufacturer = doc.getString("manufacturer") ?: "",
-                    unitModel = doc.getString("unitModel") ?: "",
-                    unitModelNo = doc.getString("unitModelNo") ?: "",
-                    unitSerialNo = doc.getString("unitSerialNo") ?: "",
-                    yearOfBuilt = doc.getString("yearOfBuilt") ?: "",
-                    unitType = doc.getString("unitType") ?: "",
-                    clientName = doc.getString("clientName") ?: "",
-                    location = doc.getString("location") ?: "",
-                    technicianId = doc.safeLong("technicianId") ?: 0L,
-                    technicianName = doc.getString("technicianName") ?: "",
-                    createdAt = doc.safeLong("createdAt") ?: 0L,
-                    approvedAt = doc.safeLong("approvedAt"),
-                    closedAt = doc.safeLong("closedAt"),
-                    status = runCatching { EstimadoStatus.valueOf(doc.getString("status") ?: "") }
-                        .getOrDefault(EstimadoStatus.ABIERTO),
-                    damages = doc.getString("damages") ?: "[]",
-                    hasIva = doc.safeInt("hasIva") ?: 0,
-                    reportUrl = doc.getString("reportUrl"),
-                )
-            }
+            firestore.collection(COL_ESTIMADOS).get().await()
+                .documents.mapNotNull { it.toEstimadoEntity() }
         } catch (e: Exception) {
             Log.w(TAG, "fetchAllEstimados: ${e.message}")
             emptyList()
@@ -340,37 +316,84 @@ class FirestoreService @Inject constructor(
                 .get()
                 .await()
                 .documents
-                .mapNotNull { doc ->
-                    val id = doc.safeLong("id") ?: return@mapNotNull null
-                    val inspectionId = doc.safeLong("inspectionId") ?: return@mapNotNull null
-                    EstimadoEntity(
-                        id = id,
-                        inspectionId = inspectionId,
-                        containerNo = doc.getString("containerNo") ?: "",
-                        manufacturer = doc.getString("manufacturer") ?: "",
-                        unitModel = doc.getString("unitModel") ?: "",
-                        unitModelNo = doc.getString("unitModelNo") ?: "",
-                        unitSerialNo = doc.getString("unitSerialNo") ?: "",
-                        yearOfBuilt = doc.getString("yearOfBuilt") ?: "",
-                        unitType = doc.getString("unitType") ?: "",
-                        clientName = doc.getString("clientName") ?: "",
-                        location = doc.getString("location") ?: "",
-                        technicianId = doc.safeLong("technicianId") ?: 0L,
-                        technicianName = doc.getString("technicianName") ?: "",
-                        createdAt = doc.safeLong("createdAt") ?: 0L,
-                        approvedAt = doc.safeLong("approvedAt"),
-                        closedAt = doc.safeLong("closedAt"),
-                        status = runCatching { EstimadoStatus.valueOf(doc.getString("status") ?: "") }
-                            .getOrDefault(EstimadoStatus.ABIERTO),
-                        damages = doc.getString("damages") ?: "[]",
-                        hasIva = doc.safeInt("hasIva") ?: 0,
-                        reportUrl = doc.getString("reportUrl"),
-                    )
-                }
+                .mapNotNull { it.toEstimadoEntity() }
         } catch (e: Exception) {
             Log.w(TAG, "fetchEstimadosByContainerNo: ${e.message}")
             emptyList()
         }
+    }
+
+    /** Estimados ABIERTOS en remoto (sync post-login). */
+    suspend fun fetchOpenEstimados(): List<EstimadoEntity> = withContext(ioDispatcher) {
+        try {
+            firestore.collection(COL_ESTIMADOS)
+                .whereEqualTo("status", EstimadoStatus.ABIERTO.name)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toEstimadoEntity() }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchOpenEstimados: ${e.message}")
+            emptyList()
+        }
+    }
+
+    /** Estimados creados después de [sinceMillis] (sync post-login). */
+    suspend fun fetchEstimadosCreatedSince(sinceMillis: Long): List<EstimadoEntity> = withContext(ioDispatcher) {
+        try {
+            firestore.collection(COL_ESTIMADOS)
+                .whereGreaterThan("createdAt", sinceMillis)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toEstimadoEntity() }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchEstimadosCreatedSince: ${e.message}")
+            emptyList()
+        }
+    }
+
+    /** Un estimado puntual por id; null si no existe o no hay conexión. */
+    suspend fun fetchEstimadoById(id: Long): EstimadoEntity? = withContext(ioDispatcher) {
+        try {
+            firestore.collection(COL_ESTIMADOS)
+                .document(id.toString())
+                .get()
+                .await()
+                .toEstimadoEntity()
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchEstimadoById: ${e.message}")
+            null
+        }
+    }
+
+    /** Mapper único documento→entidad: todas las lecturas de estimados pasan por aquí. */
+    private fun DocumentSnapshot.toEstimadoEntity(): EstimadoEntity? {
+        val id = safeLong("id") ?: return null
+        val inspectionId = safeLong("inspectionId") ?: return null
+        return EstimadoEntity(
+            id = id,
+            inspectionId = inspectionId,
+            containerNo = getString("containerNo") ?: "",
+            manufacturer = getString("manufacturer") ?: "",
+            unitModel = getString("unitModel") ?: "",
+            unitModelNo = getString("unitModelNo") ?: "",
+            unitSerialNo = getString("unitSerialNo") ?: "",
+            yearOfBuilt = getString("yearOfBuilt") ?: "",
+            unitType = getString("unitType") ?: "",
+            clientName = getString("clientName") ?: "",
+            location = getString("location") ?: "",
+            technicianId = safeLong("technicianId") ?: 0L,
+            technicianName = getString("technicianName") ?: "",
+            createdAt = safeLong("createdAt") ?: 0L,
+            approvedAt = safeLong("approvedAt"),
+            closedAt = safeLong("closedAt"),
+            status = runCatching { EstimadoStatus.valueOf(getString("status") ?: "") }
+                .getOrDefault(EstimadoStatus.ABIERTO),
+            damages = getString("damages") ?: "[]",
+            hasIva = safeInt("hasIva") ?: 0,
+            reportUrl = getString("reportUrl"),
+        )
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
