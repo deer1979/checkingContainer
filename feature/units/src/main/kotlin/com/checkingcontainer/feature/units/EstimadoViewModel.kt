@@ -5,9 +5,11 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.checkingcontainer.core.domain.ClientsRepository
 import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.domain.InspectionRepository
 import com.checkingcontainer.core.domain.ReeferEquipmentRepository
+import com.checkingcontainer.core.model.Client
 import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.Estimado
@@ -19,6 +21,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -32,6 +36,7 @@ import javax.inject.Inject
 class EstimadoViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val estimadosRepo: EstimadosRepository,
+    private val clientsRepo: ClientsRepository,
     private val inspectionRepo: InspectionRepository,
     private val reeferUnitRepo: ReeferEquipmentRepository,
     private val pdfGenerator: EstimadoPdfGenerator,
@@ -42,6 +47,13 @@ class EstimadoViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(EstimadoUiState(inspectionId = inspectionId))
     val state: StateFlow<EstimadoUiState> = _state.asStateFlow()
+
+    /** Catálogo de clientes activos, para el selector. */
+    val activeClients: StateFlow<List<Client>> = clientsRepo.observeActive().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList(),
+    )
 
     // Temporary fields for bottom-sheet forms
     private var pendingDamageDescription = ""
@@ -76,6 +88,11 @@ class EstimadoViewModel @Inject constructor(
                     status = existing?.status ?: EstimadoStatus.ABIERTO,
                     damages = existing?.damages ?: emptyList(),
                     mediciones = existing?.mediciones ?: emptyList(),
+                    clientId = existing?.clientId,
+                    clientIdNumber = existing?.clientIdNumber ?: "",
+                    clientDireccion = existing?.clientDireccion ?: "",
+                    clientTelefono = existing?.clientTelefono ?: "",
+                    clientEmail = existing?.clientEmail ?: "",
                     hasIva = existing?.hasIva ?: false,
                 )
             }
@@ -276,6 +293,40 @@ class EstimadoViewModel @Inject constructor(
         }
     }
 
+    /** Asigna un cliente del catálogo: referencia + snapshot congelado. */
+    fun selectClient(client: Client) {
+        _state.update {
+            it.copy(
+                clientId = client.id,
+                clientName = client.razonSocial,
+                clientIdNumber = client.idNumber,
+                clientDireccion = client.direccion,
+                clientTelefono = client.telefono,
+                clientEmail = client.email,
+                isDirty = true,
+                savedMessage = null,
+            )
+        }
+    }
+
+    /** Crea el cliente en el catálogo y lo asigna al estimado. */
+    fun createClientAndSelect(client: Client, onDone: () -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(isSavingClient = true) }
+            runCatching { clientsRepo.save(client) }
+                .onSuccess { id ->
+                    selectClient(client.copy(id = id))
+                    _state.update { it.copy(isSavingClient = false) }
+                    onDone()
+                }
+                .onFailure { e ->
+                    _state.update {
+                        it.copy(isSavingClient = false, errorMessage = e.message ?: "Error al guardar el cliente")
+                    }
+                }
+        }
+    }
+
     private fun deletePhotoAsync(url: String) {
         viewModelScope.launch(Dispatchers.IO) { estimadosRepo.deletePhoto(url) }
     }
@@ -363,6 +414,11 @@ class EstimadoViewModel @Inject constructor(
                 yearOfBuilt = current.yearOfBuilt,
                 unitType = current.unitType,
                 clientName = current.clientName.trim(),
+                clientId = current.clientId,
+                clientIdNumber = current.clientIdNumber,
+                clientDireccion = current.clientDireccion,
+                clientTelefono = current.clientTelefono,
+                clientEmail = current.clientEmail,
                 location = current.location.trim(),
                 technicianId = 0,
                 technicianName = current.technicianName,
@@ -414,6 +470,11 @@ class EstimadoViewModel @Inject constructor(
                 yearOfBuilt = current.yearOfBuilt,
                 unitType = current.unitType,
                 clientName = current.clientName,
+                clientId = current.clientId,
+                clientIdNumber = current.clientIdNumber,
+                clientDireccion = current.clientDireccion,
+                clientTelefono = current.clientTelefono,
+                clientEmail = current.clientEmail,
                 location = current.location,
                 technicianName = current.technicianName,
                 createdAt = current.createdAt,

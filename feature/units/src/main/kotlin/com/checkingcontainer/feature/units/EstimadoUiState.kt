@@ -25,6 +25,13 @@ data class EstimadoUiState(
     // Ítems
     val damages: List<DamageItem> = emptyList(),
     val mediciones: List<MedicionSnapshot> = emptyList(),
+    // Cliente del catálogo (referencia + snapshot congelado al asignar)
+    val clientId: Long? = null,
+    val clientIdNumber: String = "",
+    val clientDireccion: String = "",
+    val clientTelefono: String = "",
+    val clientEmail: String = "",
+    val isSavingClient: Boolean = false,
     // Configuración
     val hasIva: Boolean = false,
     // Estados de carga

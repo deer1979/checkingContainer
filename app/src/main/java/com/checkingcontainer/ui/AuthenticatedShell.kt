@@ -34,6 +34,8 @@ import com.checkingcontainer.feature.announcements.navigation.announcementsGraph
 import com.checkingcontainer.feature.settings.navigation.SETTINGS_ROUTE
 import com.checkingcontainer.feature.settings.navigation.settingsScreen
 import com.checkingcontainer.feature.sensors.navigation.sensorsGraph
+import com.checkingcontainer.feature.units.navigation.CLIENTES_LIST_ROUTE
+import com.checkingcontainer.feature.units.navigation.clientesGraph
 import com.checkingcontainer.feature.units.navigation.estimadosGraph
 import com.checkingcontainer.feature.units.navigation.unitsGraph
 import com.checkingcontainer.feature.users.navigation.USERS_LIST_ROUTE
@@ -199,9 +201,11 @@ private fun ShellNavHost(
                 },
             )
             sensorsGraph(navController = navController)
+            clientesGraph(navController = navController)
             settingsScreen(
                 isAdmin = user.role.isAdmin,
                 onUsersClick = { navController.navigate(USERS_LIST_ROUTE) },
+                onClientsClick = { navController.navigate(CLIENTES_LIST_ROUTE) },
             )
         }
     }

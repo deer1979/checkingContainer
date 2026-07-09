@@ -31,6 +31,12 @@ data class Estimado(
     val unitType: String = "",
     // Datos del estimado
     val clientName: String = "",
+    // Referencia + snapshot del cliente del catálogo (congelado al asignar)
+    val clientId: Long? = null,
+    val clientIdNumber: String = "",
+    val clientDireccion: String = "",
+    val clientTelefono: String = "",
+    val clientEmail: String = "",
     val location: String = "",
     val technicianId: Long = 0,
     val technicianName: String = "",

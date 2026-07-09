@@ -9,12 +9,14 @@ const val SETTINGS_ROUTE = "settings"
 fun NavGraphBuilder.settingsScreen(
     isAdmin: Boolean = false,
     onUsersClick: () -> Unit = {},
+    onClientsClick: () -> Unit = {},
 ) {
     composable(route = SETTINGS_ROUTE) {
         SettingsRoute(
             onBack = {},
             isAdmin = isAdmin,
             onUsersClick = onUsersClick,
+            onClientsClick = onClientsClick,
         )
     }
 }

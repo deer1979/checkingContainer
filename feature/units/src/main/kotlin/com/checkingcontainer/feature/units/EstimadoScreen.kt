@@ -190,12 +190,30 @@ fun EstimadoRoute(
         )
     }
 
+    var showClientPicker by remember { mutableStateOf(false) }
+    if (showClientPicker) {
+        val clients by viewModel.activeClients.collectAsStateWithLifecycle()
+        ClientPickerSheet(
+            clients = clients,
+            isSaving = state.isSavingClient,
+            onSelect = { client ->
+                viewModel.selectClient(client)
+                showClientPicker = false
+            },
+            onCreate = { client ->
+                viewModel.createClientAndSelect(client) { showClientPicker = false }
+            },
+            onDismiss = { showClientPicker = false },
+        )
+    }
+
     EstimadoScreen(
         state = state,
         onBack = onBackSafe,
         onEvent = viewModel::onEvent,
         onSave = viewModel::save,
         onGeneratePdf = viewModel::generateAndSharePdf,
+        onSelectClientClick = { showClientPicker = true },
         onAddDamagePhoto = viewModel::addDamagePhoto,
         onAddRepairPhoto = viewModel::addRepairPhoto,
         getPendingDamageDescription = viewModel::getPendingDamageDescription,
@@ -213,6 +231,7 @@ fun EstimadoScreen(
     onEvent: (EstimadoEvent) -> Unit,
     onSave: () -> Unit,
     onGeneratePdf: () -> Unit,
+    onSelectClientClick: () -> Unit = {},
     onAddDamagePhoto: (String, Uri) -> Unit,
     onAddRepairPhoto: (String, Uri) -> Unit,
     getPendingDamageDescription: () -> String,
@@ -347,15 +366,25 @@ fun EstimadoScreen(
                 ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         SectionTitle("Cliente")
-                        OutlinedTextField(
-                            value = state.clientName,
-                            onValueChange = { onEvent(EstimadoEvent.ClientNameChange(it)) },
-                            label = { Text("Nombre del cliente") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                            enabled = state.status != EstimadoStatus.CERRADO,
-                        )
+                        if (state.clientName.isNotEmpty()) {
+                            InfoRow("Nombre", state.clientName)
+                            if (state.clientIdNumber.isNotEmpty()) InfoRow("RUC/CI", state.clientIdNumber)
+                            if (state.clientTelefono.isNotEmpty()) InfoRow("Teléfono", state.clientTelefono)
+                        } else {
+                            Text(
+                                "Sin cliente asignado",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (state.status != EstimadoStatus.CERRADO) {
+                            OutlinedButton(
+                                onClick = onSelectClientClick,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(if (state.clientName.isEmpty()) "Seleccionar cliente" else "Cambiar cliente")
+                            }
+                        }
                         OutlinedTextField(
                             value = state.location,
                             onValueChange = { onEvent(EstimadoEvent.LocationChange(it)) },

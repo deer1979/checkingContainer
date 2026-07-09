@@ -3,6 +3,7 @@ package com.checkingcontainer.core.data
 import android.util.Log
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
+import com.checkingcontainer.core.database.dao.ClientDao
 import com.checkingcontainer.core.database.dao.EstimadoDao
 import com.checkingcontainer.core.database.dao.InspectionDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
@@ -25,6 +26,7 @@ private const val BOOT_TAG = "BootstrapSync"
 class BootstrapRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
     private val estimadoDao: EstimadoDao,
+    private val clientDao: ClientDao,
     private val inspectionDao: InspectionDao,
     private val reeferUnitDao: ReeferUnitDao,
     private val firestoreService: FirestoreService,
@@ -61,6 +63,11 @@ class BootstrapRepositoryImpl @Inject constructor(
         val estimados = firestoreService.fetchAllEstimados()
         estimados.forEach { runCatching { estimadoDao.upsert(it) } }
         Log.i(BOOT_TAG, "Estimados: ${estimados.size}")
+
+        // 5. Clientes (catálogo para estimados)
+        val clients = firestoreService.fetchAllClients()
+        clients.forEach { runCatching { clientDao.upsert(it) } }
+        Log.i(BOOT_TAG, "Clientes: ${clients.size}")
 
         Log.i(BOOT_TAG, "Sincronización completa.")
     }

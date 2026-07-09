@@ -118,6 +118,21 @@ fix rebote del preview PDF, PIN hasheado, sync visible, 27 tests, CI bloqueante.
   cableado e indicador "Leyendo con IA local…" en `OcrScannerBottomSheet`.
   Probado en Xiaomi 17 Ultra (estado "Disponible").
 
+## Catálogo de clientes (jul 2026)
+Entidad `Client` (razón social, RUC/cédula/pasaporte, email, dirección,
+teléfono, contacto, notas) con validación por dígito verificador SRI
+(`IdentificacionEc` en core:model, con tests — módulo 10 cédula, módulo 11
+sociedades/público, RUC natural = cédula+establecimiento). Tabla `clients`
+(migración 15→16, que también añade clientId + snapshot del cliente al
+estimado) + colección Firestore + bootstrap. UI en feature:units: sección
+Clientes (Ajustes → Catálogos → Clientes; `clientesGraph`), y en el estimado
+selector con búsqueda + creación rápida (`ClientPickerSheet`, formulario
+compartido `ClientFormFields`). El estimado congela snapshot (clientIdNumber/
+dirección/teléfono/email) al asignar; el PDF imprime RUC/dirección/teléfono.
+Cualquier usuario puede crear clientes. PENDIENTE (fase 3): escaneo de
+factura con Gemini Nano y pegado de texto (WhatsApp) para pre-llenar el
+formulario.
+
 ## Sync post-login (jul 2026)
 `BootstrapRepository.syncRecentAsync(user)` — disparado por `MainViewModel` en
 cada transición a `AuthState.Authenticated` (distinct por user.id), corre en

@@ -6,6 +6,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.checkingcontainer.core.model.User
+import com.checkingcontainer.feature.units.ClientFormRoute
+import com.checkingcontainer.feature.units.ClientesListRoute
 import com.checkingcontainer.feature.units.ContainerSearchRoute
 import com.checkingcontainer.feature.units.EstimadoRoute
 import com.checkingcontainer.feature.units.EstimadosListRoute
@@ -25,6 +27,11 @@ const val UNIT_DETAIL_ROUTE_PATTERN = "units/detail/{containerNo}"
 internal const val UNIT_DETAIL_ARG = "containerNo"
 const val ESTIMADO_INSPECTION_ID_ARG = "inspectionId"
 private const val ESTIMADO_ROUTE_PATTERN = "estimado/{$ESTIMADO_INSPECTION_ID_ARG}"
+
+const val CLIENTES_LIST_ROUTE = "clientes"
+internal const val CLIENTE_FORM_ID_ARG = "clienteId"
+private const val CLIENTE_FORM_ROUTE = "clientes/form?clienteId={$CLIENTE_FORM_ID_ARG}"
+private fun clienteFormRoute(clienteId: Long) = "clientes/form?clienteId=$clienteId"
 
 fun unitDetailRoute(containerNo: String) = "units/detail/$containerNo"
 fun unitEntryEditRoute(unitId: Long) = "$UNITS_ENTRY_BASE?unitId=$unitId"
@@ -110,5 +117,27 @@ fun NavGraphBuilder.estimadosGraph(
             },
             onBack = { navController.popBackStack() },
         )
+    }
+}
+
+/** Sección de clientes: lista + formulario. Se entra desde Ajustes. */
+fun NavGraphBuilder.clientesGraph(navController: NavHostController) {
+    composable(route = CLIENTES_LIST_ROUTE) {
+        ClientesListRoute(
+            onBack = { navController.popBackStack() },
+            onClientClick = { id -> navController.navigate(clienteFormRoute(id)) },
+            onNewClient = { navController.navigate(clienteFormRoute(-1L)) },
+        )
+    }
+    composable(
+        route = CLIENTE_FORM_ROUTE,
+        arguments = listOf(
+            navArgument(CLIENTE_FORM_ID_ARG) {
+                type = NavType.LongType
+                defaultValue = -1L
+            },
+        ),
+    ) {
+        ClientFormRoute(onBack = { navController.popBackStack() })
     }
 }

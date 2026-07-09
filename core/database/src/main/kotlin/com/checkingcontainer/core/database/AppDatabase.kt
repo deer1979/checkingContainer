@@ -6,12 +6,14 @@ import androidx.room.TypeConverters
 import com.checkingcontainer.core.database.converters.EnumConverters
 import com.checkingcontainer.core.database.dao.AnnouncementDao
 import com.checkingcontainer.core.database.dao.CatalogDao
+import com.checkingcontainer.core.database.dao.ClientDao
 import com.checkingcontainer.core.database.dao.EstimadoDao
 import com.checkingcontainer.core.database.dao.InspectionDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.database.entity.AnnouncementEntity
 import com.checkingcontainer.core.database.entity.CatalogEntryEntity
+import com.checkingcontainer.core.database.entity.ClientEntity
 import com.checkingcontainer.core.database.entity.EstimadoEntity
 import com.checkingcontainer.core.database.entity.InspectionEntity
 import com.checkingcontainer.core.database.entity.ManufacturerEntity
@@ -27,8 +29,9 @@ import com.checkingcontainer.core.database.entity.UserEntity
         CatalogEntryEntity::class,
         AnnouncementEntity::class,
         EstimadoEntity::class,
+        ClientEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = false,
 )
 @TypeConverters(EnumConverters::class)
@@ -39,4 +42,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun catalogDao(): CatalogDao
     abstract fun announcementDao(): AnnouncementDao
     abstract fun estimadoDao(): EstimadoDao
+    abstract fun clientDao(): ClientDao
 }

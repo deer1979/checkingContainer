@@ -4,11 +4,13 @@ import android.util.Log
 import com.checkingcontainer.core.common.di.AppDispatcher
 import com.checkingcontainer.core.common.di.Dispatcher
 import com.checkingcontainer.core.database.entity.AnnouncementEntity
+import com.checkingcontainer.core.database.entity.ClientEntity
 import com.checkingcontainer.core.database.entity.EstimadoEntity
 import com.checkingcontainer.core.database.entity.InspectionEntity
 import com.checkingcontainer.core.database.entity.ReeferUnitEntity
 import com.checkingcontainer.core.database.entity.UserEntity
 import com.checkingcontainer.core.model.Brand
+import com.checkingcontainer.core.model.ClientIdType
 import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.JobTitle
@@ -39,6 +41,7 @@ private const val COL_REEFER_UNITS = "reefer_units"
 private const val COL_INSPECTIONS = "inspections"
 private const val COL_USERS = "users"
 private const val COL_ESTIMADOS = "estimados"
+private const val COL_CLIENTS = "clients"
 
 @Singleton
 class FirestoreService @Inject constructor(
@@ -382,6 +385,11 @@ class FirestoreService @Inject constructor(
             yearOfBuilt = getString("yearOfBuilt") ?: "",
             unitType = getString("unitType") ?: "",
             clientName = getString("clientName") ?: "",
+            clientId = safeLong("clientId"),
+            clientIdNumber = getString("clientIdNumber") ?: "",
+            clientDireccion = getString("clientDireccion") ?: "",
+            clientTelefono = getString("clientTelefono") ?: "",
+            clientEmail = getString("clientEmail") ?: "",
             location = getString("location") ?: "",
             technicianId = safeLong("technicianId") ?: 0L,
             technicianName = getString("technicianName") ?: "",
@@ -395,6 +403,41 @@ class FirestoreService @Inject constructor(
             hasIva = safeInt("hasIva") ?: 0,
             reportUrl = getString("reportUrl"),
         )
+    }
+
+    // ── Clients ──────────────────────────────────────────────────────────────
+
+    suspend fun upsertClient(entity: ClientEntity): Unit = write("upsertClient") {
+        firestore.collection(COL_CLIENTS)
+            .document(entity.id.toString())
+            .set(entity.toFirestoreMap())
+            .await()
+    }
+
+    suspend fun fetchAllClients(): List<ClientEntity> = withContext(ioDispatcher) {
+        try {
+            firestore.collection(COL_CLIENTS).get().await().documents.mapNotNull { doc ->
+                val id = doc.safeLong("id") ?: return@mapNotNull null
+                ClientEntity(
+                    id = id,
+                    razonSocial = doc.getString("razonSocial") ?: "",
+                    idType = runCatching { ClientIdType.valueOf(doc.getString("idType") ?: "") }
+                        .getOrDefault(ClientIdType.RUC),
+                    idNumber = doc.getString("idNumber") ?: "",
+                    email = doc.getString("email") ?: "",
+                    direccion = doc.getString("direccion") ?: "",
+                    telefono = doc.getString("telefono") ?: "",
+                    contacto = doc.getString("contacto") ?: "",
+                    notas = doc.getString("notas") ?: "",
+                    isActive = doc.safeInt("isActive") ?: 1,
+                    createdAt = doc.safeLong("createdAt") ?: 0L,
+                    updatedAt = doc.safeLong("updatedAt") ?: 0L,
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchAllClients: ${e.message}")
+            emptyList()
+        }
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -468,6 +511,11 @@ private fun EstimadoEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "yearOfBuilt"   to yearOfBuilt,
     "unitType"      to unitType,
     "clientName"    to clientName,
+    "clientId"      to clientId,
+    "clientIdNumber" to clientIdNumber,
+    "clientDireccion" to clientDireccion,
+    "clientTelefono" to clientTelefono,
+    "clientEmail"   to clientEmail,
     "location"      to location,
     "technicianId"  to technicianId,
     "technicianName" to technicianName,
@@ -492,4 +540,19 @@ private fun UserEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "company"   to company,
     "location"  to location,
     "isActive"  to isActive,
+)
+
+private fun ClientEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
+    "id"          to id,
+    "razonSocial" to razonSocial,
+    "idType"      to idType.name,
+    "idNumber"    to idNumber,
+    "email"       to email,
+    "direccion"   to direccion,
+    "telefono"    to telefono,
+    "contacto"    to contacto,
+    "notas"       to notas,
+    "isActive"    to isActive,
+    "createdAt"   to createdAt,
+    "updatedAt"   to updatedAt,
 )

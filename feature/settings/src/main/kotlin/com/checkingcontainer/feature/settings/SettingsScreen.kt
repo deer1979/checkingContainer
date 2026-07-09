@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
@@ -40,6 +41,7 @@ fun SettingsRoute(
     onBack: () -> Unit,
     isAdmin: Boolean = false,
     onUsersClick: () -> Unit = {},
+    onClientsClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -48,6 +50,7 @@ fun SettingsRoute(
         onBack = onBack,
         isAdmin = isAdmin,
         onUsersClick = onUsersClick,
+        onClientsClick = onClientsClick,
         onThemeChange = viewModel::onThemeChange,
         onToggleDynamicColor = viewModel::onDynamicColorChange,
         onToggleNotifications = viewModel::onToggleNotifications,
@@ -63,6 +66,7 @@ private fun SettingsScreen(
     onBack: () -> Unit,
     isAdmin: Boolean = false,
     onUsersClick: () -> Unit = {},
+    onClientsClick: () -> Unit = {},
     onThemeChange: (ThemeConfig) -> Unit,
     onToggleDynamicColor: (Boolean) -> Unit,
     onToggleNotifications: (Boolean) -> Unit,
@@ -132,6 +136,17 @@ private fun SettingsScreen(
                     icon = Icons.Outlined.Sync,
                     checked = state.autoSync,
                     onCheckedChange = onToggleAutoSync,
+                )
+            }
+            item { HorizontalDivider() }
+
+            item { SectionHeader("Catálogos") }
+            item {
+                ListItem(
+                    headlineContent = { Text("Clientes") },
+                    supportingContent = { Text("Datos de facturación de tus clientes (SRI)") },
+                    leadingContent = { Icon(Icons.Outlined.Business, contentDescription = null) },
+                    modifier = Modifier.clickable(onClick = onClientsClick),
                 )
             }
             item { HorizontalDivider() }
