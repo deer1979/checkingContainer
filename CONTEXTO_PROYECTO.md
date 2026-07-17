@@ -146,10 +146,16 @@ un ASISTENTE ("¿Qué vas a revisar?"); para no-reefer la identidad es un
 → inspecciones/estimados/sensores/PDF fluyen sin tocarse), sin validación ISO
 ni escáner de número, y PTI no exigido. Rótulos por heurística: containerNo
 que NO pasa Iso6346 ⇒ "Equipo:"/"Código de equipo" en PDF y estimado.
-PENDIENTE (tanda 2): escaneo de placa genérico con salida estructurada
-(DatosPlacaEquipo @Generable: marca/modelo/serie/refrigerante/capacidad/
-voltaje/año) + cuadro de referencia en cámara + sugerencia de código desde
-el serial + etiqueta de tipo en listas.
+Tanda 2 HECHA: `PlacaEquipoExtractor` + `DatosPlacaEquipo` (@Generable:
+marca/modelo/serie/refrigerante/capacidad/voltaje/año) — foto por cámara
+(TakePicture + FileProvider) o galería en `PlacaScanRow` (solo no-reefer,
+sobre IdentificationCard); pre-llena vía el canal OcrResult (claves nuevas
+"Manufacturer" y "Observaciones" en applyOcrFields; refrigerante/capacidad/
+voltaje van a observaciones) y sugiere código = prefijo(AC/CF/CH/EQ)-SERIE
+sin pisar un código ya escrito. Sin IA: OCR + regex por palabras clave.
+Nota: se usa la cámara del sistema (sin overlay de encuadre); un visor
+propio con marco queda como mejora opcional. Etiqueta de tipo en listas:
+descartada — el código (AC-…, CF-…) ya distingue a simple vista.
 
 ## ML Kit R41 / Structured Output (jul 2026)
 genai-prompt beta3 + genai-schema(-compiler) alpha1 (KSP). La extracción de

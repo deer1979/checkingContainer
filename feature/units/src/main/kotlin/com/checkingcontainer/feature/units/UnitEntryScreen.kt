@@ -148,6 +148,13 @@ fun UnitEntryScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            if (!state.esReefer) {
+                PlacaScanRow(
+                    tipo = state.tipoEquipo,
+                    codigoActual = state.containerNo,
+                    onResult = { onEvent(UnitEntryEvent.OcrResult(it)) },
+                )
+            }
             IdentificationCard(state = state, onEvent = onEvent)
             EquipmentDataCard(state = state, onEvent = onEvent)
             InspectionCard(state = state, onEvent = onEvent)

@@ -98,6 +98,12 @@ internal fun UnitEntryUiState.applyOcrFields(fields: Map<String, String>): UnitE
             "Unit Model" -> updated.copy(unitModelNo = value)
             "Unit Serial No." -> updated.copy(unitSerialNo = value.uppercase())
             "Year of Built" -> updated.copy(yearOfBuilt = value)
+            // Claves del escaneo de placa genérico (equipos no-reefer)
+            "Manufacturer" -> updated.copy(manufacturer = value)
+            "Observaciones" -> updated.copy(
+                observations = if (updated.observations.isBlank()) value
+                else "${updated.observations}\n$value",
+            )
             else -> updated
         }
     }
