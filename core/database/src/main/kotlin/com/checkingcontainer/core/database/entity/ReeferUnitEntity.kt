@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.ReeferEquipment
+import com.checkingcontainer.core.model.TipoEquipo
 
 @Entity(tableName = "reefer_units")
 data class ReeferUnitEntity(
@@ -15,6 +16,7 @@ data class ReeferUnitEntity(
     val yearOfBuilt: String = "",
     val brand: Brand = Brand.CARRIER,
     val unitType: String = "",
+    val tipoEquipo: TipoEquipo = TipoEquipo.REEFER,
 ) {
     fun toDomain(): ReeferEquipment = ReeferEquipment(
         containerNo = containerNo,
@@ -25,6 +27,7 @@ data class ReeferUnitEntity(
         yearOfBuilt = yearOfBuilt,
         brand = brand,
         unitType = unitType,
+        tipoEquipo = tipoEquipo,
     )
 }
 
@@ -37,4 +40,5 @@ fun ReeferEquipment.toEntity(): ReeferUnitEntity = ReeferUnitEntity(
     yearOfBuilt = yearOfBuilt,
     brand = brand,
     unitType = unitType,
+    tipoEquipo = tipoEquipo,
 )

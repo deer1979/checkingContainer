@@ -31,7 +31,7 @@ import com.checkingcontainer.core.database.entity.UserEntity
         EstimadoEntity::class,
         ClientEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = false,
 )
 @TypeConverters(EnumConverters::class)

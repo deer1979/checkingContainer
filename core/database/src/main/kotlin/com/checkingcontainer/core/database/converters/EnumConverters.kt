@@ -7,6 +7,7 @@ import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.PtiInstruction
+import com.checkingcontainer.core.model.TipoEquipo
 import com.checkingcontainer.core.model.UserRole
 
 class EnumConverters {
@@ -45,6 +46,13 @@ class EnumConverters {
     @TypeConverter
     fun stringToBrand(value: String?): Brand? =
         value?.let { runCatching { Brand.valueOf(it) }.getOrNull() }
+
+    @TypeConverter
+    fun tipoEquipoToString(value: TipoEquipo?): String? = value?.name
+
+    @TypeConverter
+    fun stringToTipoEquipo(value: String?): TipoEquipo? =
+        value?.let { runCatching { TipoEquipo.valueOf(it) }.getOrNull() }
 
     @TypeConverter
     fun clientIdTypeToString(value: ClientIdType?): String? = value?.name

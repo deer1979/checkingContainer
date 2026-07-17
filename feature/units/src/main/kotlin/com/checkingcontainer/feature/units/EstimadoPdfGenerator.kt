@@ -192,7 +192,9 @@ class EstimadoPdfGenerator @Inject constructor(
         )
         y += 6f; hLine(); y += 12f
 
-        infoRow("Contenedor:", estimado.containerNo)
+        // Heurística sin cambio de esquema: los reefer siempre pasan ISO 6346;
+        // los demás equipos usan código libre.
+        infoRow(if (Iso6346.isValid(estimado.containerNo)) "Contenedor:" else "Equipo:", estimado.containerNo)
         if (estimado.clientName.isNotEmpty()) infoRow("Cliente:", estimado.clientName)
         if (estimado.clientIdNumber.isNotEmpty()) infoRow("RUC/CI:", estimado.clientIdNumber)
         if (estimado.clientDireccion.isNotEmpty()) infoRow("Dirección:", estimado.clientDireccion)

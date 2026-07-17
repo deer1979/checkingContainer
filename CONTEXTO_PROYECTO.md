@@ -138,6 +138,19 @@ respaldo/sin-IA (OCR ML Kit para fotos) → el usuario revisa antes de guardar.
 PENDIENTE menor: botón de captura directa con cámara en el formulario
 (hoy: tomar foto con la cámara del sistema y elegirla de galería).
 
+## Equipos más allá del reefer (jul 2026 — tanda 1 HECHA)
+`TipoEquipo` (REEFER/AIRE_ACONDICIONADO/CAMARA_FRIA/CHILLER/OTRO) en
+ReeferEquipment/entity (migración 16→17) + Firestore. El "+" de la lista abre
+un ASISTENTE ("¿Qué vas a revisar?"); para no-reefer la identidad es un
+"código de equipo" libre (≥3 chars, editable, ocupa el lugar del containerNo
+→ inspecciones/estimados/sensores/PDF fluyen sin tocarse), sin validación ISO
+ni escáner de número, y PTI no exigido. Rótulos por heurística: containerNo
+que NO pasa Iso6346 ⇒ "Equipo:"/"Código de equipo" en PDF y estimado.
+PENDIENTE (tanda 2): escaneo de placa genérico con salida estructurada
+(DatosPlacaEquipo @Generable: marca/modelo/serie/refrigerante/capacidad/
+voltaje/año) + cuadro de referencia en cámara + sugerencia de código desde
+el serial + etiqueta de tipo en listas.
+
 ## ML Kit R41 / Structured Output (jul 2026)
 genai-prompt beta3 + genai-schema(-compiler) alpha1 (KSP). La extracción de
 clientes usa SALIDA TIPADA: `DatosClienteExtraidos` anotada con

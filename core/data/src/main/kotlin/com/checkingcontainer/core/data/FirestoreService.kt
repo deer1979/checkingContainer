@@ -16,6 +16,7 @@ import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.JobTitle
 import com.checkingcontainer.core.model.PtiInstruction
 import com.checkingcontainer.core.model.ReeferEquipment
+import com.checkingcontainer.core.model.TipoEquipo
 import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.core.domain.SyncStatusRepository
 import com.checkingcontainer.core.network.FirestoreDataSource
@@ -141,6 +142,8 @@ class FirestoreService @Inject constructor(
                     ?.let { runCatching { Brand.valueOf(it) }.getOrDefault(Brand.CARRIER) }
                     ?: Brand.CARRIER,
                 unitType = doc.getString("unitType") ?: "",
+                tipoEquipo = runCatching { TipoEquipo.valueOf(doc.getString("tipoEquipo") ?: "") }
+                    .getOrDefault(TipoEquipo.REEFER),
             )
         } catch (e: Exception) {
             Log.w(TAG, "fetchEquipment deferred (offline?): ${e.message}")
@@ -260,6 +263,8 @@ class FirestoreService @Inject constructor(
                     brand = runCatching { Brand.valueOf(doc.getString("brand") ?: "") }
                         .getOrDefault(Brand.CARRIER),
                     unitType = doc.getString("unitType") ?: "",
+                    tipoEquipo = runCatching { TipoEquipo.valueOf(doc.getString("tipoEquipo") ?: "") }
+                        .getOrDefault(TipoEquipo.REEFER),
                 )
             }
         } catch (e: Exception) {
@@ -478,6 +483,7 @@ private fun ReeferUnitEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "unitSerialNo" to unitSerialNo,
     "yearOfBuilt" to yearOfBuilt,
     "brand"       to brand.name,
+    "tipoEquipo"   to tipoEquipo.name,
     "unitType"    to unitType,
 )
 

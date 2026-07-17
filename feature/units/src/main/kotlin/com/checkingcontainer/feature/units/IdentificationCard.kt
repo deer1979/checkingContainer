@@ -66,15 +66,15 @@ internal fun IdentificationCard(
                     // tiene 11 caracteres (p. ej. tras escanear o al editar una unidad),
                     // rechazar la tecla congelaba la edición. Con take(11) se puede
                     // corregir borrando, seleccionando-y-reemplazando o insertando.
-                    val upper = v.uppercase().take(11)
+                    val upper = v.uppercase().take(if (state.esReefer) 11 else 24)
                     if (upper != state.containerNo) {
                         onEvent(UnitEntryEvent.ContainerNoChange(upper))
-                        if (upper.length == 11 && Iso6346.isValid(upper)) {
+                        if (state.esReefer && upper.length == 11 && Iso6346.isValid(upper)) {
                             focusManager.moveFocus(FocusDirection.Down)
                         }
                     }
                 },
-                label = { Text("Container No.") },
+                label = { Text(if (state.esReefer) "Container No." else "Código del equipo") },
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = containerFontSize.sp),
                 modifier = Modifier
@@ -89,7 +89,8 @@ internal fun IdentificationCard(
                         Text(
                             text = when {
                                 state.showContainerError -> "Formato ISO 6346 inválido"
-                                state.isContainerValid -> "Número válido"
+                                !state.esReefer && !state.isContainerValid -> "Código único (mín. 3 caracteres); sugerencia: tipo-serial"
+                                state.isContainerValid -> if (state.esReefer) "Número válido" else "Código válido"
                                 else -> ""
                             },
                             color = when {
@@ -98,10 +99,12 @@ internal fun IdentificationCard(
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
                         )
-                        Text(
-                            text = "${state.containerNo.length}/11",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (state.esReefer) {
+                            Text(
+                                text = "${state.containerNo.length}/11",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 },
                 colors = if (state.isContainerValid) {
@@ -125,7 +128,7 @@ internal fun IdentificationCard(
                         IconButton(onClick = { onEvent(UnitEntryEvent.ContainerNoChange("")) }) {
                             Icon(Icons.Outlined.Clear, contentDescription = "Limpiar")
                         }
-                    } else {
+                    } else if (state.esReefer) {
                         IconButton(
                             onClick = { onEvent(UnitEntryEvent.OpenOrientationPicker) },
                         ) {

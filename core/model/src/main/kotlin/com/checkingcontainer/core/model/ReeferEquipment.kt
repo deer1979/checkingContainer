@@ -9,4 +9,5 @@ data class ReeferEquipment(
     val yearOfBuilt: String = "",
     val brand: Brand = Brand.CARRIER,
     val unitType: String = "",
+    val tipoEquipo: TipoEquipo = TipoEquipo.REEFER,
 )

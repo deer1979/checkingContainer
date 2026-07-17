@@ -412,7 +412,7 @@ fun EstimadoScreen(
                 ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         SectionTitle("Datos del equipo")
-                        InfoRow("No. Contenedor", state.containerNo)
+                        InfoRow(if (Iso6346.isValid(state.containerNo)) "No. Contenedor" else "Código de equipo", state.containerNo)
                         if (state.unitSerialNo.isNotEmpty()) InfoRow("No. Serie", state.unitSerialNo)
                         if (state.manufacturer.isNotEmpty()) InfoRow("Fabricante", state.manufacturer)
                         if (state.unitModel.isNotEmpty()) InfoRow("Modelo", state.unitModel)

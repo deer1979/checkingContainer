@@ -12,7 +12,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -34,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.checkingcontainer.core.designsystem.UserAvatarMenu
+import com.checkingcontainer.core.model.TipoEquipo
 import com.checkingcontainer.core.model.User
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -42,7 +45,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UnitListRoute(
-    onNewInspection: () -> Unit,
+    onNewInspection: (String) -> Unit,
     onUnitClick: (String) -> Unit,
     onSearch: () -> Unit = {},
     user: User? = null,
@@ -52,6 +55,32 @@ fun UnitListRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
+    // Asistente del "+": pregunta qué se va a revisar antes de abrir el formulario.
+    var showTipoDialog by remember { mutableStateOf(false) }
+
+    if (showTipoDialog) {
+        AlertDialog(
+            onDismissRequest = { showTipoDialog = false },
+            title = { Text("¿Qué vas a revisar?") },
+            text = {
+                Column {
+                    TipoEquipo.entries.forEach { tipo ->
+                        ListItem(
+                            headlineContent = { Text(tipo.etiqueta) },
+                            modifier = Modifier.clickable {
+                                showTipoDialog = false
+                                onNewInspection(tipo.name)
+                            },
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showTipoDialog = false }) { Text("Cancelar") }
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -75,7 +104,7 @@ fun UnitListRoute(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onNewInspection) {
+            FloatingActionButton(onClick = { showTipoDialog = true }) {
                 Icon(Icons.Outlined.Add, contentDescription = "Nueva inspección")
             }
         },

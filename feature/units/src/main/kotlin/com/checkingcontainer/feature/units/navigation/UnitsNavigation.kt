@@ -20,7 +20,8 @@ const val UNITS_ROUTE = "units"
 const val ESTIMADOS_LIST_ROUTE = "estimados"
 private const val ESTIMADOS_SEARCH_ROUTE = "estimados/buscar"
 private const val UNITS_ENTRY_BASE = "units/entry"
-private const val UNITS_ENTRY_ROUTE = "$UNITS_ENTRY_BASE?unitId={unitId}"
+internal const val UNIT_ENTRY_TIPO_ARG = "tipo"
+private const val UNITS_ENTRY_ROUTE = "$UNITS_ENTRY_BASE?unitId={unitId}&tipo={$UNIT_ENTRY_TIPO_ARG}"
 private const val UNITS_SEARCH_ROUTE = "units/search"
 internal const val UNIT_ENTRY_ID_ARG = "unitId"
 const val UNIT_DETAIL_ROUTE_PATTERN = "units/detail/{containerNo}"
@@ -45,7 +46,7 @@ fun NavGraphBuilder.unitsGraph(
 ) {
     composable(route = UNITS_ROUTE) {
         UnitListRoute(
-            onNewInspection = { navController.navigate(UNITS_ENTRY_BASE) },
+            onNewInspection = { tipo -> navController.navigate("$UNITS_ENTRY_BASE?tipo=$tipo") },
             onUnitClick = { containerNo -> navController.navigate(unitDetailRoute(containerNo)) },
             onSearch = { navController.navigate(UNITS_SEARCH_ROUTE) },
             user = user,
@@ -59,6 +60,10 @@ fun NavGraphBuilder.unitsGraph(
             navArgument(UNIT_ENTRY_ID_ARG) {
                 type = NavType.LongType
                 defaultValue = -1L
+            },
+            navArgument(UNIT_ENTRY_TIPO_ARG) {
+                type = NavType.StringType
+                defaultValue = "REEFER"
             },
         ),
     ) {

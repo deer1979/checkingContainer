@@ -6,6 +6,7 @@ import com.checkingcontainer.core.model.Inspection
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.PtiInstruction
 import com.checkingcontainer.core.model.ReeferEquipment
+import com.checkingcontainer.core.model.TipoEquipo
 
 enum class ScannerMode { CONTAINER, DATA_PLATE }
 
@@ -14,6 +15,7 @@ data class DuplicateWarning(val time: String, val technicianName: String)
 @Immutable
 data class UnitEntryUiState(
     val inspectionId: Long? = null,
+    val tipoEquipo: TipoEquipo = TipoEquipo.REEFER,
     val containerNo: String = "",
     val unitModelNo: String = "",
     val unitModel: String = "",
@@ -42,16 +44,21 @@ data class UnitEntryUiState(
     val catalogError: String? = null,
     val duplicateWarning: DuplicateWarning? = null,
 ) {
-    val isContainerValid: Boolean get() = Iso6346.isValid(containerNo)
+    val esReefer: Boolean get() = tipoEquipo == TipoEquipo.REEFER
 
-    val showContainerError: Boolean get() = containerNo.length >= 4 && !isContainerValid
+    // REEFER: ISO 6346 con dígito verificador. Otros equipos: código libre (≥3).
+    val isContainerValid: Boolean
+        get() = if (esReefer) Iso6346.isValid(containerNo) else containerNo.trim().length >= 3
+
+    val showContainerError: Boolean
+        get() = esReefer && containerNo.length >= 4 && !isContainerValid
 
     val showSaveFab: Boolean
         get() = isContainerValid &&
             unitModelNo.isNotBlank() &&
             unitSerialNo.isNotBlank() &&
             yearOfBuilt.isNotBlank() &&
-            ptiInstruction != null &&
+            (!esReefer || ptiInstruction != null) &&
             (brand != Brand.STAR_COOL || deployedAs != null)
 
     val canSave: Boolean
@@ -60,7 +67,7 @@ data class UnitEntryUiState(
     val showUnitModelNoError: Boolean get() = (showValidation || isContainerValid) && unitModelNo.isBlank()
     val showUnitSerialNoError: Boolean get() = (showValidation || isContainerValid) && unitSerialNo.isBlank()
     val showYearOfBuiltError: Boolean get() = (showValidation || isContainerValid) && yearOfBuilt.isBlank()
-    val showPtiError: Boolean get() = (showValidation || isContainerValid) && ptiInstruction == null
+    val showPtiError: Boolean get() = esReefer && (showValidation || isContainerValid) && ptiInstruction == null
 }
 
 sealed interface UnitEntryEvent {
@@ -99,6 +106,7 @@ internal fun UnitEntryUiState.applyOcrFields(fields: Map<String, String>): UnitE
 
 fun UnitEntryUiState.toEquipment(): ReeferEquipment = ReeferEquipment(
     containerNo = containerNo.trim().uppercase(),
+    tipoEquipo = tipoEquipo,
     manufacturer = manufacturer.ifBlank { brand.label },
     unitModel = unitModel.trim(),
     unitModelNo = unitModelNo.trim(),

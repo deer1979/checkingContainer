@@ -10,7 +10,9 @@ import com.checkingcontainer.core.domain.ReeferEquipmentRepository
 import com.checkingcontainer.core.domain.usecase.CatalogLookupUseCase
 import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.InspStatus
+import com.checkingcontainer.core.model.TipoEquipo
 import com.checkingcontainer.feature.units.navigation.UNIT_ENTRY_ID_ARG
+import com.checkingcontainer.feature.units.navigation.UNIT_ENTRY_TIPO_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -41,6 +43,12 @@ class UnitEntryViewModel @Inject constructor(
     private var lastAutoTriggeredModel = ""
 
     init {
+        // Tipo elegido en el asistente del "+" (solo para creación; en edición
+        // manda el tipo guardado del equipo).
+        savedStateHandle.get<String>(UNIT_ENTRY_TIPO_ARG)?.let { arg ->
+            val tipo = runCatching { TipoEquipo.valueOf(arg) }.getOrDefault(TipoEquipo.REEFER)
+            _state.update { it.copy(tipoEquipo = tipo) }
+        }
         editId?.let { loadInspection(it) }
     }
 
@@ -59,6 +67,7 @@ class UnitEntryViewModel @Inject constructor(
                     unitSerialNo = equipment?.unitSerialNo ?: "",
                     yearOfBuilt = equipment?.yearOfBuilt ?: "",
                     brand = equipment?.brand ?: Brand.CARRIER,
+                    tipoEquipo = equipment?.tipoEquipo ?: TipoEquipo.REEFER,
                     status = inspection.status,
                     ptiInstruction = inspection.ptiInstruction,
                     deployedAs = inspection.deployedAs,
@@ -112,7 +121,7 @@ class UnitEntryViewModel @Inject constructor(
         }
         if (event is UnitEntryEvent.ContainerNoChange && editId == null) {
             val containerNo = event.value.uppercase()
-            if (Iso6346.isValid(containerNo)) checkDuplicate(containerNo)
+            if (_state.value.isContainerValid) checkDuplicate(containerNo)
         }
         if (event is UnitEntryEvent.UnitModelNoChange) {
             val model = event.value
