@@ -8,8 +8,10 @@ import com.checkingcontainer.core.model.ClientIdType
 import com.checkingcontainer.core.model.IdentificacionEc
 import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.ImagePart
+import com.google.mlkit.genai.prompt.SystemInstruction
 import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.prompt.generateContentRequest
+import com.google.mlkit.genai.prompt.generateTypedContentRequest
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -62,23 +64,55 @@ internal object ClientDataExtractor {
 
     // ── Gemini Nano ──────────────────────────────────────────────────────────
 
+    private const val REGLAS =
+        "You extract client data from Ecuadorian invoices and contact text. " +
+            "Extract ONLY information explicitly present. Never guess, complete or " +
+            "invent values. For invoices, the relevant party is the ISSUER at the top."
+
+    /**
+     * Salida estructurada (R41): el modelo responde con [DatosClienteExtraidos]
+     * directamente — sin parseo de texto. Si el equipo no soporta salida tipada
+     * (requiere Nano v3+), cae al camino clásico de líneas etiquetadas.
+     */
     private suspend fun nano(text: TextPart, image: ImagePart?): Map<String, String> {
         val model = Generation.getClient()
         return try {
-            val request = if (image != null) {
-                generateContentRequest(image, text) { temperature = 0f; topK = 1; maxOutputTokens = 256 }
+            val base = if (image != null) {
+                generateContentRequest(image, text) {
+                    temperature = 0f; topK = 1; maxOutputTokens = 256
+                    systemInstruction = SystemInstruction(REGLAS)
+                }
             } else {
-                generateContentRequest(text) { temperature = 0f; topK = 1; maxOutputTokens = 256 }
+                generateContentRequest(text) {
+                    temperature = 0f; topK = 1; maxOutputTokens = 256
+                    systemInstruction = SystemInstruction(REGLAS)
+                }
             }
-            val respuesta = model.generateContent(request).candidates.firstOrNull()?.text.orEmpty()
-            respuesta.lines().mapNotNull { line ->
-                val idx = line.indexOf(':')
-                if (idx <= 0) return@mapNotNull null
-                val clave = line.take(idx).trim().uppercase()
-                val valor = line.substring(idx + 1).trim().takeUnless { it.isEmpty() || it == "-" }
-                    ?: return@mapNotNull null
-                clave to valor
-            }.toMap()
+            val tipado = runCatching {
+                val typed = generateTypedContentRequest(base, DatosClienteExtraidos::class)
+                model.generateContent(typed).candidates.firstOrNull()?.response
+            }.getOrNull()
+            if (tipado != null) {
+                buildMap {
+                    if (tipado.razonSocial.isNotBlank()) put("RAZON_SOCIAL", tipado.razonSocial.trim())
+                    if (tipado.ruc.isNotBlank()) put("RUC", tipado.ruc.trim())
+                    if (tipado.cedula.isNotBlank()) put("CEDULA", tipado.cedula.trim())
+                    if (tipado.email.isNotBlank()) put("EMAIL", tipado.email.trim())
+                    if (tipado.direccion.isNotBlank()) put("DIRECCION", tipado.direccion.trim())
+                    if (tipado.telefono.isNotBlank()) put("TELEFONO", tipado.telefono.trim())
+                }
+            } else {
+                Log.i(TAG, "Salida tipada no disponible (¿Nano < v3?); usando formato de líneas")
+                val respuesta = model.generateContent(base).candidates.firstOrNull()?.text.orEmpty()
+                respuesta.lines().mapNotNull { line ->
+                    val idx = line.indexOf(':')
+                    if (idx <= 0) return@mapNotNull null
+                    val clave = line.take(idx).trim().uppercase()
+                    val valor = line.substring(idx + 1).trim().takeUnless { it.isEmpty() || it == "-" }
+                        ?: return@mapNotNull null
+                    clave to valor
+                }.toMap()
+            }
         } finally {
             runCatching { model.close() }
         }

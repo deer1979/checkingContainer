@@ -40,7 +40,8 @@ camerax = "1.6.1"
 mlkitTextRecognition = "19.0.1"
 
 # IA local (Gemini Nano vía ML Kit GenAI — beta)
-mlkitGenaiPrompt = "1.0.0-beta2"
+mlkitGenaiPrompt = "1.0.0-beta3"
+mlkitGenaiSchema = "1.0.0-alpha1"
 
 # Image loading
 appfunctions = "1.0.0-alpha09"
@@ -127,6 +128,9 @@ androidx-camera-view = { group = "androidx.camera", name = "camera-view", versio
 mlkit-text-recognition = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition", version.ref = "mlkitTextRecognition" }
 # Gemini Nano en el dispositivo (Prompt API — beta pública)
 mlkit-genai-prompt = { group = "com.google.mlkit", name = "genai-prompt", version.ref = "mlkitGenaiPrompt" }
+# Structured Output (R41): clases Kotlin @Generable como esquema de salida de Nano
+mlkit-genai-schema          = { group = "com.google.mlkit", name = "genai-schema", version.ref = "mlkitGenaiSchema" }
+mlkit-genai-schema-compiler = { group = "com.google.mlkit", name = "genai-schema-compiler", version.ref = "mlkitGenaiSchema" }
 
 
 # Supabase  (group = io.github.jan-tennert.supabase, BOM artifact = bom)

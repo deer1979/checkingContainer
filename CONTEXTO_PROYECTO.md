@@ -138,6 +138,26 @@ respaldo/sin-IA (OCR ML Kit para fotos) → el usuario revisa antes de guardar.
 PENDIENTE menor: botón de captura directa con cámara en el formulario
 (hoy: tomar foto con la cámara del sistema y elegirla de galería).
 
+## ML Kit R41 / Structured Output (jul 2026)
+genai-prompt beta3 + genai-schema(-compiler) alpha1 (KSP). La extracción de
+clientes usa SALIDA TIPADA: `DatosClienteExtraidos` anotada con
+@Generable/@Guide (debe ser pública — el provider KSP generado es público);
+`generateTypedContentRequest(base, DatosClienteExtraidos::class)` devuelve el
+objeto directo, sin parseo. `SystemInstruction` lleva las reglas anti-inventos.
+Requiere Nano v3+: si el equipo no lo soporta, cae solo al formato de líneas
+(camino previo, intacto) y luego a regex/OCR. Ideas futuras del R41:
+multi-imagen por sesión (Content multipart) y genai-speech-recognition
+(dictar descripciones de daño). Thinking Mode descartado (latencia sin
+beneficio para extracción).
+
+## Entorno remoto (nota operativa)
+Si el contenedor se recicla: reinstalar SDK (`/opt/android-sdk`, plataformas
+36 + 37.0, build-tools 36) con cmdline-tools de dl.google.com, recrear
+`local.properties`, y si el wrapper de Gradle no puede bajar su distribución
+(github.com bloqueado), usar el espejo
+`mirrors.cloud.tencent.com/gradle/gradle-X-bin.zip` y reconstruir
+`~/.gradle/wrapper/dists/<ver>/<hash>/` (zip + extraído + marcador `.ok`).
+
 ## Sync post-login (jul 2026)
 `BootstrapRepository.syncRecentAsync(user)` — disparado por `MainViewModel` en
 cada transición a `AuthState.Authenticated` (distinct por user.id), corre en

@@ -22,6 +22,9 @@ dependencies {
 
     // Gemini Nano (IA local, beta) — respaldo del OCR cuando la lectura normal falla
     implementation(libs.mlkit.genai.prompt)
+    // Structured Output (R41): salida tipada para la extracción de clientes
+    implementation(libs.mlkit.genai.schema)
+    ksp(libs.mlkit.genai.schema.compiler)
 
     // Coil — thumbnails de fotos en EstimadoScreen
     implementation(libs.coil.compose)
