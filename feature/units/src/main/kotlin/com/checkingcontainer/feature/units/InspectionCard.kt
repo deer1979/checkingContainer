@@ -45,8 +45,15 @@ internal fun InspectionCard(
             )
 
             FieldLabel("Estado")
+            // Reefer: flujo clásico. Otros equipos: visitas de contrato de
+            // mantenimiento (REPARACION es la que genera estimado).
+            val opciones = if (state.esReefer) {
+                listOf(InspStatus.INSP, InspStatus.OP, InspStatus.NEST, InspStatus.EST)
+            } else {
+                listOf(InspStatus.MANT_PREVENTIVO, InspStatus.MANT_CORRECTIVO, InspStatus.REPARACION)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                InspStatus.entries.forEach { status ->
+                opciones.forEach { status ->
                     val colors = status.chipColors(isDark)
                     FilterChip(
                         selected = state.status == status,
@@ -60,25 +67,27 @@ internal fun InspectionCard(
                 }
             }
 
-            FieldLabel(
-                text = "Instrucción PTI",
-                isError = state.showPtiError,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PtiInstruction.entries.forEach { pti ->
-                    FilterChip(
-                        selected = state.ptiInstruction == pti,
-                        onClick = { onEvent(UnitEntryEvent.PtiInstructionChange(pti)) },
-                        label = { Text(pti.label) },
+            if (state.esReefer) {
+                FieldLabel(
+                    text = "Instrucción PTI",
+                    isError = state.showPtiError,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PtiInstruction.entries.forEach { pti ->
+                        FilterChip(
+                            selected = state.ptiInstruction == pti,
+                            onClick = { onEvent(UnitEntryEvent.PtiInstructionChange(pti)) },
+                            label = { Text(pti.label) },
+                        )
+                    }
+                }
+                if (state.showPtiError) {
+                    Text(
+                        text = "Selecciona una instrucción PTI",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
-            }
-            if (state.showPtiError) {
-                Text(
-                    text = "Selecciona una instrucción PTI",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
             }
 
             if (state.brand == Brand.STAR_COOL) {

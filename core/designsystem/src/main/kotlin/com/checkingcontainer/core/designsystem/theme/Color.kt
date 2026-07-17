@@ -45,6 +45,20 @@ fun InspStatus.chipColors(isDark: Boolean): StatusColors = when (this) {
         container = if (isDark) EstContainerDark else EstContainerLight,
         onContainer = EstOnContainer,
     )
+    // Estados de mantenimiento (equipos no-reefer): preventivo=verde (rutina),
+    // correctivo=ámbar (hubo algo), reparación=rojo/est (genera estimado).
+    InspStatus.MANT_PREVENTIVO -> StatusColors(
+        container = if (isDark) OpContainerDark else OpContainerLight,
+        onContainer = OpOnContainer,
+    )
+    InspStatus.MANT_CORRECTIVO -> StatusColors(
+        container = if (isDark) NestContainerDark else NestContainerLight,
+        onContainer = NestOnContainer,
+    )
+    InspStatus.REPARACION -> StatusColors(
+        container = if (isDark) EstContainerDark else EstContainerLight,
+        onContainer = EstOnContainer,
+    )
     InspStatus.INSP -> StatusColors(
         container = if (isDark) InspContainerDark else InspContainerLight,
         onContainer = InspOnContainer,

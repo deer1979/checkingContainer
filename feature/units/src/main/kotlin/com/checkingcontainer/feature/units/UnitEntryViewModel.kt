@@ -47,7 +47,12 @@ class UnitEntryViewModel @Inject constructor(
         // manda el tipo guardado del equipo).
         savedStateHandle.get<String>(UNIT_ENTRY_TIPO_ARG)?.let { arg ->
             val tipo = runCatching { TipoEquipo.valueOf(arg) }.getOrDefault(TipoEquipo.REEFER)
-            _state.update { it.copy(tipoEquipo = tipo) }
+            _state.update {
+                it.copy(
+                    tipoEquipo = tipo,
+                    status = if (tipo == TipoEquipo.REEFER) it.status else InspStatus.MANT_PREVENTIVO,
+                )
+            }
         }
         editId?.let { loadInspection(it) }
     }
@@ -171,7 +176,8 @@ class UnitEntryViewModel @Inject constructor(
 
             result
                 .onSuccess {
-                    val navTarget = if (current.status == InspStatus.EST && savedInspectionId != 0L) {
+                    val esEstimable = current.status == InspStatus.EST || current.status == InspStatus.REPARACION
+                    val navTarget = if (esEstimable && savedInspectionId != 0L) {
                         savedInspectionId
                     } else null
                     _state.update { it.copy(isSaving = false, savedSuccessfully = true, navigateToEstimado = navTarget) }

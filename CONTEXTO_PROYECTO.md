@@ -156,6 +156,13 @@ sin pisar un código ya escrito. Sin IA: OCR + regex por palabras clave.
 Nota: se usa la cámara del sistema (sin overlay de encuadre); un visor
 propio con marco queda como mejora opcional. Etiqueta de tipo en listas:
 descartada — el código (AC-…, CF-…) ya distingue a simple vista.
+Estados por tipo (jul 2026): InspStatus ganó MANT_PREVENTIVO/MANT_CORRECTIVO/
+REPARACION (colores reusan OP/NEST/EST). No-reefer muestra SOLO esos 3 chips
+(default PREVENTIVO), sin selector PTI; REPARACION dispara el estimado igual
+que EST. Contexto de negocio: contratos/licitaciones de mantenimiento.
+PENDIENTE: ficha técnica completa de placa (lista abierta etiqueta→valor
+extraída por IA, columna nueva en reefer_units, visible en tarjeta + PDF;
+plan acordado con el usuario — "no encasillar la placa en campos fijos").
 
 ## ML Kit R41 / Structured Output (jul 2026)
 genai-prompt beta3 + genai-schema(-compiler) alpha1 (KSP). La extracción de
