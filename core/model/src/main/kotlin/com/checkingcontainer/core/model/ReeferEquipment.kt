@@ -12,4 +12,6 @@ data class ReeferEquipment(
     val tipoEquipo: TipoEquipo = TipoEquipo.REEFER,
     // Ficha técnica: TODOS los datos legibles de la placa (lista abierta).
     val fichaTecnica: List<CampoFicha> = emptyList(),
+    // Foto de la placa de datos (URL remota o ruta local file://)
+    val fotoPlacaUrl: String? = null,
 )

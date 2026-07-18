@@ -19,6 +19,7 @@ data class ReeferUnitEntity(
     val unitType: String = "",
     val tipoEquipo: TipoEquipo = TipoEquipo.REEFER,
     val fichaTecnica: String = "[]",
+    val fotoPlacaUrl: String? = null,
 ) {
     fun toDomain(): ReeferEquipment = ReeferEquipment(
         containerNo = containerNo,
@@ -31,6 +32,7 @@ data class ReeferUnitEntity(
         unitType = unitType,
         tipoEquipo = tipoEquipo,
         fichaTecnica = parseFicha(fichaTecnica),
+        fotoPlacaUrl = fotoPlacaUrl,
     )
 }
 
@@ -45,6 +47,7 @@ fun ReeferEquipment.toEntity(): ReeferUnitEntity = ReeferUnitEntity(
     unitType = unitType,
     tipoEquipo = tipoEquipo,
     fichaTecnica = fichaTecnica.fichaToJson(),
+    fotoPlacaUrl = fotoPlacaUrl,
 )
 
 private fun parseFicha(json: String): List<CampoFicha> = buildList {

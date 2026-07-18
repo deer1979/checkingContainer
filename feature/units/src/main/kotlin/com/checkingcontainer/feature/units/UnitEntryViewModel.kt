@@ -1,5 +1,7 @@
 package com.checkingcontainer.feature.units
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,6 +16,11 @@ import com.checkingcontainer.core.model.TipoEquipo
 import com.checkingcontainer.feature.units.navigation.UNIT_ENTRY_ID_ARG
 import com.checkingcontainer.feature.units.navigation.UNIT_ENTRY_TIPO_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.UUID
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -29,6 +36,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class UnitEntryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    @param:ApplicationContext private val context: Context,
     private val equipmentRepo: ReeferEquipmentRepository,
     private val inspectionRepo: InspectionRepository,
     private val authRepository: AuthRepository,
@@ -74,6 +82,7 @@ class UnitEntryViewModel @Inject constructor(
                     brand = equipment?.brand ?: Brand.CARRIER,
                     tipoEquipo = equipment?.tipoEquipo ?: TipoEquipo.REEFER,
                     fichaTecnica = equipment?.fichaTecnica ?: emptyList(),
+                    fotoPlacaUrl = equipment?.fotoPlacaUrl,
                     status = inspection.status,
                     ptiInstruction = inspection.ptiInstruction,
                     deployedAs = inspection.deployedAs,
@@ -155,6 +164,86 @@ class UnitEntryViewModel @Inject constructor(
             _state.update { it.copy(isDeleting = true, showDeleteConfirm = false) }
             inspectionRepo.delete(id)
             _state.update { it.copy(isDeleting = false, deletedSuccessfully = true) }
+        }
+    }
+
+    /**
+     * Foto de la placa: se guarda al instante (copia local persistente) y el
+     * análisis corre en segundo plano en el ViewModel — el usuario sigue
+     * llenando el formulario y la ficha aparece sola. La subida a Storage es
+     * best-effort (sin conexión, queda la copia local).
+     */
+    fun onFotoPlaca(uri: Uri) {
+        viewModelScope.launch {
+            val local = withContext(Dispatchers.IO) {
+                runCatching {
+                    val dir = File(context.filesDir, "placas").apply { mkdirs() }
+                    val f = File(dir, "${UUID.randomUUID()}.jpg")
+                    context.contentResolver.openInputStream(uri)?.use { inp ->
+                        f.outputStream().use { out -> inp.copyTo(out) }
+                    } ?: return@runCatching null
+                    f
+                }.getOrNull()
+            }
+            val localUri = local?.let(Uri::fromFile) ?: uri
+            _state.update { it.copy(fotoPlacaUrl = localUri.toString()) }
+            analizarPlaca(localUri)
+            // Subida en paralelo; si logra, la URL remota reemplaza la local.
+            local?.let { f ->
+                launch(Dispatchers.IO) {
+                    runCatching { equipmentRepo.uploadFotoPlaca(f.readBytes()) }
+                        .onSuccess { url -> _state.update { it.copy(fotoPlacaUrl = url) } }
+                }
+            }
+        }
+    }
+
+    /** Vuelve a leer la placa desde la foto guardada (local o remota). */
+    fun reanalizarPlaca() {
+        val actual = _state.value.fotoPlacaUrl ?: return
+        viewModelScope.launch {
+            val uri = if (actual.startsWith("http")) {
+                // Remota: bajarla a un archivo temporal vía la caché de Coil.
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        val loader = coil3.SingletonImageLoader.get(context)
+                        val req = coil3.request.ImageRequest.Builder(context).data(actual).build()
+                        val bmp = (loader.execute(req) as? coil3.request.SuccessResult)
+                            ?.image?.let { (it as? coil3.BitmapImage)?.bitmap } ?: return@runCatching null
+                        val f = File(context.cacheDir, "placa_reanalisis.jpg")
+                        f.outputStream().use { out ->
+                            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, out)
+                        }
+                        Uri.fromFile(f)
+                    }.getOrNull()
+                }
+            } else {
+                Uri.parse(actual)
+            }
+            if (uri != null) analizarPlaca(uri) else {
+                _state.update { it.copy(metodoLectura = "No se pudo cargar la foto guardada") }
+            }
+        }
+    }
+
+    private fun analizarPlaca(uri: Uri) {
+        viewModelScope.launch {
+            _state.update { it.copy(analizandoPlaca = true, metodoLectura = null) }
+            val r = runCatching {
+                PlacaEquipoExtractor.desdeImagen(context, uri, _state.value.tipoEquipo)
+            }.getOrNull()
+            _state.update { s ->
+                if (r == null || (r.ficha.isEmpty() && r.fields.isEmpty())) {
+                    s.copy(analizandoPlaca = false, metodoLectura = "No se pudo leer la placa")
+                } else {
+                    val fields = if (s.containerNo.isNotBlank()) r.fields - "Container No." else r.fields
+                    s.applyOcrFields(fields).copy(
+                        fichaTecnica = if (r.ficha.isNotEmpty()) r.ficha else s.fichaTecnica,
+                        analizandoPlaca = false,
+                        metodoLectura = "${r.ficha.size} datos leídos con ${r.metodo}",
+                    )
+                }
+            }
         }
     }
 

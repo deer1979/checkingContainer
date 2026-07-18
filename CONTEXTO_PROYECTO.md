@@ -171,6 +171,21 @@ con X por par). PDF: sección "FICHA TÉCNICA (PLACA)" en dos columnas bajo
 DATOS DEL EQUIPO (el generador recibe la ficha como parámetro; el estimado
 NO la guarda — se lee del equipo al generar).
 
+## Placa v2 + tres partes del trabajo (jul 2026)
+- Estimado: sitioClienteId/sitioNombre (cliente final, mismo catálogo, picker
+  reutilizado) + ordenTrabajo (nº O.T./contrato del contratante, clave en
+  licitaciones). Migración 19 (incluye también fotoPlacaUrl en reefer_units).
+  PDF: líneas "Orden de trabajo:" y "Trabajo en:".
+- Motor de placa: OCR lee (ML Kit) → Nano ORGANIZA el texto en pares (salida
+  tipada) → respaldo IA-imagen → solo-OCR con etiquetas conocidas. Indicador
+  "N datos leídos con X". Serial: solo primer token (no arrastra REV/fechas).
+- Foto de placa: copia local persistente en filesDir/placas al instante,
+  análisis en 2º plano en UnitEntryViewModel (sobrevive navegación), subida
+  a Storage best-effort (placas/uuid.jpg; sin red queda file:// local),
+  "Volver a leer placa" re-analiza (si es URL http, baja vía Coil).
+- Ficha editable total: tocar par = editar, "Agregar dato", X quita.
+- Guardar no-reefer: solo requiere código válido (modelo/serial/año opcionales).
+
 ## ML Kit R41 / Structured Output (jul 2026)
 genai-prompt beta3 + genai-schema(-compiler) alpha1 (KSP). La extracción de
 clientes usa SALIDA TIPADA: `DatosClienteExtraidos` anotada con

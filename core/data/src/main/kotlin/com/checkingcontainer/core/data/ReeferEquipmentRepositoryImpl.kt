@@ -15,6 +15,7 @@ import javax.inject.Singleton
 class ReeferEquipmentRepositoryImpl @Inject constructor(
     private val dao: ReeferUnitDao,
     private val firestoreService: FirestoreService,
+    private val storageService: StorageService,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : ReeferEquipmentRepository {
 
@@ -33,4 +34,12 @@ class ReeferEquipmentRepositoryImpl @Inject constructor(
         dao.upsert(entity)
         firestoreService.upsertEquipment(entity)
     }
+
+    override suspend fun uploadFotoPlaca(bytes: ByteArray): String =
+        withContext(ioDispatcher) {
+            storageService.uploadToPath(
+                "placas/${java.util.UUID.randomUUID()}.jpg",
+                bytes,
+            )
+        }
 }

@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,74 +44,76 @@ import java.io.File
  */
 @Composable
 internal fun PlacaScanRow(
-    tipo: TipoEquipo,
-    codigoActual: String,
-    onResult: (Map<String, String>, List<CampoFicha>) -> Unit,
+    fotoUrl: String?,
+    analizando: Boolean,
+    metodo: String?,
+    onFoto: (Uri) -> Unit,
+    onReanalizar: () -> Unit,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var procesando by remember { mutableStateOf(false) }
-    var sinLectura by remember { mutableStateOf(false) }
-    var metodoLectura by remember { mutableStateOf<String?>(null) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
 
-    fun procesar(uri: Uri) {
-        scope.launch {
-            procesando = true
-            sinLectura = false
-            runCatching { PlacaEquipoExtractor.desdeImagen(context, uri, tipo) }
-                .onSuccess { r ->
-                    // No pisar un código ya escrito a mano.
-                    val filtrado = if (codigoActual.isNotBlank()) r.fields - "Container No." else r.fields
-                    if (filtrado.isNotEmpty() || r.ficha.isNotEmpty()) {
-                        metodoLectura = "${r.ficha.size} datos leídos con ${r.metodo}"
-                        onResult(filtrado, r.ficha)
-                    } else {
-                        sinLectura = true
-                        metodoLectura = null
-                    }
-                }
-                .onFailure { sinLectura = true }
-            procesando = false
-        }
-    }
-
     val galeria = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let(::procesar)
+        uri?.let(onFoto)
     }
     val camara = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val uri = pendingCameraUri?.let(Uri::parse)
         pendingCameraUri = null
-        if (ok && uri != null) procesar(uri)
+        if (ok && uri != null) onFoto(uri)
     }
 
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Escanear placa de datos", style = MaterialTheme.typography.titleSmall)
             Text(
-                "Escanear placa de datos",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                "Encuadra la placa completa y bien iluminada: se lee TODA la placa " +
-                    "(ficha técnica) y se sugiere el código del equipo.",
+                "La foto queda guardada con el equipo y el análisis corre en " +
+                    "segundo plano: puedes seguir llenando mientras.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            metodoLectura?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+
+            if (fotoUrl != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
+                    coil3.compose.AsyncImage(
+                        model = fotoUrl,
+                        contentDescription = "Foto de la placa",
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(
+                                androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                            ),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    )
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (analizando) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Text("Analizando placa…", style = MaterialTheme.typography.bodySmall)
+                            }
+                        } else {
+                            metodo?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (it.startsWith("No se pudo")) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                )
+                            }
+                            OutlinedButton(onClick = onReanalizar) { Text("Volver a leer placa") }
+                        }
+                    }
+                }
             }
-            if (sinLectura) {
-                Text(
-                    "No se pudo leer la placa. Intenta de frente, con buena luz y " +
-                        "que la placa llene la foto.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = {
@@ -119,20 +122,15 @@ internal fun PlacaScanRow(
                         pendingCameraUri = uri.toString()
                         camara.launch(uri)
                     },
-                    enabled = !procesando,
+                    enabled = !analizando,
                     modifier = Modifier.weight(1f),
                 ) {
-                    if (procesando) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Text(" Analizando…")
-                    } else {
-                        Icon(Icons.Outlined.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text(" Cámara")
-                    }
+                    Icon(Icons.Outlined.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(" Cámara")
                 }
                 OutlinedButton(
                     onClick = { galeria.launch("image/*") },
-                    enabled = !procesando,
+                    enabled = !analizando,
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(18.dp))

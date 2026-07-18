@@ -145,6 +145,7 @@ class FirestoreService @Inject constructor(
                 tipoEquipo = runCatching { TipoEquipo.valueOf(doc.getString("tipoEquipo") ?: "") }
                     .getOrDefault(TipoEquipo.REEFER),
                 fichaTecnica = parseFichaJson(doc.getString("fichaTecnica") ?: "[]"),
+                fotoPlacaUrl = doc.getString("fotoPlacaUrl"),
             )
         } catch (e: Exception) {
             Log.w(TAG, "fetchEquipment deferred (offline?): ${e.message}")
@@ -267,6 +268,7 @@ class FirestoreService @Inject constructor(
                     tipoEquipo = runCatching { TipoEquipo.valueOf(doc.getString("tipoEquipo") ?: "") }
                         .getOrDefault(TipoEquipo.REEFER),
                     fichaTecnica = doc.getString("fichaTecnica") ?: "[]",
+                    fotoPlacaUrl = doc.getString("fotoPlacaUrl"),
                 )
             }
         } catch (e: Exception) {
@@ -489,6 +491,7 @@ private fun ReeferUnitEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "yearOfBuilt" to yearOfBuilt,
     "brand"       to brand.name,
     "fichaTecnica" to fichaTecnica,
+    "fotoPlacaUrl" to fotoPlacaUrl,
     "tipoEquipo"   to tipoEquipo.name,
     "unitType"    to unitType,
 )

@@ -11,4 +11,7 @@ interface ReeferEquipmentRepository {
 
     /** Guarda en Room (IGNORE si ya existe) y sube a Firestore. */
     suspend fun upsert(equipment: ReeferEquipment)
+
+    /** Sube la foto de la placa a Storage y devuelve su URL. */
+    suspend fun uploadFotoPlaca(bytes: ByteArray): String
 }

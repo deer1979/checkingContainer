@@ -1,5 +1,6 @@
 package com.checkingcontainer.feature.units
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -56,6 +57,8 @@ fun UnitEntryRoute(
         onEvent = viewModel::onEvent,
         onSave = viewModel::saveUnit,
         onConfirmDelete = viewModel::deleteUnit,
+        onFotoPlaca = viewModel::onFotoPlaca,
+        onReanalizarPlaca = viewModel::reanalizarPlaca,
     )
 }
 
@@ -67,6 +70,8 @@ fun UnitEntryScreen(
     onEvent: (UnitEntryEvent) -> Unit,
     onSave: () -> Unit,
     onConfirmDelete: () -> Unit = {},
+    onFotoPlaca: (Uri) -> Unit = {},
+    onReanalizarPlaca: () -> Unit = {},
 ) {
     state.duplicateWarning?.let { warning ->
         DuplicateWarningDialog(
@@ -150,12 +155,11 @@ fun UnitEntryScreen(
         ) {
             if (!state.esReefer) {
                 PlacaScanRow(
-                    tipo = state.tipoEquipo,
-                    codigoActual = state.containerNo,
-                    onResult = { fields, ficha ->
-                        if (fields.isNotEmpty()) onEvent(UnitEntryEvent.OcrResult(fields))
-                        if (ficha.isNotEmpty()) onEvent(UnitEntryEvent.FichaExtraida(ficha))
-                    },
+                    fotoUrl = state.fotoPlacaUrl,
+                    analizando = state.analizandoPlaca,
+                    metodo = state.metodoLectura,
+                    onFoto = onFotoPlaca,
+                    onReanalizar = onReanalizarPlaca,
                 )
             }
             IdentificationCard(state = state, onEvent = onEvent)
