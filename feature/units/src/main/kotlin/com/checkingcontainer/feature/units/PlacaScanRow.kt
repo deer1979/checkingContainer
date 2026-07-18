@@ -3,6 +3,7 @@ package com.checkingcontainer.feature.units
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,6 +51,7 @@ internal fun PlacaScanRow(
     val scope = rememberCoroutineScope()
     var procesando by remember { mutableStateOf(false) }
     var sinLectura by remember { mutableStateOf(false) }
+    var metodoLectura by remember { mutableStateOf<String?>(null) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun procesar(uri: Uri) {
@@ -61,9 +63,11 @@ internal fun PlacaScanRow(
                     // No pisar un código ya escrito a mano.
                     val filtrado = if (codigoActual.isNotBlank()) r.fields - "Container No." else r.fields
                     if (filtrado.isNotEmpty() || r.ficha.isNotEmpty()) {
+                        metodoLectura = "${r.ficha.size} datos leídos con ${r.metodo}"
                         onResult(filtrado, r.ficha)
                     } else {
                         sinLectura = true
+                        metodoLectura = null
                     }
                 }
                 .onFailure { sinLectura = true }
@@ -92,6 +96,13 @@ internal fun PlacaScanRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            metodoLectura?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             if (sinLectura) {
                 Text(
                     "No se pudo leer la placa. Intenta de frente, con buena luz y " +
@@ -140,18 +151,66 @@ internal fun PlacaScanRow(
 internal fun FichaTecnicaCard(
     ficha: List<CampoFicha>,
     onRemove: (Int) -> Unit,
+    onUpdate: (Int, CampoFicha) -> Unit = { _, _ -> },
+    onAdd: (CampoFicha) -> Unit = {},
 ) {
+    // index en edición: -1 = agregar nuevo, null = cerrado
+    var editando by remember { mutableStateOf<Int?>(null) }
+
+    editando?.let { idx ->
+        val original = if (idx >= 0) ficha.getOrNull(idx) else null
+        var etiqueta by remember(idx) { mutableStateOf(original?.etiqueta ?: "") }
+        var valor by remember(idx) { mutableStateOf(original?.valor ?: "") }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { editando = null },
+            title = { Text(if (idx >= 0) "Editar dato" else "Agregar dato") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = etiqueta,
+                        onValueChange = { etiqueta = it },
+                        label = { Text("Etiqueta") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    androidx.compose.material3.OutlinedTextField(
+                        value = valor,
+                        onValueChange = { valor = it },
+                        label = { Text("Valor") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    enabled = etiqueta.isNotBlank() && valor.isNotBlank(),
+                    onClick = {
+                        val campo = CampoFicha(etiqueta.trim(), valor.trim())
+                        if (idx >= 0) onUpdate(idx, campo) else onAdd(campo)
+                        editando = null
+                    },
+                ) { Text("Aceptar") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { editando = null }) { Text("Cancelar") }
+            },
+        )
+    }
+
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Ficha técnica (placa)", style = MaterialTheme.typography.titleSmall)
             Text(
-                "Leída de la placa — quita con la X lo que no aplique.",
+                "Toca un dato para corregirlo; la X lo quita.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             ficha.forEachIndexed { index, campo ->
                 Row(
-                    Modifier.fillMaxWidth(),
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { editando = index },
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
                     Text(
@@ -178,6 +237,10 @@ internal fun FichaTecnicaCard(
                     }
                 }
             }
+            OutlinedButton(
+                onClick = { editando = -1 },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Agregar dato") }
         }
     }
 }

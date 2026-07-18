@@ -55,20 +55,27 @@ data class UnitEntryUiState(
     val showContainerError: Boolean
         get() = esReefer && containerNo.length >= 4 && !isContainerValid
 
+    // Reefer: regla estricta (su placa siempre trae todo). Otros equipos: basta
+    // el código válido — hay placas gastadas sin modelo legible y eso no puede
+    // bloquear el registro de la visita.
     val showSaveFab: Boolean
-        get() = isContainerValid &&
-            unitModelNo.isNotBlank() &&
-            unitSerialNo.isNotBlank() &&
-            yearOfBuilt.isNotBlank() &&
-            (!esReefer || ptiInstruction != null) &&
-            (brand != Brand.STAR_COOL || deployedAs != null)
+        get() = if (esReefer) {
+            isContainerValid &&
+                unitModelNo.isNotBlank() &&
+                unitSerialNo.isNotBlank() &&
+                yearOfBuilt.isNotBlank() &&
+                ptiInstruction != null &&
+                (brand != Brand.STAR_COOL || deployedAs != null)
+        } else {
+            isContainerValid
+        }
 
     val canSave: Boolean
         get() = showSaveFab && !isSaving
 
-    val showUnitModelNoError: Boolean get() = (showValidation || isContainerValid) && unitModelNo.isBlank()
-    val showUnitSerialNoError: Boolean get() = (showValidation || isContainerValid) && unitSerialNo.isBlank()
-    val showYearOfBuiltError: Boolean get() = (showValidation || isContainerValid) && yearOfBuilt.isBlank()
+    val showUnitModelNoError: Boolean get() = esReefer && (showValidation || isContainerValid) && unitModelNo.isBlank()
+    val showUnitSerialNoError: Boolean get() = esReefer && (showValidation || isContainerValid) && unitSerialNo.isBlank()
+    val showYearOfBuiltError: Boolean get() = esReefer && (showValidation || isContainerValid) && yearOfBuilt.isBlank()
     val showPtiError: Boolean get() = esReefer && (showValidation || isContainerValid) && ptiInstruction == null
 }
 
@@ -84,6 +91,8 @@ sealed interface UnitEntryEvent {
     // Ficha técnica (placa completa de equipos no-reefer)
     data class FichaExtraida(val ficha: List<CampoFicha>) : UnitEntryEvent
     data class RemoveFichaCampo(val index: Int) : UnitEntryEvent
+    data class UpdateFichaCampo(val index: Int, val campo: CampoFicha) : UnitEntryEvent
+    data class AddFichaCampo(val campo: CampoFicha) : UnitEntryEvent
     data object OpenOrientationPicker : UnitEntryEvent
     data object DismissOrientationPicker : UnitEntryEvent
     data class OpenScanner(val mode: ScannerMode, val isVertical: Boolean = false) : UnitEntryEvent

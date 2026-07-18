@@ -116,6 +116,14 @@ class UnitEntryViewModel @Inject constructor(
                 is UnitEntryEvent.FichaExtraida -> s.copy(fichaTecnica = event.ficha)
                 is UnitEntryEvent.RemoveFichaCampo ->
                     s.copy(fichaTecnica = s.fichaTecnica.filterIndexed { i, _ -> i != event.index })
+                is UnitEntryEvent.UpdateFichaCampo ->
+                    s.copy(
+                        fichaTecnica = s.fichaTecnica.mapIndexed { i, c ->
+                            if (i == event.index) event.campo else c
+                        },
+                    )
+                is UnitEntryEvent.AddFichaCampo ->
+                    s.copy(fichaTecnica = s.fichaTecnica + event.campo)
                 UnitEntryEvent.ShowDeleteConfirm -> s.copy(showDeleteConfirm = true)
                 UnitEntryEvent.DismissDeleteConfirm -> s.copy(showDeleteConfirm = false)
                 UnitEntryEvent.TriggerManualLookup -> s

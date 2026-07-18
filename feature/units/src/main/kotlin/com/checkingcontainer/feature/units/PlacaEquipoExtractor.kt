@@ -40,6 +40,8 @@ internal data class ResultadoPlaca(
     val fields: Map<String, String>,
     /** TODOS los datos de la placa (ficha técnica del equipo). */
     val ficha: List<CampoFicha>,
+    /** Con qué se leyó: "OCR + IA" / "IA (imagen)" / "OCR". */
+    val metodo: String = "",
 )
 
 /**
@@ -61,12 +63,60 @@ internal object PlacaEquipoExtractor {
     private const val PROMPT =
         "List every readable label-value pair printed on this equipment data plate."
 
+    /**
+     * División del trabajo por fortaleza: ML Kit OCR lee los caracteres (su
+     * especialidad, incluso letra pequeña) y Gemini Nano ORGANIZA ese texto en
+     * pares — tarea de texto fácil para un modelo pequeño, a diferencia de leer
+     * una imagen densa. La imagen directa a Nano queda como segundo intento.
+     */
     suspend fun desdeImagen(context: Context, uri: Uri, tipo: TipoEquipo): ResultadoPlaca {
-        val ficha = runCatching { nano(context, uri) }.getOrNull()
-            ?: runCatching { nanoTexto(context, uri) }.getOrNull()
-            ?: runCatching { porOcr(context, uri) }.getOrDefault(emptyList())
-        Log.i(TAG, "Placa leída: ${ficha.size} pares")
-        return ResultadoPlaca(fields = derivarCampos(ficha, tipo), ficha = ficha)
+        val textoOcr = runCatching { ocrTexto(context, uri) }.getOrDefault("")
+
+        // 1. OCR + IA organizadora (el camino principal)
+        if (textoOcr.isNotBlank()) {
+            runCatching { nanoOrganiza(textoOcr) }.getOrNull()?.let { ficha ->
+                Log.i(TAG, "Placa: OCR + IA, ${ficha.size} pares")
+                return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "OCR + IA")
+            }
+        }
+        // 2. IA leyendo la imagen directamente (por si el OCR no sacó texto)
+        runCatching { nano(context, uri) }.getOrNull()?.let { ficha ->
+            Log.i(TAG, "Placa: IA imagen, ${ficha.size} pares")
+            return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "IA (imagen)")
+        }
+        // 3. Solo OCR con parser de etiquetas conocidas
+        val ficha = parsearPares(textoOcr)
+        Log.i(TAG, "Placa: solo OCR, ${ficha.size} pares")
+        return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "OCR")
+    }
+
+    /** Nano organiza TEXTO (no imagen) en pares, con salida estructurada. */
+    private suspend fun nanoOrganiza(texto: String): List<CampoFicha>? {
+        if (!GeminiNanoOcr.isAvailable()) return null
+        val model = Generation.getClient()
+        return try {
+            val base = generateContentRequest(
+                TextPart(
+                    "The following is raw OCR text from an equipment data plate. " +
+                        "Organize it into label-value pairs. Split lines that contain " +
+                        "several different data (e.g. 'SERIAL 04443707 REV 5165 YYWI 1737' " +
+                        "is serial + revision + date code). Use ONLY text present.\n\n$texto",
+                ),
+            ) {
+                temperature = 0f; topK = 1; maxOutputTokens = 512
+                systemInstruction = SystemInstruction(REGLAS)
+            }
+            val typed = generateTypedContentRequest(base, FichaPlacaLeida::class)
+            model.generateContent(typed).candidates.firstOrNull()?.response?.campos
+                ?.filter { it.etiqueta.isNotBlank() && it.valor.isNotBlank() }
+                ?.map { CampoFicha(it.etiqueta.trim(), it.valor.trim()) }
+                ?.ifEmpty { null }
+        } catch (e: Exception) {
+            Log.w(TAG, "Nano organizador falló: ${e.message}")
+            null
+        } finally {
+            runCatching { model.close() }
+        }
     }
 
     // ── Gemini Nano: lista abierta con salida estructurada ──────────────────
@@ -118,15 +168,13 @@ internal object PlacaEquipoExtractor {
 
     // ── OCR sin IA: pares por líneas "ETIQUETA: valor" ──────────────────────
 
-    private suspend fun porOcr(context: Context, uri: Uri): List<CampoFicha> {
-        val texto = suspendCancellableCoroutine { cont ->
+    private suspend fun ocrTexto(context: Context, uri: Uri): String =
+        suspendCancellableCoroutine { cont ->
             TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                 .process(InputImage.fromFilePath(context, uri))
                 .addOnSuccessListener { cont.resume(it.text) }
                 .addOnFailureListener { cont.resume("") }
         }
-        return parsearPares(texto)
-    }
 
     /**
      * Convierte texto en pares etiqueta→valor. Acepta "ETIQUETA: valor" y
@@ -175,7 +223,10 @@ internal object PlacaEquipoExtractor {
         buscar("marca", "brand", "fabricante", "manufacturer", "maker")
             ?.let { out["Manufacturer"] = it }
         buscar("model", "modelo", "mod.")?.let { out["Unit Model"] = it }
+        // Solo el primer token del serial: nunca arrastrar REV ni códigos de fecha
+        // que la placa imprime en el mismo renglón.
         val serie = buscar("serial", "serie", "s/n", "ser no", "s.n")
+            ?.trim()?.split(Regex("\\s+"))?.firstOrNull()
         serie?.let { out["Unit Serial No."] = it.uppercase() }
         (buscar("year", "año", "fecha fab", "mfg date", "date")
             ?.let { Regex("(19|20)\\d{2}").find(it)?.value })

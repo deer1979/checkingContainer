@@ -164,6 +164,8 @@ fun UnitEntryScreen(
                 FichaTecnicaCard(
                     ficha = state.fichaTecnica,
                     onRemove = { onEvent(UnitEntryEvent.RemoveFichaCampo(it)) },
+                    onUpdate = { i, c -> onEvent(UnitEntryEvent.UpdateFichaCampo(i, c)) },
+                    onAdd = { onEvent(UnitEntryEvent.AddFichaCampo(it)) },
                 )
             }
             InspectionCard(state = state, onEvent = onEvent)
