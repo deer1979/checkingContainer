@@ -138,7 +138,7 @@ fun OcrScannerBottomSheet(
                         scope.launch {
                             nanoBusy = true
                             val fields = runCatching {
-                                val bmp = InputImage.fromFilePath(context, uri).bitmapInternal
+                                val bmp = decodeBitmapForIa(context, uri)
                                     ?: return@runCatching null
                                 when (mode) {
                                     ScannerMode.CONTAINER ->

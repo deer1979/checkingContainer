@@ -52,7 +52,7 @@ internal object ClientDataExtractor {
 
     /** Foto (galería) → cliente pre-llenado. Sin IA usa OCR + patrones. */
     suspend fun desdeImagen(context: Context, uri: Uri): Client {
-        val bitmap = runCatching { InputImage.fromFilePath(context, uri).bitmapInternal }.getOrNull()
+        val bitmap = decodeBitmapForIa(context, uri)
         val ai = if (bitmap != null && GeminiNanoOcr.isAvailable()) {
             runCatching { nano(TextPart(PROMPT), ImagePart(bitmap)) }.getOrNull()
         } else {

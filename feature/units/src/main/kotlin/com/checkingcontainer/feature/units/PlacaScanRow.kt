@@ -49,17 +49,24 @@ internal fun PlacaScanRow(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var procesando by remember { mutableStateOf(false) }
+    var sinLectura by remember { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun procesar(uri: Uri) {
         scope.launch {
             procesando = true
+            sinLectura = false
             runCatching { PlacaEquipoExtractor.desdeImagen(context, uri, tipo) }
                 .onSuccess { r ->
                     // No pisar un código ya escrito a mano.
                     val filtrado = if (codigoActual.isNotBlank()) r.fields - "Container No." else r.fields
-                    if (filtrado.isNotEmpty() || r.ficha.isNotEmpty()) onResult(filtrado, r.ficha)
+                    if (filtrado.isNotEmpty() || r.ficha.isNotEmpty()) {
+                        onResult(filtrado, r.ficha)
+                    } else {
+                        sinLectura = true
+                    }
                 }
+                .onFailure { sinLectura = true }
             procesando = false
         }
     }
@@ -85,6 +92,14 @@ internal fun PlacaScanRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (sinLectura) {
+                Text(
+                    "No se pudo leer la placa. Intenta de frente, con buena luz y " +
+                        "que la placa llene la foto.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = {

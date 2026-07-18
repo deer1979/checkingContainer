@@ -22,16 +22,16 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 /** Un dato leído de la placa: etiqueta y valor tal como aparecen impresos. */
 @Generable(description = "Un dato individual impreso en la placa: su etiqueta y su valor")
 data class CampoPlacaLeido(
-    @Guide(description = "Etiqueta o nombre del dato tal como aparece, por ejemplo MODEL, SERIAL, REFRIGERANT, VOLTAGE")
+    @param:Guide(description = "Etiqueta o nombre del dato tal como aparece, por ejemplo MODEL, SERIAL, REFRIGERANT, VOLTAGE")
     val etiqueta: String,
-    @Guide(description = "Valor del dato tal como aparece impreso")
+    @param:Guide(description = "Valor del dato tal como aparece impreso")
     val valor: String,
 )
 
 /** Esquema de lista ABIERTA: todos los datos que la placa traiga, sin encasillar. */
 @Generable(description = "Todos los datos legibles impresos en la placa de identificación del equipo")
 data class FichaPlacaLeida(
-    @Guide(description = "Lista de todos los pares etiqueta-valor legibles en la placa, en el orden en que aparecen")
+    @param:Guide(description = "Lista de todos los pares etiqueta-valor legibles en la placa, en el orden en que aparecen")
     val campos: List<CampoPlacaLeido>,
 )
 
@@ -63,7 +63,9 @@ internal object PlacaEquipoExtractor {
 
     suspend fun desdeImagen(context: Context, uri: Uri, tipo: TipoEquipo): ResultadoPlaca {
         val ficha = runCatching { nano(context, uri) }.getOrNull()
+            ?: runCatching { nanoTexto(context, uri) }.getOrNull()
             ?: runCatching { porOcr(context, uri) }.getOrDefault(emptyList())
+        Log.i(TAG, "Placa leída: ${ficha.size} pares")
         return ResultadoPlaca(fields = derivarCampos(ficha, tipo), ficha = ficha)
     }
 
@@ -71,8 +73,7 @@ internal object PlacaEquipoExtractor {
 
     private suspend fun nano(context: Context, uri: Uri): List<CampoFicha>? {
         if (!GeminiNanoOcr.isAvailable()) return null
-        val bitmap = runCatching { InputImage.fromFilePath(context, uri).bitmapInternal }.getOrNull()
-            ?: return null
+        val bitmap = decodeBitmapForIa(context, uri) ?: return null
         val model = Generation.getClient()
         return try {
             val base = generateContentRequest(ImagePart(bitmap), TextPart(PROMPT)) {
@@ -92,6 +93,29 @@ internal object PlacaEquipoExtractor {
         }
     }
 
+    /** Respaldo con Nano SIN esquema (equipos donde la salida tipada falla). */
+    private suspend fun nanoTexto(context: Context, uri: Uri): List<CampoFicha>? {
+        if (!GeminiNanoOcr.isAvailable()) return null
+        val bitmap = decodeBitmapForIa(context, uri) ?: return null
+        val model = Generation.getClient()
+        return try {
+            val base = generateContentRequest(
+                ImagePart(bitmap),
+                TextPart("$PROMPT Reply ONLY with one line per pair, in the format LABEL: VALUE. No other text."),
+            ) {
+                temperature = 0f; topK = 1; maxOutputTokens = 512
+                systemInstruction = SystemInstruction(REGLAS)
+            }
+            val texto = model.generateContent(base).candidates.firstOrNull()?.text.orEmpty()
+            parsearPares(texto).ifEmpty { null }
+        } catch (e: Exception) {
+            Log.w(TAG, "Nano texto falló: ${e.message}")
+            null
+        } finally {
+            runCatching { model.close() }
+        }
+    }
+
     // ── OCR sin IA: pares por líneas "ETIQUETA: valor" ──────────────────────
 
     private suspend fun porOcr(context: Context, uri: Uri): List<CampoFicha> {
@@ -101,14 +125,44 @@ internal object PlacaEquipoExtractor {
                 .addOnSuccessListener { cont.resume(it.text) }
                 .addOnFailureListener { cont.resume("") }
         }
-        return texto.lines().mapNotNull { line ->
-            val idx = line.indexOf(':')
-            if (idx <= 0) return@mapNotNull null
-            val etiqueta = line.take(idx).trim()
-            val valor = line.substring(idx + 1).trim()
-            if (etiqueta.length in 2..30 && valor.isNotEmpty()) CampoFicha(etiqueta, valor) else null
-        }
+        return parsearPares(texto)
     }
+
+    /**
+     * Convierte texto en pares etiqueta→valor. Acepta "ETIQUETA: valor" y
+     * también líneas sin dos puntos donde la primera palabra es una etiqueta
+     * conocida de placas ("MODEL ZR72KC-TF5") — común en placas de compresor.
+     */
+    private val ETIQUETAS_CONOCIDAS = listOf(
+        "MODEL", "MODELO", "MOD", "SERIAL", "SERIE", "S/N", "SN", "TYPE", "TIPO",
+        "REFRIGERANT", "REFRIGERANTE", "GAS", "VOLTS", "VOLTAJE", "VOLTAGE", "V",
+        "PHASE", "FASE", "HZ", "AMPS", "AMP", "RLA", "LRA", "FLA", "MCA", "MOP",
+        "CAPACITY", "CAPACIDAD", "BTU", "KW", "HP", "YEAR", "AÑO", "DATE", "FECHA",
+        "PRESION", "PRESSURE", "PSI", "MADE", "PART", "P/N", "CHARGE", "CARGA",
+    )
+
+    private fun parsearPares(texto: String): List<CampoFicha> =
+        texto.lines().mapNotNull { raw ->
+            val line = raw.trim()
+            if (line.length < 3) return@mapNotNull null
+            val idx = line.indexOf(':')
+            if (idx > 0) {
+                val etiqueta = line.take(idx).trim()
+                val valor = line.substring(idx + 1).trim()
+                return@mapNotNull if (etiqueta.length in 1..30 && valor.isNotEmpty()) {
+                    CampoFicha(etiqueta, valor)
+                } else null
+            }
+            // Sin dos puntos: "MODEL ZR72KC-TF5-522" → etiqueta conocida + resto
+            val partes = line.split(Regex("\\s+"), limit = 2)
+            if (partes.size == 2) {
+                val etiqueta = partes[0].trim('.', '#')
+                if (ETIQUETAS_CONOCIDAS.any { it.equals(etiqueta, ignoreCase = true) }) {
+                    return@mapNotNull CampoFicha(etiqueta.uppercase(), partes[1].trim())
+                }
+            }
+            null
+        }
 
     // ── Campos clave derivados de la ficha (por etiqueta) ───────────────────
 
