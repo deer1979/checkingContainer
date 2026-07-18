@@ -15,6 +15,7 @@ import coil3.BitmapImage
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
+import com.checkingcontainer.core.model.CampoFicha
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoTotals
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -40,7 +41,10 @@ class EstimadoPdfGenerator @Inject constructor(
 
     // Todo el dibujo (Canvas, StaticLayout, bitmaps) fuera del main thread:
     // con varios ítems y fotos, hacerlo en Main congelaba la UI 2-3 segundos.
-    suspend fun generate(estimado: Estimado): ByteArray = withContext(Dispatchers.Default) {
+    suspend fun generate(
+        estimado: Estimado,
+        fichaTecnica: List<CampoFicha> = emptyList(),
+    ): ByteArray = withContext(Dispatchers.Default) {
         val loader = SingletonImageLoader.get(context)
 
         // Pre-cargar todas las fotos antes de empezar a dibujar
@@ -229,6 +233,21 @@ class EstimadoPdfGenerator @Inject constructor(
                 equipRow("No. Serie:", estimado.unitSerialNo, "No. Modelo:", estimado.unitModelNo)
             if (estimado.yearOfBuilt.isNotEmpty())
                 equipRow("Año:", estimado.yearOfBuilt, "Tipo:", estimado.unitType)
+
+            // Ficha técnica completa (placa) — pares en dos columnas.
+            if (fichaTecnica.isNotEmpty()) {
+                y += 4f
+                checkBreak(14f)
+                canvas.drawText("FICHA TÉCNICA (PLACA)", margin, y, pSection); y += 12f
+                var i = 0
+                while (i < fichaTecnica.size) {
+                    checkBreak(13f)
+                    val a = fichaTecnica[i]
+                    val b = fichaTecnica.getOrNull(i + 1)
+                    equipRow("${a.etiqueta}:", a.valor, b?.let { "${it.etiqueta}:" } ?: "", b?.valor ?: "")
+                    i += 2
+                }
+            }
 
             y += 4f; hLine(); y += 12f
         }

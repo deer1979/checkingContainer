@@ -73,6 +73,7 @@ class UnitEntryViewModel @Inject constructor(
                     yearOfBuilt = equipment?.yearOfBuilt ?: "",
                     brand = equipment?.brand ?: Brand.CARRIER,
                     tipoEquipo = equipment?.tipoEquipo ?: TipoEquipo.REEFER,
+                    fichaTecnica = equipment?.fichaTecnica ?: emptyList(),
                     status = inspection.status,
                     ptiInstruction = inspection.ptiInstruction,
                     deployedAs = inspection.deployedAs,
@@ -112,6 +113,9 @@ class UnitEntryViewModel @Inject constructor(
                 )
                 UnitEntryEvent.CloseScanner -> s.copy(showScanner = false)
                 is UnitEntryEvent.OcrResult -> s.applyOcrFields(event.fields)
+                is UnitEntryEvent.FichaExtraida -> s.copy(fichaTecnica = event.ficha)
+                is UnitEntryEvent.RemoveFichaCampo ->
+                    s.copy(fichaTecnica = s.fichaTecnica.filterIndexed { i, _ -> i != event.index })
                 UnitEntryEvent.ShowDeleteConfirm -> s.copy(showDeleteConfirm = true)
                 UnitEntryEvent.DismissDeleteConfirm -> s.copy(showDeleteConfirm = false)
                 UnitEntryEvent.TriggerManualLookup -> s

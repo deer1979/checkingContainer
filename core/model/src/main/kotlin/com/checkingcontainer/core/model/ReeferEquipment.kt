@@ -10,4 +10,6 @@ data class ReeferEquipment(
     val brand: Brand = Brand.CARRIER,
     val unitType: String = "",
     val tipoEquipo: TipoEquipo = TipoEquipo.REEFER,
+    // Ficha técnica: TODOS los datos legibles de la placa (lista abierta).
+    val fichaTecnica: List<CampoFicha> = emptyList(),
 )

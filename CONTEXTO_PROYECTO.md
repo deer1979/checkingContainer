@@ -160,9 +160,16 @@ Estados por tipo (jul 2026): InspStatus ganó MANT_PREVENTIVO/MANT_CORRECTIVO/
 REPARACION (colores reusan OP/NEST/EST). No-reefer muestra SOLO esos 3 chips
 (default PREVENTIVO), sin selector PTI; REPARACION dispara el estimado igual
 que EST. Contexto de negocio: contratos/licitaciones de mantenimiento.
-PENDIENTE: ficha técnica completa de placa (lista abierta etiqueta→valor
-extraída por IA, columna nueva en reefer_units, visible en tarjeta + PDF;
-plan acordado con el usuario — "no encasillar la placa en campos fijos").
+Ficha técnica HECHA (jul 2026): `CampoFicha` + `ReeferEquipment.fichaTecnica`
+(columna JSON, migración 17→18, espejo Firestore). PlacaEquipoExtractor
+reescrito: esquema de LISTA ABIERTA (`FichaPlacaLeida(campos: List<
+CampoPlacaLeido>)` — @Generable anidado con lista, compila con KSP alpha1);
+la ficha completa se guarda en el equipo y los campos clave (marca/modelo/
+serie/año/código) se DERIVAN de ella por etiqueta. Sin IA: OCR por líneas
+"etiqueta: valor". UI: `FichaTecnicaCard` en UnitEntry (no-reefer, editable
+con X por par). PDF: sección "FICHA TÉCNICA (PLACA)" en dos columnas bajo
+DATOS DEL EQUIPO (el generador recibe la ficha como parámetro; el estimado
+NO la guarda — se lee del equipo al generar).
 
 ## ML Kit R41 / Structured Output (jul 2026)
 genai-prompt beta3 + genai-schema(-compiler) alpha1 (KSP). La extracción de

@@ -152,11 +152,20 @@ fun UnitEntryScreen(
                 PlacaScanRow(
                     tipo = state.tipoEquipo,
                     codigoActual = state.containerNo,
-                    onResult = { onEvent(UnitEntryEvent.OcrResult(it)) },
+                    onResult = { fields, ficha ->
+                        if (fields.isNotEmpty()) onEvent(UnitEntryEvent.OcrResult(fields))
+                        if (ficha.isNotEmpty()) onEvent(UnitEntryEvent.FichaExtraida(ficha))
+                    },
                 )
             }
             IdentificationCard(state = state, onEvent = onEvent)
             EquipmentDataCard(state = state, onEvent = onEvent)
+            if (!state.esReefer && state.fichaTecnica.isNotEmpty()) {
+                FichaTecnicaCard(
+                    ficha = state.fichaTecnica,
+                    onRemove = { onEvent(UnitEntryEvent.RemoveFichaCampo(it)) },
+                )
+            }
             InspectionCard(state = state, onEvent = onEvent)
             state.errorMessage?.let { msg ->
                 Text(

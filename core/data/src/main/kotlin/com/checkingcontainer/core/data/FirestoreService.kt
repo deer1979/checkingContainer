@@ -144,6 +144,7 @@ class FirestoreService @Inject constructor(
                 unitType = doc.getString("unitType") ?: "",
                 tipoEquipo = runCatching { TipoEquipo.valueOf(doc.getString("tipoEquipo") ?: "") }
                     .getOrDefault(TipoEquipo.REEFER),
+                fichaTecnica = parseFichaJson(doc.getString("fichaTecnica") ?: "[]"),
             )
         } catch (e: Exception) {
             Log.w(TAG, "fetchEquipment deferred (offline?): ${e.message}")
@@ -265,6 +266,7 @@ class FirestoreService @Inject constructor(
                     unitType = doc.getString("unitType") ?: "",
                     tipoEquipo = runCatching { TipoEquipo.valueOf(doc.getString("tipoEquipo") ?: "") }
                         .getOrDefault(TipoEquipo.REEFER),
+                    fichaTecnica = doc.getString("fichaTecnica") ?: "[]",
                 )
             }
         } catch (e: Exception) {
@@ -483,6 +485,7 @@ private fun ReeferUnitEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "unitSerialNo" to unitSerialNo,
     "yearOfBuilt" to yearOfBuilt,
     "brand"       to brand.name,
+    "fichaTecnica" to fichaTecnica,
     "tipoEquipo"   to tipoEquipo.name,
     "unitType"    to unitType,
 )
@@ -562,3 +565,15 @@ private fun ClientEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "createdAt"   to createdAt,
     "updatedAt"   to updatedAt,
 )
+
+private fun parseFichaJson(json: String): List<com.checkingcontainer.core.model.CampoFicha> = buildList {
+    val arr = runCatching { org.json.JSONArray(json) }.getOrNull() ?: return@buildList
+    repeat(arr.length()) { i ->
+        val obj = arr.optJSONObject(i) ?: return@repeat
+        val etiqueta = obj.optString("etiqueta")
+        val valor = obj.optString("valor")
+        if (etiqueta.isNotEmpty() && valor.isNotEmpty()) {
+            add(com.checkingcontainer.core.model.CampoFicha(etiqueta, valor))
+        }
+    }
+}

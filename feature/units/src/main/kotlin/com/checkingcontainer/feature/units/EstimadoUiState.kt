@@ -1,5 +1,6 @@
 package com.checkingcontainer.feature.units
 
+import com.checkingcontainer.core.model.CampoFicha
 import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.MedicionSnapshot
 import com.checkingcontainer.core.model.EstimadoStatus
@@ -32,6 +33,8 @@ data class EstimadoUiState(
     val clientTelefono: String = "",
     val clientEmail: String = "",
     val isSavingClient: Boolean = false,
+    // Ficha técnica del equipo (solo lectura; viene de la placa escaneada)
+    val fichaTecnica: List<CampoFicha> = emptyList(),
     // Configuración
     val hasIva: Boolean = false,
     // Estados de carga

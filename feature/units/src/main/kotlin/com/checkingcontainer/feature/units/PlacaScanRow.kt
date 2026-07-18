@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -29,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import com.checkingcontainer.core.model.CampoFicha
 import com.checkingcontainer.core.model.TipoEquipo
 import kotlinx.coroutines.launch
 import java.io.File
@@ -42,7 +44,7 @@ import java.io.File
 internal fun PlacaScanRow(
     tipo: TipoEquipo,
     codigoActual: String,
-    onResult: (Map<String, String>) -> Unit,
+    onResult: (Map<String, String>, List<CampoFicha>) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -53,10 +55,10 @@ internal fun PlacaScanRow(
         scope.launch {
             procesando = true
             runCatching { PlacaEquipoExtractor.desdeImagen(context, uri, tipo) }
-                .onSuccess { fields ->
+                .onSuccess { r ->
                     // No pisar un código ya escrito a mano.
-                    val filtrado = if (codigoActual.isNotBlank()) fields - "Container No." else fields
-                    if (filtrado.isNotEmpty()) onResult(filtrado)
+                    val filtrado = if (codigoActual.isNotBlank()) r.fields - "Container No." else r.fields
+                    if (filtrado.isNotEmpty() || r.ficha.isNotEmpty()) onResult(filtrado, r.ficha)
                 }
             procesando = false
         }
@@ -78,8 +80,8 @@ internal fun PlacaScanRow(
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                "Encuadra la placa completa y bien iluminada: se extraen marca, " +
-                    "modelo, serie y año, y se sugiere el código del equipo.",
+                "Encuadra la placa completa y bien iluminada: se lee TODA la placa " +
+                    "(ficha técnica) y se sugiere el código del equipo.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -109,6 +111,56 @@ internal fun PlacaScanRow(
                 ) {
                     Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                     Text(" Galería")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Ficha técnica del equipo: todos los datos leídos de la placa, editable
+ * antes de guardar (la X quita un par mal leído o irrelevante).
+ */
+@Composable
+internal fun FichaTecnicaCard(
+    ficha: List<CampoFicha>,
+    onRemove: (Int) -> Unit,
+) {
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Ficha técnica (placa)", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Leída de la placa — quita con la X lo que no aplique.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            ficha.forEachIndexed { index, campo ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
+                    Text(
+                        campo.etiqueta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(0.42f),
+                    )
+                    Text(
+                        campo.valor,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(0.58f),
+                    )
+                    androidx.compose.material3.IconButton(
+                        onClick = { onRemove(index) },
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = "Quitar dato",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

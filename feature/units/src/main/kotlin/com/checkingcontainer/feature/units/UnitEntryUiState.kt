@@ -2,6 +2,7 @@ package com.checkingcontainer.feature.units
 
 import androidx.compose.runtime.Immutable
 import com.checkingcontainer.core.model.Brand
+import com.checkingcontainer.core.model.CampoFicha
 import com.checkingcontainer.core.model.Inspection
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.PtiInstruction
@@ -16,6 +17,7 @@ data class DuplicateWarning(val time: String, val technicianName: String)
 data class UnitEntryUiState(
     val inspectionId: Long? = null,
     val tipoEquipo: TipoEquipo = TipoEquipo.REEFER,
+    val fichaTecnica: List<CampoFicha> = emptyList(),
     val containerNo: String = "",
     val unitModelNo: String = "",
     val unitModel: String = "",
@@ -79,6 +81,9 @@ sealed interface UnitEntryEvent {
     data class PtiInstructionChange(val value: PtiInstruction) : UnitEntryEvent
     data class DeployedAsChange(val value: String) : UnitEntryEvent
     data class ObservationsChange(val value: String) : UnitEntryEvent
+    // Ficha técnica (placa completa de equipos no-reefer)
+    data class FichaExtraida(val ficha: List<CampoFicha>) : UnitEntryEvent
+    data class RemoveFichaCampo(val index: Int) : UnitEntryEvent
     data object OpenOrientationPicker : UnitEntryEvent
     data object DismissOrientationPicker : UnitEntryEvent
     data class OpenScanner(val mode: ScannerMode, val isVertical: Boolean = false) : UnitEntryEvent
@@ -113,6 +118,7 @@ internal fun UnitEntryUiState.applyOcrFields(fields: Map<String, String>): UnitE
 fun UnitEntryUiState.toEquipment(): ReeferEquipment = ReeferEquipment(
     containerNo = containerNo.trim().uppercase(),
     tipoEquipo = tipoEquipo,
+    fichaTecnica = fichaTecnica,
     manufacturer = manufacturer.ifBlank { brand.label },
     unitModel = unitModel.trim(),
     unitModelNo = unitModelNo.trim(),

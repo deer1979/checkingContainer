@@ -80,6 +80,7 @@ class EstimadoViewModel @Inject constructor(
                     unitSerialNo = unit?.unitSerialNo ?: "",
                     yearOfBuilt = unit?.yearOfBuilt ?: "",
                     unitType = unit?.unitType ?: "",
+                    fichaTecnica = unit?.fichaTecnica ?: emptyList(),
                     estimadoId = existing?.id ?: 0L,
                     clientName = existing?.clientName ?: "",
                     location = existing?.location ?: inspection?.location ?: "",
@@ -484,7 +485,7 @@ class EstimadoViewModel @Inject constructor(
                 mediciones = current.mediciones,
                 hasIva = current.hasIva,
             )
-            runCatching { pdfGenerator.generate(estimado) }
+            runCatching { pdfGenerator.generate(estimado, current.fichaTecnica) }
                 .onSuccess { bytes ->
                     val file = File(context.cacheDir, "estimado_${inspectionId}.pdf")
                     withContext(Dispatchers.IO) { file.writeBytes(bytes) }
