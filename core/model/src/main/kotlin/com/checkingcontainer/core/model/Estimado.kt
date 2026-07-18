@@ -37,6 +37,11 @@ data class Estimado(
     val clientDireccion: String = "",
     val clientTelefono: String = "",
     val clientEmail: String = "",
+    // Sitio donde se ejecuta el trabajo (cliente final, opcional) + nº de
+    // orden de trabajo/contrato asignado por el contratante.
+    val sitioClienteId: Long? = null,
+    val sitioNombre: String = "",
+    val ordenTrabajo: String = "",
     val location: String = "",
     val technicianId: Long = 0,
     val technicianName: String = "",

@@ -191,6 +191,22 @@ fun EstimadoRoute(
     }
 
     var showClientPicker by remember { mutableStateOf(false) }
+    var showSitioPicker by remember { mutableStateOf(false) }
+    if (showSitioPicker) {
+        val clients by viewModel.activeClients.collectAsStateWithLifecycle()
+        ClientPickerSheet(
+            clients = clients,
+            isSaving = state.isSavingClient,
+            onSelect = { client ->
+                viewModel.selectSitio(client)
+                showSitioPicker = false
+            },
+            onCreate = { client ->
+                viewModel.createClientAndSelectSitio(client) { showSitioPicker = false }
+            },
+            onDismiss = { showSitioPicker = false },
+        )
+    }
     if (showClientPicker) {
         val clients by viewModel.activeClients.collectAsStateWithLifecycle()
         ClientPickerSheet(
@@ -214,6 +230,7 @@ fun EstimadoRoute(
         onSave = viewModel::save,
         onGeneratePdf = viewModel::generateAndSharePdf,
         onSelectClientClick = { showClientPicker = true },
+        onSelectSitioClick = { showSitioPicker = true },
         onAddDamagePhoto = viewModel::addDamagePhoto,
         onAddRepairPhoto = viewModel::addRepairPhoto,
         getPendingDamageDescription = viewModel::getPendingDamageDescription,
@@ -232,6 +249,7 @@ fun EstimadoScreen(
     onSave: () -> Unit,
     onGeneratePdf: () -> Unit,
     onSelectClientClick: () -> Unit = {},
+    onSelectSitioClick: () -> Unit = {},
     onAddDamagePhoto: (String, Uri) -> Unit,
     onAddRepairPhoto: (String, Uri) -> Unit,
     getPendingDamageDescription: () -> String,
@@ -385,6 +403,48 @@ fun EstimadoScreen(
                                 Text(if (state.clientName.isEmpty()) "Seleccionar cliente" else "Cambiar cliente")
                             }
                         }
+
+                        // Sitio del trabajo (cliente final) — opcional, para trabajos
+                        // vía contratante. Solo nombre; el PDF lo imprime aparte.
+                        if (state.sitioNombre.isNotEmpty()) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    InfoRow("Trabajo en", state.sitioNombre)
+                                }
+                                if (state.status != EstimadoStatus.CERRADO) {
+                                    IconButton(
+                                        onClick = { onEvent(EstimadoEvent.ClearSitio) },
+                                        modifier = Modifier.size(28.dp),
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.Close,
+                                            contentDescription = "Quitar sitio",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        } else if (state.status != EstimadoStatus.CERRADO) {
+                            OutlinedButton(
+                                onClick = onSelectSitioClick,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Sitio del trabajo (opcional)")
+                            }
+                        }
+                        OutlinedTextField(
+                            value = state.ordenTrabajo,
+                            onValueChange = { onEvent(EstimadoEvent.OrdenTrabajoChange(it)) },
+                            label = { Text("Orden de trabajo / Referencia Nº") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = state.status != EstimadoStatus.CERRADO,
+                        )
                         OutlinedTextField(
                             value = state.location,
                             onValueChange = { onEvent(EstimadoEvent.LocationChange(it)) },

@@ -203,6 +203,8 @@ class EstimadoPdfGenerator @Inject constructor(
         if (estimado.clientIdNumber.isNotEmpty()) infoRow("RUC/CI:", estimado.clientIdNumber)
         if (estimado.clientDireccion.isNotEmpty()) infoRow("Dirección:", estimado.clientDireccion)
         if (estimado.clientTelefono.isNotEmpty()) infoRow("Teléfono:", estimado.clientTelefono)
+        if (estimado.ordenTrabajo.isNotEmpty()) infoRow("Orden de trabajo:", estimado.ordenTrabajo)
+        if (estimado.sitioNombre.isNotEmpty()) infoRow("Trabajo en:", estimado.sitioNombre)
         if (estimado.location.isNotEmpty()) infoRow("Ubicación:", estimado.location)
         infoRow("Técnico:", estimado.technicianName.ifEmpty { "—" })
         infoRow("Fecha:", sdf.format(Date(estimado.createdAt)))

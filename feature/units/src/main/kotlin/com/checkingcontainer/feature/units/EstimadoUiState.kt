@@ -33,6 +33,10 @@ data class EstimadoUiState(
     val clientTelefono: String = "",
     val clientEmail: String = "",
     val isSavingClient: Boolean = false,
+    // Sitio del trabajo (cliente final) + orden de trabajo del contratante
+    val sitioClienteId: Long? = null,
+    val sitioNombre: String = "",
+    val ordenTrabajo: String = "",
     // Ficha técnica del equipo (solo lectura; viene de la placa escaneada)
     val fichaTecnica: List<CampoFicha> = emptyList(),
     // Configuración
@@ -62,6 +66,8 @@ sealed interface EstimadoSheet {
 sealed interface EstimadoEvent {
     data class ClientNameChange(val value: String) : EstimadoEvent
     data class LocationChange(val value: String) : EstimadoEvent
+    data class OrdenTrabajoChange(val value: String) : EstimadoEvent
+    data object ClearSitio : EstimadoEvent
     data class ShowSheet(val sheet: EstimadoSheet) : EstimadoEvent
     data object DismissSheet : EstimadoEvent
     data class IvaToggle(val enabled: Boolean) : EstimadoEvent

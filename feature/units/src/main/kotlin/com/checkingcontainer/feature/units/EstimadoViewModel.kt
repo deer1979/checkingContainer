@@ -94,6 +94,9 @@ class EstimadoViewModel @Inject constructor(
                     clientDireccion = existing?.clientDireccion ?: "",
                     clientTelefono = existing?.clientTelefono ?: "",
                     clientEmail = existing?.clientEmail ?: "",
+                    sitioClienteId = existing?.sitioClienteId,
+                    sitioNombre = existing?.sitioNombre ?: "",
+                    ordenTrabajo = existing?.ordenTrabajo ?: "",
                     hasIva = existing?.hasIva ?: false,
                 )
             }
@@ -106,6 +109,10 @@ class EstimadoViewModel @Inject constructor(
                 _state.update { it.copy(clientName = event.value, savedMessage = null) }
             is EstimadoEvent.LocationChange ->
                 _state.update { it.copy(location = event.value, savedMessage = null) }
+            is EstimadoEvent.OrdenTrabajoChange ->
+                _state.update { it.copy(ordenTrabajo = event.value, isDirty = true, savedMessage = null) }
+            EstimadoEvent.ClearSitio ->
+                _state.update { it.copy(sitioClienteId = null, sitioNombre = "", isDirty = true) }
             is EstimadoEvent.ShowSheet -> {
                 when (val sheet = event.sheet) {
                     is EstimadoSheet.AddDamage -> {
@@ -294,6 +301,29 @@ class EstimadoViewModel @Inject constructor(
         }
     }
 
+    /** Crea el cliente en el catálogo y lo asigna como sitio del trabajo. */
+    fun createClientAndSelectSitio(client: Client, onDone: () -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(isSavingClient = true) }
+            runCatching { clientsRepo.save(client) }
+                .onSuccess { id ->
+                    selectSitio(client.copy(id = id))
+                    _state.update { it.copy(isSavingClient = false) }
+                    onDone()
+                }
+                .onFailure { e ->
+                    _state.update { it.copy(isSavingClient = false, errorMessage = e.message) }
+                }
+        }
+    }
+
+    /** Asigna el sitio del trabajo (cliente final, solo nombre). */
+    fun selectSitio(client: Client) {
+        _state.update {
+            it.copy(sitioClienteId = client.id, sitioNombre = client.razonSocial, isDirty = true)
+        }
+    }
+
     /** Asigna un cliente del catálogo: referencia + snapshot congelado. */
     fun selectClient(client: Client) {
         _state.update {
@@ -420,6 +450,9 @@ class EstimadoViewModel @Inject constructor(
                 clientDireccion = current.clientDireccion,
                 clientTelefono = current.clientTelefono,
                 clientEmail = current.clientEmail,
+                sitioClienteId = current.sitioClienteId,
+                sitioNombre = current.sitioNombre,
+                ordenTrabajo = current.ordenTrabajo.trim(),
                 location = current.location.trim(),
                 technicianId = 0,
                 technicianName = current.technicianName,
@@ -476,6 +509,9 @@ class EstimadoViewModel @Inject constructor(
                 clientDireccion = current.clientDireccion,
                 clientTelefono = current.clientTelefono,
                 clientEmail = current.clientEmail,
+                sitioClienteId = current.sitioClienteId,
+                sitioNombre = current.sitioNombre,
+                ordenTrabajo = current.ordenTrabajo,
                 location = current.location,
                 technicianName = current.technicianName,
                 createdAt = current.createdAt,
