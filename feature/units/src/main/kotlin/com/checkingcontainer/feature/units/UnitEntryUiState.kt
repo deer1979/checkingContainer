@@ -91,6 +91,7 @@ sealed interface UnitEntryEvent {
     data class PtiInstructionChange(val value: PtiInstruction) : UnitEntryEvent
     data class DeployedAsChange(val value: String) : UnitEntryEvent
     data class ObservationsChange(val value: String) : UnitEntryEvent
+    data class ManufacturerChange(val value: String) : UnitEntryEvent
     // Ficha técnica (placa completa de equipos no-reefer)
     data class FichaExtraida(val ficha: List<CampoFicha>) : UnitEntryEvent
     data class RemoveFichaCampo(val index: Int) : UnitEntryEvent

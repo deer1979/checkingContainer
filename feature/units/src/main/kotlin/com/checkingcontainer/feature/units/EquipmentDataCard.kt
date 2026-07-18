@@ -46,6 +46,13 @@ internal fun EquipmentDataCard(
     val serialFontSize by animateFloatAsState(if (serialFocused) 20f else 16f, label = "serial")
     val yearFontSize by animateFloatAsState(if (yearFocused) 20f else 16f, label = "year")
 
+    // Equipos no-reefer: formato propio, simple y en español — sin escáner de
+    // placas Carrier, sin catálogo de modelos ni insignia de marca reefer.
+    // Su fuente de datos real es la ficha técnica de SU placa.
+    if (!state.esReefer) {
+        EquipoGenericoCard(state = state, onEvent = onEvent)
+        return
+    }
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -180,6 +187,50 @@ internal fun EquipmentDataCard(
                 keyboardActions = KeyboardActions(
                     onDone = { focusManager.clearFocus() },
                 ),
+            )
+        }
+    }
+}
+
+/** Datos del equipo para NO-reefer: campos genéricos opcionales, sin nada Carrier. */
+@Composable
+internal fun EquipoGenericoCard(
+    state: UnitEntryUiState,
+    onEvent: (UnitEntryEvent) -> Unit,
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SectionTitle(text = "Datos del Equipo", isComplete = null)
+            OutlinedTextField(
+                value = state.manufacturer,
+                onValueChange = { onEvent(UnitEntryEvent.ManufacturerChange(it)) },
+                label = { Text("Marca") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = state.unitModelNo,
+                onValueChange = { onEvent(UnitEntryEvent.UnitModelNoChange(it)) },
+                label = { Text("Modelo") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = state.unitSerialNo,
+                onValueChange = { onEvent(UnitEntryEvent.UnitSerialNoChange(it.uppercase())) },
+                label = { Text("No. Serie") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = state.yearOfBuilt,
+                onValueChange = { v -> onEvent(UnitEntryEvent.YearOfBuiltChange(v.filter(Char::isDigit).take(4))) },
+                label = { Text("Año") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
             )
         }
     }

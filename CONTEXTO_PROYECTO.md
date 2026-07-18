@@ -185,6 +185,11 @@ NO la guarda — se lee del equipo al generar).
   "Volver a leer placa" re-analiza (si es URL http, baja vía Coil).
 - Ficha editable total: tocar par = editar, "Agregar dato", X quita.
 - Guardar no-reefer: solo requiere código válido (modelo/serial/año opcionales).
+- Feedback usuario (jul 2026): no-reefer usa `EquipoGenericoCard` (Marca/
+  Modelo/No. Serie/Año en español, opcionales, sin escáner Carrier ni
+  catálogo ni badge de marca — EquipmentDataCard bifurca por esReefer);
+  y MANT_CORRECTIVO también genera estimado (se cobra) — solo PREVENTIVO
+  queda como visita de contrato sin estimado.
 
 ## ML Kit R41 / Structured Output (jul 2026)
 genai-prompt beta3 + genai-schema(-compiler) alpha1 (KSP). La extracción de

@@ -111,6 +111,8 @@ class UnitEntryViewModel @Inject constructor(
                 is UnitEntryEvent.StatusChange -> s.copy(status = event.value)
                 is UnitEntryEvent.PtiInstructionChange -> s.copy(ptiInstruction = event.value)
                 is UnitEntryEvent.DeployedAsChange -> s.copy(deployedAs = event.value)
+                is UnitEntryEvent.ManufacturerChange ->
+                    s.copy(manufacturer = event.value, errorMessage = null)
                 is UnitEntryEvent.ObservationsChange -> s.copy(observations = event.value)
                 UnitEntryEvent.OpenOrientationPicker -> s.copy(showOrientationPicker = true)
                 UnitEntryEvent.DismissOrientationPicker -> s.copy(showOrientationPicker = false)
@@ -277,7 +279,11 @@ class UnitEntryViewModel @Inject constructor(
 
             result
                 .onSuccess {
-                    val esEstimable = current.status == InspStatus.EST || current.status == InspStatus.REPARACION
+                    // Correctivo y Reparación se cobran → generan estimado.
+                    // Preventivo es visita de contrato (solo historial).
+                    val esEstimable = current.status == InspStatus.EST ||
+                        current.status == InspStatus.REPARACION ||
+                        current.status == InspStatus.MANT_CORRECTIVO
                     val navTarget = if (esEstimable && savedInspectionId != 0L) {
                         savedInspectionId
                     } else null
