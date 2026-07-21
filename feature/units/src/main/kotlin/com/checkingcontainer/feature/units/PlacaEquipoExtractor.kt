@@ -6,50 +6,36 @@ import android.util.Log
 import com.checkingcontainer.core.model.CampoFicha
 import com.checkingcontainer.core.model.TipoEquipo
 import com.google.mlkit.genai.prompt.Generation
-import com.google.mlkit.genai.prompt.ImagePart
 import com.google.mlkit.genai.prompt.SystemInstruction
 import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.prompt.generateContentRequest
-import com.google.mlkit.genai.prompt.generateTypedContentRequest
-import com.google.mlkit.genai.schema.annotations.Generable
-import com.google.mlkit.genai.schema.annotations.Guide
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
-/** Un dato leído de la placa: etiqueta y valor tal como aparecen impresos. */
-@Generable(description = "Un dato individual impreso en la placa: su etiqueta y su valor")
-data class CampoPlacaLeido(
-    @param:Guide(description = "Etiqueta o nombre del dato tal como aparece, por ejemplo MODEL, SERIAL, REFRIGERANT, VOLTAGE")
-    val etiqueta: String,
-    @param:Guide(description = "Valor del dato tal como aparece impreso")
-    val valor: String,
-)
-
-/** Esquema de lista ABIERTA: todos los datos que la placa traiga, sin encasillar. */
-@Generable(description = "Todos los datos legibles impresos en la placa de identificación del equipo")
-data class FichaPlacaLeida(
-    @param:Guide(description = "Lista de todos los pares etiqueta-valor legibles en la placa, en el orden en que aparecen")
-    val campos: List<CampoPlacaLeido>,
-)
-
 internal data class ResultadoPlaca(
     /** Campos clave mapeados al formulario (canal OcrResult). */
     val fields: Map<String, String>,
     /** TODOS los datos de la placa (ficha técnica del equipo). */
     val ficha: List<CampoFicha>,
-    /** Con qué se leyó: "OCR + IA" / "IA (imagen)" / "OCR". */
+    /** Con qué se leyó: "OCR + IA" / "OCR". */
     val metodo: String = "",
 )
 
 /**
  * Lee la placa de datos de un equipo genérico desde una foto y devuelve la
- * FICHA COMPLETA (lista abierta etiqueta→valor — cada placa trae lo suyo) más
- * los campos clave derivados (marca/modelo/serie/año + código sugerido).
- * Gemini Nano con salida estructurada; sin IA, OCR por líneas. Solo
- * PRE-LLENA: el usuario revisa, borra o corrige antes de guardar.
+ * FICHA COMPLETA (lista abierta etiqueta→valor) más los campos clave derivados
+ * (marca/modelo/serie/año + código sugerido).
+ *
+ * Estrategia (recomendada por Google para documentos): **OCR primero, IA
+ * después**. ML Kit OCR lee los caracteres; Gemini Nano ORGANIZA ese texto en
+ * pares. Clave del diseño: Nano on-device tiene un tope duro de ~512 tokens de
+ * salida — por eso se le pide texto plano "ETIQUETA: VALOR" (compacto), NO JSON
+ * estructurado (que reventaba el límite en placas densas y fallaba en silencio).
+ * Sin IA, un lector determinista de tablas de dos columnas hace el trabajo.
+ * Solo PRE-LLENA: el usuario revisa, corrige o borra antes de guardar.
  */
 internal object PlacaEquipoExtractor {
 
@@ -57,116 +43,54 @@ internal object PlacaEquipoExtractor {
 
     private const val REGLAS =
         "You read identification data plates of refrigeration and air conditioning " +
-            "equipment. Extract ONLY values explicitly printed on the plate, " +
-            "exactly as printed. Never guess, complete or invent values."
+            "equipment. Use ONLY text explicitly present. Never guess or invent values."
 
-    private const val PROMPT =
-        "List every readable label-value pair printed on this equipment data plate."
-
-    /**
-     * División del trabajo por fortaleza: ML Kit OCR lee los caracteres (su
-     * especialidad, incluso letra pequeña) y Gemini Nano ORGANIZA ese texto en
-     * pares — tarea de texto fácil para un modelo pequeño, a diferencia de leer
-     * una imagen densa. La imagen directa a Nano queda como segundo intento.
-     */
     suspend fun desdeImagen(context: Context, uri: Uri, tipo: TipoEquipo): ResultadoPlaca {
         val textoOcr = runCatching { ocrTexto(context, uri) }.getOrDefault("")
 
-        // 1. OCR + IA organizadora (el camino principal)
+        // 1. OCR + IA: Nano reorganiza el texto del OCR en pares (texto plano).
         if (textoOcr.isNotBlank()) {
             runCatching { nanoOrganiza(textoOcr) }.getOrNull()?.let { ficha ->
                 Log.i(TAG, "Placa: OCR + IA, ${ficha.size} pares")
                 return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "OCR + IA")
             }
         }
-        // 2. IA leyendo la imagen directamente (por si el OCR no sacó texto)
-        runCatching { nano(context, uri) }.getOrNull()?.let { ficha ->
-            Log.i(TAG, "Placa: IA imagen, ${ficha.size} pares")
-            return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "IA (imagen)")
-        }
-        // 3. Solo OCR con parser de etiquetas conocidas
-        val ficha = parsearPares(textoOcr)
+        // 2. Sin IA (o si falló): lector determinista de tablas de dos columnas.
+        val ficha = parsearFicha(textoOcr)
         Log.i(TAG, "Placa: solo OCR, ${ficha.size} pares")
         return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "OCR")
     }
 
-    /** Nano organiza TEXTO (no imagen) en pares, con salida estructurada. */
+    // ── IA: organiza el texto del OCR en pares (SALIDA DE TEXTO PLANO) ───────
+
     private suspend fun nanoOrganiza(texto: String): List<CampoFicha>? {
         if (!GeminiNanoOcr.isAvailable()) return null
         val model = Generation.getClient()
         return try {
             val base = generateContentRequest(
                 TextPart(
-                    "The following is raw OCR text from an equipment data plate. " +
-                        "Organize it into label-value pairs. Split lines that contain " +
-                        "several different data (e.g. 'SERIAL 04443707 REV 5165 YYWI 1737' " +
-                        "is serial + revision + date code). Use ONLY text present.\n\n$texto",
+                    "Raw OCR text from an equipment data plate follows. Rewrite it as " +
+                        "one line per field, exactly in the format LABEL: VALUE. Join each " +
+                        "label with its value even if OCR split them across separate lines. " +
+                        "If one line holds several fields, split them. Keep values exactly " +
+                        "as printed. Output ONLY the LABEL: VALUE lines, nothing else.\n\n" +
+                        texto,
                 ),
             ) {
                 temperature = 0f; topK = 1; maxOutputTokens = 512
                 systemInstruction = SystemInstruction(REGLAS)
             }
-            val typed = generateTypedContentRequest(base, FichaPlacaLeida::class)
-            model.generateContent(typed).candidates.firstOrNull()?.response?.campos
-                ?.filter { it.etiqueta.isNotBlank() && it.valor.isNotBlank() }
-                ?.map { CampoFicha(it.etiqueta.trim(), it.valor.trim()) }
-                ?.ifEmpty { null }
+            val salida = model.generateContent(base).candidates.firstOrNull()?.text.orEmpty()
+            parsearLineasEtiquetaValor(salida).ifEmpty { null }
         } catch (e: Exception) {
-            Log.w(TAG, "Nano organizador falló: ${e.message}")
+            Log.w(TAG, "Nano organizador falló (se usa lector OCR): ${e.message}")
             null
         } finally {
             runCatching { model.close() }
         }
     }
 
-    // ── Gemini Nano: lista abierta con salida estructurada ──────────────────
-
-    private suspend fun nano(context: Context, uri: Uri): List<CampoFicha>? {
-        if (!GeminiNanoOcr.isAvailable()) return null
-        val bitmap = decodeBitmapForIa(context, uri) ?: return null
-        val model = Generation.getClient()
-        return try {
-            val base = generateContentRequest(ImagePart(bitmap), TextPart(PROMPT)) {
-                temperature = 0f; topK = 1; maxOutputTokens = 512
-                systemInstruction = SystemInstruction(REGLAS)
-            }
-            val typed = generateTypedContentRequest(base, FichaPlacaLeida::class)
-            model.generateContent(typed).candidates.firstOrNull()?.response?.campos
-                ?.filter { it.etiqueta.isNotBlank() && it.valor.isNotBlank() }
-                ?.map { CampoFicha(it.etiqueta.trim(), it.valor.trim()) }
-                ?.ifEmpty { null }
-        } catch (e: Exception) {
-            Log.w(TAG, "Salida tipada de placa falló (se usa OCR): ${e.message}")
-            null
-        } finally {
-            runCatching { model.close() }
-        }
-    }
-
-    /** Respaldo con Nano SIN esquema (equipos donde la salida tipada falla). */
-    private suspend fun nanoTexto(context: Context, uri: Uri): List<CampoFicha>? {
-        if (!GeminiNanoOcr.isAvailable()) return null
-        val bitmap = decodeBitmapForIa(context, uri) ?: return null
-        val model = Generation.getClient()
-        return try {
-            val base = generateContentRequest(
-                ImagePart(bitmap),
-                TextPart("$PROMPT Reply ONLY with one line per pair, in the format LABEL: VALUE. No other text."),
-            ) {
-                temperature = 0f; topK = 1; maxOutputTokens = 512
-                systemInstruction = SystemInstruction(REGLAS)
-            }
-            val texto = model.generateContent(base).candidates.firstOrNull()?.text.orEmpty()
-            parsearPares(texto).ifEmpty { null }
-        } catch (e: Exception) {
-            Log.w(TAG, "Nano texto falló: ${e.message}")
-            null
-        } finally {
-            runCatching { model.close() }
-        }
-    }
-
-    // ── OCR sin IA: pares por líneas "ETIQUETA: valor" ──────────────────────
+    // ── OCR ─────────────────────────────────────────────────────────────────
 
     private suspend fun ocrTexto(context: Context, uri: Uri): String =
         suspendCancellableCoroutine { cont ->
@@ -176,43 +100,79 @@ internal object PlacaEquipoExtractor {
                 .addOnFailureListener { cont.resume("") }
         }
 
-    /**
-     * Convierte texto en pares etiqueta→valor. Acepta "ETIQUETA: valor" y
-     * también líneas sin dos puntos donde la primera palabra es una etiqueta
-     * conocida de placas ("MODEL ZR72KC-TF5") — común en placas de compresor.
-     */
-    private val ETIQUETAS_CONOCIDAS = listOf(
-        "MODEL", "MODELO", "MOD", "SERIAL", "SERIE", "S/N", "SN", "TYPE", "TIPO",
-        "REFRIGERANT", "REFRIGERANTE", "GAS", "VOLTS", "VOLTAJE", "VOLTAGE", "V",
-        "PHASE", "FASE", "HZ", "AMPS", "AMP", "RLA", "LRA", "FLA", "MCA", "MOP",
-        "CAPACITY", "CAPACIDAD", "BTU", "KW", "HP", "YEAR", "AÑO", "DATE", "FECHA",
-        "PRESION", "PRESSURE", "PSI", "MADE", "PART", "P/N", "CHARGE", "CARGA",
-    )
-
-    private fun parsearPares(texto: String): List<CampoFicha> =
+    /** Parsea líneas "ETIQUETA: VALOR" limpias (salida de la IA). */
+    private fun parsearLineasEtiquetaValor(texto: String): List<CampoFicha> =
         texto.lines().mapNotNull { raw ->
-            val line = raw.trim()
-            if (line.length < 3) return@mapNotNull null
+            val line = raw.trim().removePrefix("-").removePrefix("*").trim()
             val idx = line.indexOf(':')
-            if (idx > 0) {
-                val etiqueta = line.take(idx).trim()
-                val valor = line.substring(idx + 1).trim()
-                return@mapNotNull if (etiqueta.length in 1..30 && valor.isNotEmpty()) {
-                    CampoFicha(etiqueta, valor)
-                } else null
-            }
-            // Sin dos puntos: "MODEL ZR72KC-TF5-522" → etiqueta conocida + resto
-            val partes = line.split(Regex("\\s+"), limit = 2)
-            if (partes.size == 2) {
-                val etiqueta = partes[0].trim('.', '#')
-                if (ETIQUETAS_CONOCIDAS.any { it.equals(etiqueta, ignoreCase = true) }) {
-                    return@mapNotNull CampoFicha(etiqueta.uppercase(), partes[1].trim())
-                }
-            }
-            null
+            if (idx <= 0) return@mapNotNull null
+            val etiqueta = line.take(idx).trim()
+            val valor = line.substring(idx + 1).trim()
+            if (etiqueta.length in 1..40 && valor.isNotEmpty()) CampoFicha(etiqueta, valor) else null
         }
 
-    // ── Campos clave derivados de la ficha (por etiqueta) ───────────────────
+    private val ETIQUETAS_CONOCIDAS = listOf(
+        "MODEL", "MODELO", "MOD", "SERIAL", "SERIE", "S/N", "SN", "TYPE", "TIPO",
+        "REFRIGERANT", "REFRIGERANTE", "GAS", "VOLTS", "VOLTAJE", "VOLTAGE",
+        "TENSION", "TENSIÓN", "PHASE", "FASE", "HZ", "FRECUENCIA", "AMPS", "AMP",
+        "RLA", "LRA", "FLA", "MCA", "MOP", "CORRIENTE", "POTENCIA", "POWER",
+        "CAPACITY", "CAPACIDAD", "BTU", "KW", "HP", "VOLUMEN", "CONSUMO", "CARGA",
+        "YEAR", "AÑO", "DATE", "FECHA", "CLASE", "CLASS", "PRESION", "PRESSURE",
+        "PSI", "MADE", "PART", "P/N", "CHARGE", "COLOR", "CONGELADOR", "REFRIGERADOR",
+    )
+
+    /**
+     * Lector determinista para cuando no hay IA. Maneja tres formas comunes en
+     * placas: "ETIQUETA: valor", "ETIQUETA:" con el valor en la línea siguiente
+     * (tablas de dos columnas que el OCR separa), y "ETIQUETA valor" cuando la
+     * primera palabra es una etiqueta conocida.
+     */
+    private fun parsearFicha(texto: String): List<CampoFicha> {
+        val lineas = texto.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val out = mutableListOf<CampoFicha>()
+        var i = 0
+        while (i < lineas.size) {
+            val line = lineas[i]
+            val idx = line.indexOf(':')
+            when {
+                // "ETIQUETA: valor" en la misma línea
+                idx > 0 && line.substring(idx + 1).isNotBlank() -> {
+                    val et = line.take(idx).trim()
+                    val v = line.substring(idx + 1).trim()
+                    if (et.length in 1..40) out += CampoFicha(et, v)
+                }
+                // "ETIQUETA:" y el valor en la línea siguiente (dos columnas)
+                idx > 0 && line.substring(idx + 1).isBlank() && i + 1 < lineas.size -> {
+                    val et = line.take(idx).trim()
+                    val v = lineas[i + 1].trim()
+                    if (et.length in 1..40 && v.isNotEmpty() && !v.contains(':')) {
+                        out += CampoFicha(et, v); i++
+                    }
+                }
+                // "ETIQUETA valor" sin dos puntos, con etiqueta conocida
+                else -> {
+                    val partes = line.split(Regex("\\s+"), limit = 2)
+                    if (partes.size == 2) {
+                        val et = partes[0].trim('.', '#')
+                        if (ETIQUETAS_CONOCIDAS.any { it.equals(et, ignoreCase = true) }) {
+                            out += CampoFicha(et.uppercase(), partes[1].trim())
+                        }
+                    }
+                }
+            }
+            i++
+        }
+        return out
+    }
+
+    // ── Campos clave derivados de la ficha ──────────────────────────────────
+
+    // Marcas comunes de línea blanca / climatización en Ecuador y la región.
+    private val MARCAS_CONOCIDAS = listOf(
+        "INDURAMA", "MABE", "LG", "SAMSUNG", "WHIRLPOOL", "ELECTROLUX", "DUREX",
+        "GLOBAL", "OSTER", "HACEB", "CARRIER", "YORK", "TRANE", "DAIKIN", "MIDEA",
+        "GREE", "PANASONIC", "TCL", "HISENSE", "BOSCH", "GENERAL ELECTRIC", "GE",
+    )
 
     private fun derivarCampos(ficha: List<CampoFicha>, tipo: TipoEquipo): Map<String, String> {
         fun buscar(vararg claves: String): String? = ficha.firstOrNull { c ->
@@ -220,24 +180,46 @@ internal object PlacaEquipoExtractor {
         }?.valor
 
         val out = mutableMapOf<String, String>()
-        buscar("marca", "brand", "fabricante", "manufacturer", "maker")
-            ?.let { out["Manufacturer"] = it }
+
+        // Marca: por etiqueta (incluye tipo de equipo como etiqueta portadora:
+        // "Congelador: Indurama") o, si no, por una marca conocida en cualquier valor.
+        val marca = buscar("marca", "brand", "fabricante", "manufacturer", "maker",
+            "congelador", "refrigerador", "nevera", "frigorifico", "frigorífico", "equipo")
+            ?: ficha.firstOrNull { c ->
+                MARCAS_CONOCIDAS.any { m -> c.valor.uppercase().contains(m) }
+            }?.let { c -> MARCAS_CONOCIDAS.first { m -> c.valor.uppercase().contains(m) } }
+        marca?.let { out["Manufacturer"] = it }
+
         buscar("model", "modelo", "mod.")?.let { out["Unit Model"] = it }
-        // Solo el primer token del serial: nunca arrastrar REV ni códigos de fecha
-        // que la placa imprime en el mismo renglón.
-        val serie = buscar("serial", "serie", "s/n", "ser no", "s.n")
+
+        // Serie: primer token (no arrastrar REV ni fechas del mismo renglón).
+        val serie = buscar("serial", "serie", "s/n", "ser no", "s.n", "número de serie")
             ?.trim()?.split(Regex("\\s+"))?.firstOrNull()
-        serie?.let { out["Unit Serial No."] = it.uppercase() }
-        (buscar("year", "año", "fecha fab", "mfg date", "date")
-            ?.let { Regex("(19|20)\\d{2}").find(it)?.value })
+            ?.filter { it.isLetterOrDigit() || it == '-' }
+        serie?.takeIf { it.length >= 3 }?.let { out["Unit Serial No."] = it.uppercase() }
+
+        // Año: acepta 4 dígitos (2024) y también fechas con año de 2 dígitos
+        // (01/02/24 → 2024), muy común en placas.
+        buscar("year", "año", "anio", "fecha de fab", "fecha fab", "mfg date", "fabricacion", "date")
+            ?.let { extraerAnio(it) }
             ?.let { out["Year of Built"] = it }
 
-        // Código de equipo sugerido: identidad estable desde el serial.
-        serie?.let {
+        // Código de equipo sugerido desde el serial.
+        serie?.takeIf { it.length >= 3 }?.let {
             val limpio = it.uppercase().replace(Regex("[^A-Z0-9-]"), "")
             if (limpio.length >= 3) out["Container No."] = "${tipo.prefijoCodigo()}-$limpio"
         }
         return out
+    }
+
+    /** Año de 4 dígitos directo, o el año de una fecha dd/mm/yy(yy). */
+    private fun extraerAnio(texto: String): String? {
+        Regex("(19|20)\\d{2}").find(texto)?.let { return it.value }
+        // dd/mm/yy o dd-mm-yy → toma el último grupo de 2 dígitos como año.
+        Regex("\\b\\d{1,2}[/-]\\d{1,2}[/-](\\d{2})\\b").find(texto)?.let {
+            return "20${it.groupValues[1]}"
+        }
+        return null
     }
 
     private fun TipoEquipo.prefijoCodigo(): String = when (this) {

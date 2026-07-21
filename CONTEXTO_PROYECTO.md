@@ -171,6 +171,19 @@ con X por par). PDF: sección "FICHA TÉCNICA (PLACA)" en dos columnas bajo
 DATOS DEL EQUIPO (el generador recibe la ficha como parámetro; el estimado
 NO la guarda — se lee del equipo al generar).
 
+## Placa v3 — lectura robusta (jul 2026)
+Causa raíz del fallo previo (placas densas salían con 5 datos torcidos): Nano
+on-device topa a ~512 tokens de SALIDA; pedirle la ficha como JSON estructurado
+(lista anidada) reventaba el límite y fallaba en silencio → caía a OCR crudo.
+Fix (Google recomienda OCR→IA para documentos): `nanoOrganiza` ahora pide
+TEXTO PLANO "ETIQUETA: VALOR" (compacto, cabe en 512), no JSON. Se eliminaron
+las clases @Generable de placa (FichaPlacaLeida/CampoPlacaLeido); la salida
+tipada quedó SOLO para clientes (DatosClienteExtraidos). Lector determinista
+`parsearFicha` maneja tablas de 2 columnas (etiqueta:, valor en línea siguiente).
+Derivación arreglada: marca reconoce "Congelador/Refrigerador/…" + lista de
+marcas conocidas (Indurama, Mabe, LG…); año acepta 2 dígitos y fechas dd/mm/yy
+(01/02/24→2024); serie filtra a alfanumérico. Flujo: OCR→IA-texto→lector OCR.
+
 ## Placa v2 + tres partes del trabajo (jul 2026)
 - Estimado: sitioClienteId/sitioNombre (cliente final, mismo catálogo, picker
   reutilizado) + ordenTrabajo (nº O.T./contrato del contratante, clave en
