@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.checkingcontainer.android.hilt)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 // AppFunctions: agrega el registro agregado de funciones en el APK
@@ -92,6 +93,10 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:common"))
     implementation(project(":core:network"))
+
+    // Firebase Crashlytics: reporte de fallos en campo (BOM viene de core:network)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
 
     // AndroidX
     implementation(libs.androidx.core.ktx)

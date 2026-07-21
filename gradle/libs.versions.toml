@@ -1,13 +1,14 @@
 [versions]
 # Build tools
-agp = "9.2.1"
+agp = "9.3.0"
 javaxInject = "1"
 kotlin = "2.3.21"
 ksp = "2.3.9"
 
 # Firebase
-firebaseBom = "34.15.0"
+firebaseBom = "34.16.0"
 googleServices = "4.5.0"
+crashlyticsGradle = "3.0.7"
 
 # Android SDK
 compileSdk = "37"
@@ -150,6 +151,7 @@ firebase-bom      = { group = "com.google.firebase", name = "firebase-bom", vers
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-storage   = { group = "com.google.firebase", name = "firebase-storage" }
 firebase-auth      = { group = "com.google.firebase", name = "firebase-auth" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
 
 # Build-logic accessors — needed inside convention plugins so they can reference
 # AGP / Kotlin / KSP / Hilt Gradle plugins as runtime dependencies.
@@ -166,6 +168,7 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "crashlyticsGradle" }
 
 # Convention plugins exposed by build-logic/ (registered in
 # build-logic/convention/build.gradle.kts).

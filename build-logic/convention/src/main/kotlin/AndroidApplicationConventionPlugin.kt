@@ -27,7 +27,6 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     warningsAsErrors = false
                     abortOnError = true
                     checkDependencies = false
-                    textReport = true
                     disable += setOf("GradleDependency", "AndroidGradlePluginVersion")
                 }
             }

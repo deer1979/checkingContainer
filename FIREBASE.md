@@ -68,6 +68,13 @@ Requisitos en la consola (una sola vez):
 La sesión anónima persiste entre arranques (solo el primer arranque necesita
 red). Nunca caduca, a diferencia de las reglas del modo de prueba.
 
+## Crashlytics (reporte de fallos)
+
+La app envía los cierres inesperados a **Firebase Crashlytics**. Requisito en
+la consola (una sola vez): **Compilación → Crashlytics → Habilitar**. Tras el
+primer crash (o prueba) los reportes aparecen ahí con línea y modelo de equipo.
+Activo también en el APK debug (que es el que se usa en campo).
+
 ## Comportamiento offline-first
 
 - Todo se guarda primero en Room; luego se hace upsert a Firestore.

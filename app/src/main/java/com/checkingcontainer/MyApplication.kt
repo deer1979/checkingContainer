@@ -11,6 +11,7 @@ import coil3.memory.MemoryCache
 import coil3.request.crossfade
 import com.checkingcontainer.appfunctions.ContainerFunctions
 import com.checkingcontainer.core.network.AnonymousAuth
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -28,6 +29,11 @@ class MyApplication :
 
     override fun onCreate() {
         super.onCreate()
+        // Crashlytics captura los fallos no controlados automáticamente (instala
+        // su propio handler). Activo también en debug: el propietario usa el APK
+        // debug publicado por el CI, así que ahí es donde hay que ver los crashes.
+        FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = true
+
         // Sesión anónima de Firebase: requerida por las reglas de seguridad
         // (request.auth != null). Persiste entre arranques; sin red se
         // reintenta en el próximo arranque o login.

@@ -191,6 +191,19 @@ NO la guarda — se lee del equipo al generar).
   y MANT_CORRECTIVO también genera estimado (se cobra) — solo PREVENTIVO
   queda como visita de contrato sin estimado.
 
+## Estabilidad y crash reporting (jul 2026)
+- **Firebase Crashlytics** integrado (plugin `firebase-crashlytics` 3.0.7 +
+  `firebase-crashlytics` lib vía BOM). Init en `MyApplication.onCreate`:
+  `isCrashlyticsCollectionEnabled = true` SIEMPRE (el propietario usa el APK
+  DEBUG del CI — ahí hay que ver los crashes, no solo en release). Release
+  sube el mapping (deofuscación). Requiere activar Crashlytics una vez en la
+  consola Firebase.
+- Updates de estabilidad: AGP 9.2.1 → **9.3.0** (estable; quitado `textReport`
+  de los convention plugins, deprecado en 9.3), Firebase BOM 34.15 → **34.16.0**.
+- Auditoría de código: sin `!!` peligrosos (los 4 están guardados), costos con
+  `toDoubleOrNull`, 0 GlobalScope/runBlocking/Dispatchers.Main. Diferido:
+  Kotlin 2.4.x (mayor, validar KSP).
+
 ## ML Kit R41 / Structured Output (jul 2026)
 genai-prompt beta3 + genai-schema(-compiler) alpha1 (KSP). La extracción de
 clientes usa SALIDA TIPADA: `DatosClienteExtraidos` anotada con
