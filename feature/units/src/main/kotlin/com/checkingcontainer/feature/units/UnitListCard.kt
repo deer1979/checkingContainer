@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -40,6 +42,7 @@ import com.checkingcontainer.core.designsystem.theme.chipColors
 import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.InspStatus
 import com.checkingcontainer.core.model.InspectionWithEquipment
+import com.checkingcontainer.core.model.TipoEquipo
 import com.checkingcontainer.core.model.PtiInstruction
 
 @Composable
@@ -64,7 +67,18 @@ internal fun InspectionListItem(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ManufacturerLogo(equipment.brand)
+                // Solo los reefers muestran logo de marca (Carrier, etc.). Los
+                // demás equipos usan un icono genérico — no una marca de reefer.
+                if (equipment.tipoEquipo == TipoEquipo.REEFER) {
+                    ManufacturerLogo(equipment.brand)
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.AcUnit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
                 Text(
                     text = inspection.containerNo,
                     style = MaterialTheme.typography.titleMedium,
@@ -114,7 +128,10 @@ internal fun InspectionListItem(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = equipment.unitModel.ifBlank { "—" },
+                    // Reefer usa unitModel; otros equipos, marca + modelo de placa.
+                    text = equipment.unitModel
+                        .ifBlank { listOf(equipment.manufacturer, equipment.unitModelNo).filter { it.isNotBlank() }.joinToString(" · ") }
+                        .ifBlank { "—" },
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
