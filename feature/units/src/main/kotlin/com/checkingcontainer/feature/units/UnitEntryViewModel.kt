@@ -243,6 +243,7 @@ class UnitEntryViewModel @Inject constructor(
                         fichaTecnica = if (r.ficha.isNotEmpty()) r.ficha else s.fichaTecnica,
                         analizandoPlaca = false,
                         metodoLectura = "${r.ficha.size} datos leídos con ${r.metodo}",
+                        textoOcrDiag = r.textoOcr,
                     )
                 }
             }

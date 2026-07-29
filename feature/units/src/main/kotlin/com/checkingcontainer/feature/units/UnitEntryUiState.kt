@@ -21,6 +21,7 @@ data class UnitEntryUiState(
     val fotoPlacaUrl: String? = null,
     val analizandoPlaca: Boolean = false,
     val metodoLectura: String? = null,
+    val textoOcrDiag: String = "",
     val containerNo: String = "",
     val unitModelNo: String = "",
     val unitModel: String = "",

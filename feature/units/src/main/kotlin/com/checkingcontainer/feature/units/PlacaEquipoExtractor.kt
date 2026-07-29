@@ -22,6 +22,8 @@ internal data class ResultadoPlaca(
     val ficha: List<CampoFicha>,
     /** Con qué se leyó: "OCR + IA" / "OCR". */
     val metodo: String = "",
+    /** Texto crudo del OCR (diagnóstico temporal para afinar el lector). */
+    val textoOcr: String = "",
 )
 
 /**
@@ -40,6 +42,15 @@ internal data class ResultadoPlaca(
 internal object PlacaEquipoExtractor {
 
     private const val TAG = "PlacaEquipoExtractor"
+
+    /**
+     * Motivo cacheado del fallo de IA en ESTA sesión (proceso). Una vez que Nano
+     * falla (error 606 de AICore, no soportada, etc.), no vale la pena reintentar
+     * en cada escaneo — se va directo al OCR, más rápido. Se reinicia al relanzar
+     * la app, así que si Google arregla la IA vía sistema, se reactiva sola.
+     */
+    @Volatile
+    private var iaFalloSesion: String? = null
 
     private const val REGLAS =
         "You read identification data plates of refrigeration and air conditioning " +
@@ -63,13 +74,16 @@ internal object PlacaEquipoExtractor {
         //    se acabó fallar en silencio, la app dice exactamente qué pasó.
         val ficha = parsearFicha(textoOcr)
         Log.i(TAG, "Placa: solo OCR, ${ficha.size} pares (IA: $iaNota)")
-        return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "OCR · IA: $iaNota")
+        return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "OCR · IA: $iaNota", textoOcr)
     }
 
     // ── IA: organiza el texto del OCR en pares (SALIDA DE TEXTO PLANO) ───────
 
     /** Devuelve (pares, motivo). Si los pares son null, el motivo explica por qué. */
     private suspend fun nanoOrganiza(texto: String): Pair<List<CampoFicha>?, String> {
+        // Ya falló antes en esta sesión → no perder tiempo, directo al OCR.
+        iaFalloSesion?.let { return null to it }
+
         val estado = GeminiNanoOcr.estadoIa()
         if (estado != "AVAILABLE") {
             val nota = when (estado) {
@@ -78,6 +92,7 @@ internal object PlacaEquipoExtractor {
                 "UNAVAILABLE" -> "no soportada en este equipo"
                 else -> estado.lowercase()
             }
+            iaFalloSesion = nota
             return null to nota
         }
         val model = Generation.getClient()
@@ -100,7 +115,9 @@ internal object PlacaEquipoExtractor {
             if (pares.isEmpty()) null to "respuesta vacía" else pares to "ok"
         } catch (e: Exception) {
             Log.w(TAG, "Nano organizador falló (se usa lector OCR): ${e.message}")
-            null to "error: ${e.message?.take(40) ?: e.javaClass.simpleName}"
+            val nota = "error: ${e.message?.take(40) ?: e.javaClass.simpleName}"
+            iaFalloSesion = nota  // cachear: no reintentar en esta sesión
+            nota.let { null to it }
         } finally {
             runCatching { model.close() }
         }

@@ -158,6 +158,7 @@ fun UnitEntryScreen(
                     fotoUrl = state.fotoPlacaUrl,
                     analizando = state.analizandoPlaca,
                     metodo = state.metodoLectura,
+                    textoOcr = state.textoOcrDiag,
                     onFoto = onFotoPlaca,
                     onReanalizar = onReanalizarPlaca,
                 )
