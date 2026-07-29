@@ -155,47 +155,84 @@ internal object PlacaEquipoExtractor {
     )
 
     /**
-     * Lector determinista para cuando no hay IA. Maneja tres formas comunes en
-     * placas: "ETIQUETA: valor", "ETIQUETA:" con el valor en la línea siguiente
-     * (tablas de dos columnas que el OCR separa), y "ETIQUETA valor" cuando la
-     * primera palabra es una etiqueta conocida.
+     * Lector determinista para cuando no hay IA. Las placas de electrodoméstico
+     * son tablas de dos columnas y el OCR de ML Kit las lee traicioneramente:
+     * primero TODAS las etiquetas juntas y luego TODOS los valores juntos, y no
+     * siempre en el mismo orden. Emparejar por posición falla.
+     *
+     * Estrategia: reconocer cada valor por su UNIDAD FÍSICA (115V→Tensión,
+     * 60Hz→Frecuencia, R600a→Refrigerante…) y darle una etiqueta canónica en
+     * español, sin depender del orden ni de la etiqueta garabateada. Más las
+     * formas directas "ETIQUETA: valor", "ETIQUETA:" + valor con dígitos en la
+     * línea siguiente (serie, código), y "ETIQUETA valor" con etiqueta conocida.
      */
     private fun parsearFicha(texto: String): List<CampoFicha> {
         val lineas = texto.lines().map { it.trim() }.filter { it.isNotEmpty() }
-        val out = mutableListOf<CampoFicha>()
+        val orden = mutableListOf<String>()
+        val out = LinkedHashMap<String, String>()
+        fun add(etiqueta: String, valor: String) {
+            if (valor.isBlank() || etiqueta.isBlank()) return
+            if (!out.containsKey(etiqueta)) orden += etiqueta
+            out[etiqueta] = valor
+        }
+
         var i = 0
         while (i < lineas.size) {
             val line = lineas[i]
             val idx = line.indexOf(':')
             when {
-                // "ETIQUETA: valor" en la misma línea
-                idx > 0 && line.substring(idx + 1).isNotBlank() -> {
-                    val et = line.take(idx).trim()
-                    val v = line.substring(idx + 1).trim()
-                    if (et.length in 1..40) out += CampoFicha(et, v)
+                // "ETIQUETA: valor" en la misma línea.
+                idx in 1 until line.length - 1 && line.substring(idx + 1).isNotBlank() -> {
+                    add(line.take(idx).trim(), line.substring(idx + 1).trim())
                 }
-                // "ETIQUETA:" y el valor en la línea siguiente (dos columnas)
-                idx > 0 && line.substring(idx + 1).isBlank() && i + 1 < lineas.size -> {
-                    val et = line.take(idx).trim()
-                    val v = lineas[i + 1].trim()
-                    if (et.length in 1..40 && v.isNotEmpty() && !v.contains(':')) {
-                        out += CampoFicha(et, v); i++
-                    }
+                // "ETIQUETA:" y en la línea siguiente un valor CON DÍGITOS y sin
+                // dos puntos (serie, código). Evita emparejar etiqueta con etiqueta.
+                idx > 0 && line.substring(idx + 1).isBlank() && i + 1 < lineas.size &&
+                    lineas[i + 1].any { it.isDigit() } && !lineas[i + 1].endsWith(":") -> {
+                    add(line.take(idx).trim(), lineas[i + 1].trim()); i++
                 }
-                // "ETIQUETA valor" sin dos puntos, con etiqueta conocida
                 else -> {
-                    val partes = line.split(Regex("\\s+"), limit = 2)
-                    if (partes.size == 2) {
-                        val et = partes[0].trim('.', '#')
-                        if (ETIQUETAS_CONOCIDAS.any { it.equals(et, ignoreCase = true) }) {
-                            out += CampoFicha(et.uppercase(), partes[1].trim())
+                    // Valor con unidad física reconocible → etiqueta canónica.
+                    val canon = clasificarValor(line)
+                    if (canon != null) {
+                        add(canon.first, canon.second)
+                    } else {
+                        // "ETIQUETA valor" con etiqueta conocida — solo si el valor
+                        // TIENE dígitos (evita partir un rótulo de dos palabras como
+                        // "Capacidad de congelación:" tomando "de congelación:" de valor).
+                        val partes = line.split(Regex("\\s+"), limit = 2)
+                        if (partes.size == 2 && partes[1].any { it.isDigit() }) {
+                            val et = partes[0].trim('.', '#')
+                            if (ETIQUETAS_CONOCIDAS.any { it.equals(et, ignoreCase = true) }) {
+                                add(et.uppercase(), partes[1].trim())
+                            }
                         }
                     }
                 }
             }
             i++
         }
-        return out
+        return orden.map { CampoFicha(it, out.getValue(it)) }
+    }
+
+    /**
+     * Reconoce un valor suelto por su unidad y le pone etiqueta canónica en
+     * español. Corrige errores típicos del OCR (O↔0 en el refrigerante).
+     */
+    private fun clasificarValor(bruto: String): Pair<String, String>? {
+        val v = bruto.trim().trimEnd('.')
+        return when {
+            Regex("^R\\s?[0-9O]{3}[A-Za-z]?$").matches(v) ->
+                "Refrigerante" to ("R" + v.drop(1).replace("O", "0").replace("o", "0").replace(" ", ""))
+            Regex("^\\d{2,3}\\s?[Vv]$").matches(v) -> "Tensión" to v.replace(" ", "")
+            Regex("^\\d{2,3}\\s?[Hh][Zz]$").matches(v) -> "Frecuencia" to v.replace(" ", "")
+            Regex("^\\d{1,4}\\s?[Ww]$").matches(v) -> "Potencia" to v.replace(" ", "")
+            Regex("^[\\d.]+\\s?[Aa]$").matches(v) -> "Corriente" to v.replace(" ", "")
+            Regex("^[\\d.]+\\s?[Ll]itros?$").matches(v) -> "Volumen" to v
+            Regex("^[\\d.,]+\\s?kWh.*", RegexOption.IGNORE_CASE).matches(v) -> "Consumo de energía" to v
+            Regex("^[\\d.]+\\s?kg\\.?$", RegexOption.IGNORE_CASE).matches(v) -> "Capacidad" to v
+            else -> null
+        }
     }
 
     // ── Campos clave derivados de la ficha ──────────────────────────────────
@@ -225,10 +262,21 @@ internal object PlacaEquipoExtractor {
 
         buscar("model", "modelo", "mod.")?.let { out["Unit Model"] = it }
 
-        // Serie: primer token (no arrastrar REV ni fechas del mismo renglón).
+        // Serie: junta los grupos de dígitos contiguos (el OCR a veces mete un
+        // espacio: "19003012302 14" → "1900301230214") pero se DETIENE ante un
+        // token no numérico (así no arrastra "REV 5165" ni códigos de fecha).
         val serie = buscar("serial", "serie", "s/n", "ser no", "s.n", "número de serie")
-            ?.trim()?.split(Regex("\\s+"))?.firstOrNull()
-            ?.filter { it.isLetterOrDigit() || it == '-' }
+            ?.let { valor ->
+                val tokens = valor.trim().split(Regex("\\s+"))
+                buildString {
+                    for (t in tokens) {
+                        val limpio = t.filter { it.isLetterOrDigit() || it == '-' }
+                        if (limpio.all { it.isDigit() } && limpio.isNotEmpty()) append(limpio)
+                        else if (isEmpty() && limpio.any { it.isDigit() }) { append(limpio); break }
+                        else break
+                    }
+                }
+            }
         serie?.takeIf { it.length >= 3 }?.let { out["Unit Serial No."] = it.uppercase() }
 
         // Año: acepta 4 dígitos (2024) y también fechas con año de 2 dígitos
