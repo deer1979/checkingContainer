@@ -49,22 +49,37 @@ internal object PlacaEquipoExtractor {
         val textoOcr = runCatching { ocrTexto(context, uri) }.getOrDefault("")
 
         // 1. OCR + IA: Nano reorganiza el texto del OCR en pares (texto plano).
+        var iaNota = "sin texto OCR"
         if (textoOcr.isNotBlank()) {
-            runCatching { nanoOrganiza(textoOcr) }.getOrNull()?.let { ficha ->
+            val (ficha, razon) = nanoOrganiza(textoOcr)
+            iaNota = razon
+            if (ficha != null) {
                 Log.i(TAG, "Placa: OCR + IA, ${ficha.size} pares")
                 return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "OCR + IA")
             }
         }
         // 2. Sin IA (o si falló): lector determinista de tablas de dos columnas.
+        //    El motivo por el que la IA no corrió va en el método — DIAGNÓSTICO:
+        //    se acabó fallar en silencio, la app dice exactamente qué pasó.
         val ficha = parsearFicha(textoOcr)
-        Log.i(TAG, "Placa: solo OCR, ${ficha.size} pares")
-        return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "OCR")
+        Log.i(TAG, "Placa: solo OCR, ${ficha.size} pares (IA: $iaNota)")
+        return ResultadoPlaca(derivarCampos(ficha, tipo), ficha, "OCR · IA: $iaNota")
     }
 
     // ── IA: organiza el texto del OCR en pares (SALIDA DE TEXTO PLANO) ───────
 
-    private suspend fun nanoOrganiza(texto: String): List<CampoFicha>? {
-        if (!GeminiNanoOcr.isAvailable()) return null
+    /** Devuelve (pares, motivo). Si los pares son null, el motivo explica por qué. */
+    private suspend fun nanoOrganiza(texto: String): Pair<List<CampoFicha>?, String> {
+        val estado = GeminiNanoOcr.estadoIa()
+        if (estado != "AVAILABLE") {
+            val nota = when (estado) {
+                "DOWNLOADABLE" -> "modelo por descargar"
+                "DOWNLOADING" -> "descargando modelo"
+                "UNAVAILABLE" -> "no soportada en este equipo"
+                else -> estado.lowercase()
+            }
+            return null to nota
+        }
         val model = Generation.getClient()
         return try {
             val base = generateContentRequest(
@@ -81,10 +96,11 @@ internal object PlacaEquipoExtractor {
                 systemInstruction = SystemInstruction(REGLAS)
             }
             val salida = model.generateContent(base).candidates.firstOrNull()?.text.orEmpty()
-            parsearLineasEtiquetaValor(salida).ifEmpty { null }
+            val pares = parsearLineasEtiquetaValor(salida)
+            if (pares.isEmpty()) null to "respuesta vacía" else pares to "ok"
         } catch (e: Exception) {
             Log.w(TAG, "Nano organizador falló (se usa lector OCR): ${e.message}")
-            null
+            null to "error: ${e.message?.take(40) ?: e.javaClass.simpleName}"
         } finally {
             runCatching { model.close() }
         }

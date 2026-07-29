@@ -61,6 +61,26 @@ internal object GeminiNanoOcr {
     }
 
     /**
+     * Estado REAL de la IA local, para diagnóstico (que la app deje de fallar en
+     * silencio). Código corto: "AVAILABLE" (lista), "DOWNLOADABLE" (soportada,
+     * falta descargar el modelo), "DOWNLOADING", "UNAVAILABLE" (no soportada en
+     * este equipo) o "ERROR: <mensaje>".
+     */
+    suspend fun estadoIa(): String = runCatching {
+        val model = Generation.getClient()
+        try {
+            when (model.checkStatus()) {
+                FeatureStatus.AVAILABLE -> "AVAILABLE"
+                FeatureStatus.DOWNLOADABLE -> "DOWNLOADABLE"
+                FeatureStatus.DOWNLOADING -> "DOWNLOADING"
+                else -> "UNAVAILABLE"
+            }
+        } finally {
+            runCatching { model.close() }
+        }
+    }.getOrElse { "ERROR: ${it.message?.take(50) ?: it.javaClass.simpleName}" }
+
+    /**
      * Intenta leer el número de contenedor. Devuelve el número SOLO si pasa la
      * corrección posicional + dígito verificador ISO 6346; si no, `null`.
      */
