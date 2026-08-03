@@ -73,8 +73,12 @@ data class SensorsUiState(
     val tempSuccionRaw get() = valorPorRol(temperatura, SensorType.TEMPERATURA, RolMedicion.BAJA)
 
     // Saturación, superheat y subcooling (°C) calculados con la tabla del gas.
-    val satVaporC get() = Saturacion.satTempC(vapSatPressures, vapSatGas, YjackParser.aPsig(presionBajaRaw))
-    val satLiquidoC get() = Saturacion.satTempC(liqSatPressures, liqSatGas, YjackParser.aPsig(presionAltaRaw))
+    // OJO: la tabla PT (vapSatPressures/liqSatPressures) está en presión ABSOLUTA
+    // (psia), NO manométrica — por eso se pasa la presión cruda del sensor tal
+    // cual (también absoluta), sin restar la atmósfera. Con aPsig() antes se
+    // buscaba a ~0 y caía fuera de la tabla, dando "—" incluso conectado.
+    val satVaporC get() = Saturacion.satTempC(vapSatPressures, vapSatGas, presionBajaRaw)
+    val satLiquidoC get() = Saturacion.satTempC(liqSatPressures, liqSatGas, presionAltaRaw)
     val superheatC get() = Saturacion.superheat(YjackParser.aCelsius(tempSuccionRaw), satVaporC)
     val subcoolingC get() = Saturacion.subcooling(satLiquidoC, YjackParser.aCelsius(tempDescargaRaw))
 

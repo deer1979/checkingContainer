@@ -490,7 +490,13 @@ class EstimadoViewModel @Inject constructor(
 
     fun generateAndSharePdf() {
         val current = _state.value
-        if (current.estimadoId == 0L || current.damages.isEmpty()) return
+        // Antes exigía daños; ahora también genera si solo hay mediciones (un
+        // mantenimiento puede ser solo lecturas del manómetro, sin ítems de daño).
+        if (current.estimadoId == 0L ||
+            (current.damages.isEmpty() && current.mediciones.isEmpty())
+        ) {
+            return
+        }
         viewModelScope.launch {
             _state.update { it.copy(isGeneratingPdf = true, errorMessage = null) }
             val estimado = Estimado(
