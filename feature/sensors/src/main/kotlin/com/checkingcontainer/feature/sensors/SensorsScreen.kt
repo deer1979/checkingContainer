@@ -194,6 +194,23 @@ private fun SensorsScreen(
                     CardRendimiento(COLOR_ALTA, "Alta / Descarga", "Sat. líquido", state.satLiquidoC, "Subcooling", state.subcoolingC)
                 }
             }
+
+            // Diagnóstico de campo (temporal): todo lo que la app recibe y calcula.
+            if (state.hayDatos) {
+                item(key = "h-diag") { SeccionTitulo("Diagnóstico (temporal)") }
+                item(key = "diag") {
+                    ElevatedCard(Modifier.fillMaxWidth()) {
+                        androidx.compose.foundation.text.selection.SelectionContainer {
+                            Text(
+                                state.diagnostico(),
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -77,6 +77,27 @@ data class SensorsUiState(
     val satLiquidoC get() = Saturacion.satTempC(liqSatPressures, liqSatGas, YjackParser.aPsig(presionAltaRaw))
     val superheatC get() = Saturacion.superheat(YjackParser.aCelsius(tempSuccionRaw), satVaporC)
     val subcoolingC get() = Saturacion.subcooling(satLiquidoC, YjackParser.aCelsius(tempDescargaRaw))
+
+    /**
+     * Diagnóstico de campo (temporal): TODO lo que la app recibe y calcula, para
+     * ver por qué no salen temperatura/saturación sin adivinar.
+     */
+    fun diagnostico(): String {
+        fun d(v: Double) = if (v == SensorReading.SIN_DATO) "SIN_DATO" else "%.2f".format(v)
+        val sb = StringBuilder()
+        sb.appendLine("Refrigerante: '$refrigerante'")
+        sb.appendLine("Tabla gas: vapSat=${vapSatGas.size} liqSat=${liqSatGas.size} ejes=${vapSatPressures.size}/${liqSatPressures.size}")
+        sb.appendLine("Sensores detectados: ${tarjetas.size}")
+        tarjetas.values.forEach { t ->
+            sb.appendLine("• ${t.deviceName} [${t.ultima.type}] v1=${d(t.ultima.valor1)} v2=${d(t.ultima.valor2)} v3=${d(t.ultima.valor3)} bat=${t.ultima.bateria}")
+        }
+        sb.appendLine("— Presión ALTA(raw)=${d(presionAltaRaw)} → psig=${d(YjackParser.aPsig(presionAltaRaw))}")
+        sb.appendLine("— Presión BAJA(raw)=${d(presionBajaRaw)} → psig=${d(YjackParser.aPsig(presionBajaRaw))}")
+        sb.appendLine("— Temp descarga(raw)=${d(tempDescargaRaw)}  succión(raw)=${d(tempSuccionRaw)}")
+        sb.appendLine("— Sat vapor=${d(satVaporC)}  Sat líquido=${d(satLiquidoC)}")
+        sb.appendLine("— Superheat=${d(superheatC)}  Subcooling=${d(subcoolingC)}")
+        return sb.toString().trim()
+    }
 }
 
 @HiltViewModel
