@@ -4,7 +4,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.EstimadosRepository
+import com.checkingcontainer.core.model.DiagnosticoRefrigeracion
 import com.checkingcontainer.core.model.MedicionSnapshot
+import com.checkingcontainer.core.model.Observacion
+import com.checkingcontainer.core.model.ObjetivoRefrigeracion
+import com.checkingcontainer.core.model.ObjetivosEfectivos
+import com.checkingcontainer.core.model.RangoObjetivo
+import com.checkingcontainer.core.model.TipoExpansion
 import com.checkingcontainer.feature.sensors.navigation.SENSORS_CONTAINER_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -39,6 +45,9 @@ data class SensorsUiState(
     val liqSatPressures: List<Double> = emptyList(),
     val vapSatGas: List<Int> = emptyList(),
     val liqSatGas: List<Int> = emptyList(),
+    // Dispositivo de expansión + objetivo (automático por dispositivo, reajustable a mano).
+    val tipoExpansion: TipoExpansion = TipoExpansion.NO_ESPECIFICADO,
+    val objetivoManual: RangoObjetivo? = null,
     // Captura hacia el estimado abierto del contenedor
     val capturando: Boolean = false,
     val capturaMensaje: String? = null,
@@ -92,26 +101,25 @@ data class SensorsUiState(
             satVaporC == SensorReading.SIN_DATO &&
             satLiquidoC == SensorReading.SIN_DATO
 
-    /**
-     * Diagnóstico de campo (temporal): TODO lo que la app recibe y calcula, para
-     * ver por qué no salen temperatura/saturación sin adivinar.
-     */
-    fun diagnostico(): String {
-        fun d(v: Double) = if (v == SensorReading.SIN_DATO) "SIN_DATO" else "%.2f".format(v)
-        val sb = StringBuilder()
-        sb.appendLine("Refrigerante: '$refrigerante'")
-        sb.appendLine("Tabla gas: vapSat=${vapSatGas.size} liqSat=${liqSatGas.size} ejes=${vapSatPressures.size}/${liqSatPressures.size}")
-        sb.appendLine("Sensores detectados: ${tarjetas.size}")
-        tarjetas.values.forEach { t ->
-            sb.appendLine("• ${t.deviceName} [${t.ultima.type}] v1=${d(t.ultima.valor1)} v2=${d(t.ultima.valor2)} v3=${d(t.ultima.valor3)} bat=${t.ultima.bateria}")
-        }
-        sb.appendLine("— Presión ALTA(raw)=${d(presionAltaRaw)} → psig=${d(YjackParser.aPsig(presionAltaRaw))}")
-        sb.appendLine("— Presión BAJA(raw)=${d(presionBajaRaw)} → psig=${d(YjackParser.aPsig(presionBajaRaw))}")
-        sb.appendLine("— Temp descarga(raw)=${d(tempDescargaRaw)}  succión(raw)=${d(tempSuccionRaw)}")
-        sb.appendLine("— Sat vapor=${d(satVaporC)}  Sat líquido=${d(satLiquidoC)}")
-        sb.appendLine("— Superheat=${d(superheatC)}  Subcooling=${d(subcoolingC)}")
-        return sb.toString().trim()
-    }
+    // Recalentamiento / subenfriamiento en null cuando no hay dato (para el diagnóstico).
+    private val recalentamientoONull get() = superheatC.oNull()
+    private val subenfriamientoONull get() = subcoolingC.oNull()
+
+    /** Rangos objetivo efectivos (automáticos por dispositivo o el ajuste manual). */
+    val objetivos: ObjetivosEfectivos
+        get() = ObjetivoRefrigeracion.efectivos(tipoExpansion, objetivoManual)
+
+    /** Diagnóstico técnico en vivo (mismo cálculo que va al PDF). */
+    val observacion: Observacion
+        get() = DiagnosticoRefrigeracion.evaluar(
+            tipoExpansion, recalentamientoONull, subenfriamientoONull, objetivos,
+        )
+
+    /** true/false/null (sin dato u objetivo) según el recalentamiento caiga en rango. */
+    val recalentamientoEnRango: Boolean?
+        get() = objetivos.recalentamiento?.let { r -> recalentamientoONull?.let { r.contiene(it) } }
+    val subenfriamientoEnRango: Boolean?
+        get() = objetivos.subenfriamiento?.let { r -> subenfriamientoONull?.let { r.contiene(it) } }
 }
 
 @HiltViewModel
@@ -149,6 +157,22 @@ class SensorsViewModel @Inject constructor(
                 liqSatGas = gas?.liqSat ?: emptyList(),
             )
         }
+    }
+
+    /** Cambia el dispositivo de expansión (define cómo se interpreta la medición). */
+    fun seleccionarTipoExpansion(tipo: TipoExpansion) {
+        _state.update { it.copy(tipoExpansion = tipo) }
+    }
+
+    /** Ajuste manual del objetivo del parámetro guía (según el manual del equipo). */
+    fun ajustarObjetivo(min: Double, max: Double) {
+        if (min.isNaN() || max.isNaN() || max < min) return
+        _state.update { it.copy(objetivoManual = RangoObjetivo(min, max)) }
+    }
+
+    /** Vuelve al objetivo automático por dispositivo. */
+    fun limpiarObjetivoManual() {
+        _state.update { it.copy(objetivoManual = null) }
     }
 
     fun toggleEscaneo() {
@@ -220,6 +244,9 @@ class SensorsViewModel @Inject constructor(
                 tempSuccionC = YjackParser.aCelsius(s.tempSuccionRaw).oNull(),
                 tempDescargaC = YjackParser.aCelsius(s.tempDescargaRaw).oNull(),
                 corrienteA = s.corriente?.ultima?.valor1.oNull(),
+                tipoExpansion = s.tipoExpansion,
+                objetivoMinC = s.objetivoManual?.min,
+                objetivoMaxC = s.objetivoManual?.max,
                 dispositivos = s.tarjetas.values.map { it.deviceName }.distinct(),
             )
             val ok = runCatching { estimadosRepo.addMedicion(s.containerNo, snapshot) }

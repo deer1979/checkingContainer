@@ -54,6 +54,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.checkingcontainer.core.model.Observacion
+import com.checkingcontainer.core.model.ObjetivosEfectivos
+import com.checkingcontainer.core.model.ParametroGuia
+import com.checkingcontainer.core.model.Severidad
+import com.checkingcontainer.core.model.TipoExpansion
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -82,6 +87,9 @@ fun SensorsRoute(
         onToggleScan = { launcher.launch(permisos) },
         onToggleRol = viewModel::toggleRol,
         onRefrigeranteChange = viewModel::seleccionarRefrigerante,
+        onTipoExpansionChange = viewModel::seleccionarTipoExpansion,
+        onAjustarObjetivo = viewModel::ajustarObjetivo,
+        onLimpiarObjetivo = viewModel::limpiarObjetivoManual,
         onCapturar = viewModel::capturarParaEstimado,
         onMensajeMostrado = viewModel::consumirMensajeCaptura,
     )
@@ -95,6 +103,9 @@ private fun SensorsScreen(
     onToggleScan: () -> Unit,
     onToggleRol: (String, SensorType, Int) -> Unit,
     onRefrigeranteChange: (String) -> Unit,
+    onTipoExpansionChange: (TipoExpansion) -> Unit = {},
+    onAjustarObjetivo: (Double, Double) -> Unit = { _, _ -> },
+    onLimpiarObjetivo: () -> Unit = {},
     onCapturar: () -> Unit = {},
     onMensajeMostrado: () -> Unit = {},
 ) {
@@ -188,11 +199,46 @@ private fun SensorsScreen(
                     SelectorRefrigerante(state.refrigerantes, state.refrigerante, onRefrigeranteChange)
                 }
             }
+            // Dispositivo de expansión: define cuál parámetro es la guía y el objetivo.
+            item(key = "expansion") {
+                SelectorExpansion(
+                    tipo = state.tipoExpansion,
+                    objetivos = state.objetivos,
+                    objetivoManual = state.objetivoManual,
+                    onTipoChange = onTipoExpansionChange,
+                    onAjustar = onAjustarObjetivo,
+                    onLimpiar = onLimpiarObjetivo,
+                )
+            }
             item(key = "rend") {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CardRendimiento(COLOR_BAJA, "Baja / Succión", "Sat. vapor", state.satVaporC, "Superheat", state.superheatC)
-                    CardRendimiento(COLOR_ALTA, "Alta / Descarga", "Sat. líquido", state.satLiquidoC, "Subcooling", state.subcoolingC)
+                    CardRendimiento(
+                        color = COLOR_BAJA,
+                        titulo = "Baja / Succión",
+                        etiquetaSat = "Sat. vapor",
+                        satC = state.satVaporC,
+                        etiquetaCalc = "Superheat",
+                        calcC = state.superheatC,
+                        objetivo = state.objetivos.recalentamiento,
+                        enRango = state.recalentamientoEnRango,
+                        esGuia = state.objetivos.guia == ParametroGuia.RECALENTAMIENTO,
+                    )
+                    CardRendimiento(
+                        color = COLOR_ALTA,
+                        titulo = "Alta / Descarga",
+                        etiquetaSat = "Sat. líquido",
+                        satC = state.satLiquidoC,
+                        etiquetaCalc = "Subcooling",
+                        calcC = state.subcoolingC,
+                        objetivo = state.objetivos.subenfriamiento,
+                        enRango = state.subenfriamientoEnRango,
+                        esGuia = state.objetivos.guia == ParametroGuia.SUBENFRIAMIENTO,
+                    )
                 }
+            }
+            // Diagnóstico técnico automático (mismo que va al PDF).
+            if (state.hayDatos && state.tipoExpansion != TipoExpansion.NO_ESPECIFICADO) {
+                item(key = "diag") { BannerObservacion(state.observacion) }
             }
             if (state.presionFueraDeRango) {
                 item(key = "hint-presion") {
@@ -205,23 +251,132 @@ private fun SensorsScreen(
                     )
                 }
             }
+        }
+    }
+}
 
-            // Diagnóstico de campo (temporal): todo lo que la app recibe y calcula.
-            if (state.hayDatos) {
-                item(key = "h-diag") { SeccionTitulo("Diagnóstico (temporal)") }
-                item(key = "diag") {
-                    ElevatedCard(Modifier.fillMaxWidth()) {
-                        androidx.compose.foundation.text.selection.SelectionContainer {
-                            Text(
-                                state.diagnostico(),
-                                modifier = Modifier.padding(12.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            )
+/**
+ * Selector de dispositivo de expansión + objetivo del parámetro guía. El objetivo
+ * sale automático por dispositivo y se puede reajustar a mano (manual del equipo).
+ */
+@Composable
+private fun SelectorExpansion(
+    tipo: TipoExpansion,
+    objetivos: ObjetivosEfectivos,
+    objetivoManual: com.checkingcontainer.core.model.RangoObjetivo?,
+    onTipoChange: (TipoExpansion) -> Unit,
+    onAjustar: (Double, Double) -> Unit,
+    onLimpiar: () -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    var dialogo by remember { mutableStateOf(false) }
+    val rangoGuia = objetivos.rangoGuia()
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Expansión", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                Box {
+                    TextButton(onClick = { menu = true }) {
+                        Text(tipo.abreviatura, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = "Elegir dispositivo de expansión")
+                    }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        TipoExpansion.entries.filter { it != TipoExpansion.NO_ESPECIFICADO }.forEach { t ->
+                            DropdownMenuItem(text = { Text(t.label) }, onClick = { onTipoChange(t); menu = false })
                         }
                     }
                 }
             }
+            if (tipo == TipoExpansion.NO_ESPECIFICADO) {
+                Text(
+                    "Selecciona el dispositivo para ver el objetivo y el diagnóstico.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                val guiaTxt = if (objetivos.guia == ParametroGuia.SUBENFRIAMIENTO) "Subcooling" else "Superheat"
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Objetivo $guiaTxt: ${rangoGuia?.etiqueta() ?: "—"}" +
+                            if (objetivoManual != null) "  (manual)" else "  (auto)",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    if (objetivoManual != null) {
+                        TextButton(onClick = onLimpiar) { Text("Auto") }
+                    }
+                    TextButton(onClick = { dialogo = true }) { Text("Ajustar") }
+                }
+            }
+        }
+    }
+    if (dialogo) {
+        DialogoObjetivo(
+            inicial = rangoGuia,
+            onConfirmar = { min, max -> onAjustar(min, max); dialogo = false },
+            onCancelar = { dialogo = false },
+        )
+    }
+}
+
+/** Diálogo mínimo para ajustar el rango objetivo (mín/máx en °C). */
+@Composable
+private fun DialogoObjetivo(
+    inicial: com.checkingcontainer.core.model.RangoObjetivo?,
+    onConfirmar: (Double, Double) -> Unit,
+    onCancelar: () -> Unit,
+) {
+    var minTxt by remember { mutableStateOf(inicial?.min?.let { fmt(it) } ?: "") }
+    var maxTxt by remember { mutableStateOf(inicial?.max?.let { fmt(it) } ?: "") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onCancelar,
+        title = { Text("Ajustar objetivo (°C)") },
+        text = {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = minTxt,
+                    onValueChange = { minTxt = it.replace(',', '.') },
+                    label = { Text("Mín") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                androidx.compose.material3.OutlinedTextField(
+                    value = maxTxt,
+                    onValueChange = { maxTxt = it.replace(',', '.') },
+                    label = { Text("Máx") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val min = minTxt.toDoubleOrNull()
+                val max = maxTxt.toDoubleOrNull()
+                if (min != null && max != null && max >= min) onConfirmar(min, max)
+            }) { Text("Guardar") }
+        },
+        dismissButton = { TextButton(onClick = onCancelar) { Text("Cancelar") } },
+    )
+}
+
+/** Banner de diagnóstico coloreado por severidad (verde OK · ámbar alerta · gris info). */
+@Composable
+private fun BannerObservacion(observacion: Observacion) {
+    val (bg, icono) = when (observacion.severidad) {
+        Severidad.OK -> Color(0xFF2E7D32) to "✅"
+        Severidad.ALERTA -> Color(0xFFE65100) to "⚠️"
+        Severidad.INFO -> MaterialTheme.colorScheme.surfaceVariant to "ℹ️"
+    }
+    val fg = if (observacion.severidad == Severidad.INFO) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
+    ElevatedCard(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = bg),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(icono, style = MaterialTheme.typography.bodyMedium)
+            Text(observacion.texto, style = MaterialTheme.typography.bodySmall, color = fg)
         }
     }
 }
@@ -247,7 +402,11 @@ private fun SelectorRefrigerante(
     }
 }
 
-/** Tarjeta de rendimiento por lado: temp de saturación + cálculo (superheat/subcooling). */
+/**
+ * Tarjeta de rendimiento por lado: temp de saturación + cálculo (superheat/subcooling),
+ * con el objetivo del dispositivo y un indicador dentro/fuera de rango. El parámetro
+ * GUÍA (según el dispositivo) se marca con una estrella.
+ */
 @Composable
 private fun RowScope.CardRendimiento(
     color: Color,
@@ -256,6 +415,9 @@ private fun RowScope.CardRendimiento(
     satC: Double,
     etiquetaCalc: String,
     calcC: Double,
+    objetivo: com.checkingcontainer.core.model.RangoObjetivo?,
+    enRango: Boolean?,
+    esGuia: Boolean,
 ) {
     ElevatedCard(
         modifier = Modifier.weight(1f),
@@ -264,8 +426,30 @@ private fun RowScope.CardRendimiento(
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(titulo, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
             Text("$etiquetaSat: ${fmt(satC)} °C", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
-            Text(etiquetaCalc, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.9f))
-            Text("${fmt(calcC)} °C", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(
+                etiquetaCalc + if (esGuia) "  ★" else "",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.9f),
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("${fmt(calcC)} °C", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                if (enRango != null) {
+                    Text(
+                        if (enRango) "  ✔" else "  ✕",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (enRango) Color(0xFFB9F6CA) else Color(0xFFFFD180),
+                        modifier = Modifier.padding(bottom = 2.dp),
+                    )
+                }
+            }
+            if (objetivo != null) {
+                Text(
+                    "Obj: ${objetivo.etiqueta()}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            }
         }
     }
 }

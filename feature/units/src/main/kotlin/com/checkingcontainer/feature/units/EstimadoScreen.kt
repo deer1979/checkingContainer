@@ -98,10 +98,13 @@ import coil3.request.ImageRequest
 import java.io.File
 import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
+import com.checkingcontainer.core.model.DiagnosticoRefrigeracion
 import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.EstimadoTotals
 import com.checkingcontainer.core.model.MAX_FOTOS_POR_GRUPO
 import com.checkingcontainer.core.model.MedicionSnapshot
+import com.checkingcontainer.core.model.Severidad
+import com.checkingcontainer.core.model.TipoExpansion
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -1307,20 +1310,32 @@ private fun MedicionRow(
             }
         }
         Text(
-            "ALTA ${medicion.presionAltaPsig.fmtMedicion(0)} psig · sat ${medicion.satLiquidoC.fmtMedicion()} °C" +
-                " · SC ${medicion.subcoolingC.fmtMedicion()} K",
+            "ALTA ${medicion.presionAltaPsig.fmtMedicion(0)} psi · temp ${medicion.tempDescargaC.fmtMedicion()} °C" +
+                " · sat ${medicion.satLiquidoC.fmtMedicion()} °C · SC ${medicion.subcoolingC.fmtMedicion()} °C",
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
-            "BAJA ${medicion.presionBajaPsig.fmtMedicion(0)} psig · sat ${medicion.satVaporC.fmtMedicion()} °C" +
-                " · SH ${medicion.superheatC.fmtMedicion()} K",
+            "BAJA ${medicion.presionBajaPsig.fmtMedicion(0)} psi · temp ${medicion.tempSuccionC.fmtMedicion()} °C" +
+                " · sat ${medicion.satVaporC.fmtMedicion()} °C · SH ${medicion.superheatC.fmtMedicion()} °C",
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
-            "Corriente ${medicion.corrienteA.fmtMedicion()} A" +
-                if (medicion.dispositivos.isNotEmpty()) " · ${medicion.dispositivos.joinToString(", ")}" else "",
+            buildString {
+                append("Corriente ${medicion.corrienteA.fmtMedicion()} A")
+                if (medicion.tipoExpansion != TipoExpansion.NO_ESPECIFICADO) append(" · ${medicion.tipoExpansion.abreviatura}")
+                if (medicion.dispositivos.isNotEmpty()) append(" · ${medicion.dispositivos.joinToString(", ")}")
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (medicion.tipoExpansion != TipoExpansion.NO_ESPECIFICADO) {
+            val obs = remember(medicion) { DiagnosticoRefrigeracion.evaluar(medicion) }
+            val color = when (obs.severidad) {
+                Severidad.OK -> Color(0xFF2E7D32)
+                Severidad.ALERTA -> Color(0xFFE65100)
+                Severidad.INFO -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Text(obs.texto, style = MaterialTheme.typography.labelSmall, color = color)
+        }
     }
 }

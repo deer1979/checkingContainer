@@ -7,6 +7,7 @@ import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.MedicionSnapshot
+import com.checkingcontainer.core.model.TipoExpansion
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -179,6 +180,10 @@ private fun parseMediciones(json: String): List<MedicionSnapshot> = buildList {
                 tempSuccionC = obj.optDoubleOrNull("tempSuccionC"),
                 tempDescargaC = obj.optDoubleOrNull("tempDescargaC"),
                 corrienteA = obj.optDoubleOrNull("corrienteA"),
+                tipoExpansion = runCatching { TipoExpansion.valueOf(obj.optString("tipoExpansion")) }
+                    .getOrDefault(TipoExpansion.NO_ESPECIFICADO),
+                objetivoMinC = obj.optDoubleOrNull("objetivoMinC"),
+                objetivoMaxC = obj.optDoubleOrNull("objetivoMaxC"),
                 dispositivos = obj.optJSONArray("dispositivos")?.let { d ->
                     buildList { repeat(d.length()) { j -> d.optString(j).takeIf { it.isNotEmpty() }?.let { add(it) } } }
                 } ?: emptyList(),
@@ -206,6 +211,9 @@ private fun List<MedicionSnapshot>.medicionesToJson(): String {
                 put("tempSuccionC", m.tempSuccionC ?: JSONObject.NULL)
                 put("tempDescargaC", m.tempDescargaC ?: JSONObject.NULL)
                 put("corrienteA", m.corrienteA ?: JSONObject.NULL)
+                put("tipoExpansion", m.tipoExpansion.name)
+                put("objetivoMinC", m.objetivoMinC ?: JSONObject.NULL)
+                put("objetivoMaxC", m.objetivoMaxC ?: JSONObject.NULL)
                 put("dispositivos", JSONArray(m.dispositivos))
             },
         )

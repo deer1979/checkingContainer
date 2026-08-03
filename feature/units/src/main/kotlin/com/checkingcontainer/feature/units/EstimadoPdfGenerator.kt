@@ -16,8 +16,13 @@ import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import com.checkingcontainer.core.model.CampoFicha
+import com.checkingcontainer.core.model.DiagnosticoRefrigeracion
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoTotals
+import com.checkingcontainer.core.model.ObjetivoRefrigeracion
+import com.checkingcontainer.core.model.ParametroGuia
+import com.checkingcontainer.core.model.Severidad
+import com.checkingcontainer.core.model.TipoExpansion
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -261,27 +266,102 @@ class EstimadoPdfGenerator @Inject constructor(
             fun num(v: Double?, dec: Int = 1): String =
                 v?.let { String.format(Locale.US, "%.${dec}f", it) } ?: "—"
 
-            checkBreak(12f + estimado.mediciones.size.coerceAtMost(2) * 52f)
+            // ── Paints y colores de la tabla de mediciones ──────────────────
+            val cRojo = 0xFFC62828.toInt()      // ALTA / descarga / líquido (cálido)
+            val cAzul = 0xFF0277BD.toInt()      // BAJA / succión / vapor (frío)
+            val cRojoTenue = 0xFFFCE9E7.toInt()
+            val cAzulTenue = 0xFFE3F2FD.toInt()
+            val cGrisFila = 0xFFF5F5F5.toInt()
+            val pCellHdr = TextPaint().apply { color = Color.WHITE; textSize = 8.5f; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true }
+            val pCellLbl = TextPaint().apply { color = 0xFF555555.toInt(); textSize = 9f; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true }
+            val pCellVal = TextPaint().apply { color = 0xFF222222.toInt(); textSize = 9.5f; isAntiAlias = true }
+
+            fun fillRect(x0: Float, y0: Float, x1: Float, y1: Float, c: Int) =
+                canvas.drawRect(RectF(x0, y0, x1, y1), Paint().apply { color = c; style = Paint.Style.FILL })
+
+            fun centrado(text: String, cx: Float, baseY: Float, p: TextPaint) =
+                canvas.drawText(text, cx - p.measureText(text) / 2f, baseY, p)
+
+            // Geometría de la tabla: columna de etiqueta + dos columnas (ALTA/BAJA).
+            val labelW = 96f
+            val cellW = (contentW - labelW) / 2f
+            val xLbl = margin
+            val xAlta = margin + labelW
+            val xBaja = xAlta + cellW
+            val xEnd = xBaja + cellW
+            val rowH = 15f
+
             canvas.drawText("MEDICIONES DEL EQUIPO", margin, y, pSection); y += 12f
 
             estimado.mediciones.forEach { m ->
-                // Bloque de una captura: cabecera + 3 líneas. Se mantiene junto.
-                checkBreak(52f)
+                val objetivos = ObjetivoRefrigeracion.efectivos(m.tipoExpansion, m.objetivoManual())
+                val obs = DiagnosticoRefrigeracion.evaluar(m)
+                val diagH = measureHeight(obs.texto, pBody, contentW - 24f) + 8f
+                // Todo el bloque de una captura se mantiene junto (cabecera + tabla + diagnóstico).
+                checkBreak(12f + rowH * 6 + diagH + 14f)
+
+                // Cabecera: fecha · gas · dispositivo de expansión · medidores.
                 val cab = sdfHora.format(Date(m.timestamp)) +
                     (if (m.refrigerante.isNotEmpty()) "  ·  ${m.refrigerante}" else "") +
+                    (if (m.tipoExpansion != TipoExpansion.NO_ESPECIFICADO) "  ·  ${m.tipoExpansion.abreviatura}" else "") +
                     (if (m.dispositivos.isNotEmpty()) "  ·  ${m.dispositivos.joinToString(", ")}" else "")
                 canvas.drawText(cab, margin, y, pLabel); y += 12f
-                canvas.drawText(
-                    "ALTA  ${num(m.presionAltaPsig, 0)} psig    Sat. líquido ${num(m.satLiquidoC)} °C    " +
-                        "Subcooling ${num(m.subcoolingC)} K",
-                    margin + 8f, y, pBody,
-                ); y += 12f
-                canvas.drawText(
-                    "BAJA  ${num(m.presionBajaPsig, 0)} psig    Sat. vapor ${num(m.satVaporC)} °C    " +
-                        "Superheat ${num(m.superheatC)} K",
-                    margin + 8f, y, pBody,
-                ); y += 12f
-                canvas.drawText("Corriente  ${num(m.corrienteA)} A", margin + 8f, y, pBody); y += 16f
+
+                // Fila de encabezado con las dos columnas coloreadas.
+                fillRect(xAlta, y - rowH + 4f, xBaja, y + 4f, cRojo)
+                fillRect(xBaja, y - rowH + 4f, xEnd, y + 4f, cAzul)
+                centrado("ALTA / Descarga", (xAlta + xBaja) / 2f, y, pCellHdr)
+                centrado("BAJA / Succión", (xBaja + xEnd) / 2f, y, pCellHdr)
+                y += rowH
+
+                // Una fila de datos: etiqueta + valor ALTA + valor BAJA, con tinte de columna.
+                fun filaDatos(etiqueta: String, valAlta: String, valBaja: String, guia: Boolean = false) {
+                    fillRect(xLbl, y - rowH + 4f, xAlta, y + 4f, cGrisFila)
+                    fillRect(xAlta, y - rowH + 4f, xBaja, y + 4f, cRojoTenue)
+                    fillRect(xBaja, y - rowH + 4f, xEnd, y + 4f, cAzulTenue)
+                    canvas.drawText(etiqueta + if (guia) "  ★" else "", xLbl + 4f, y, pCellLbl)
+                    centrado(valAlta, (xAlta + xBaja) / 2f, y, pCellVal)
+                    centrado(valBaja, (xBaja + xEnd) / 2f, y, pCellVal)
+                    y += rowH
+                }
+
+                val guiaSH = objetivos.guia == ParametroGuia.RECALENTAMIENTO
+                val guiaSC = objetivos.guia == ParametroGuia.SUBENFRIAMIENTO
+                filaDatos("Presión", "${num(m.presionAltaPsig, 0)} psi", "${num(m.presionBajaPsig, 0)} psi")
+                filaDatos("Temperatura", "${num(m.tempDescargaC)} °C", "${num(m.tempSuccionC)} °C")
+                filaDatos("Saturación", "${num(m.satLiquidoC)} °C", "${num(m.satVaporC)} °C")
+                filaDatos("Subcool / Superheat", "${num(m.subcoolingC)} °C", "${num(m.superheatC)} °C", guia = guiaSH || guiaSC)
+
+                // Fila corriente + objetivo (ancho completo bajo la tabla).
+                val guiaNombre = when (objetivos.guia) {
+                    ParametroGuia.SUBENFRIAMIENTO -> "Subcooling"
+                    ParametroGuia.RECALENTAMIENTO -> "Superheat"
+                    ParametroGuia.NINGUNO -> ""
+                }
+                val objTxt = objetivos.rangoGuia()?.let { "Objetivo $guiaNombre: ${it.etiqueta()}" }
+                    ?: "Objetivo: seleccione dispositivo de expansión"
+                canvas.drawText("Corriente  ${num(m.corrienteA)} A", xLbl + 4f, y + rowH - 4f, pBody)
+                canvas.drawText(objTxt, xBaja - 40f, y + rowH - 4f, pBody)
+                y += rowH + 2f
+
+                // Diagnóstico técnico: caja coloreada por severidad con la observación.
+                val bgDiag = when (obs.severidad) {
+                    Severidad.OK -> 0xFFE8F5E9.toInt()
+                    Severidad.ALERTA -> 0xFFFFF3E0.toInt()
+                    Severidad.INFO -> 0xFFF5F5F5.toInt()
+                }
+                val icono = when (obs.severidad) {
+                    Severidad.OK -> "OK  "
+                    Severidad.ALERTA -> "! "
+                    Severidad.INFO -> "i  "
+                }
+                val txtDiag = icono + obs.texto
+                val hDiag = measureHeight(txtDiag, pBody, contentW - 16f)
+                val topDiag = y
+                fillRect(margin, topDiag, pageW - margin, topDiag + hDiag + 14f, bgDiag)
+                y += 9f
+                drawMultiline(txtDiag, pBody, contentW - 16f, margin + 8f)
+                y = topDiag + hDiag + 14f + 6f
             }
 
             y += 4f; hLine(); y += 12f

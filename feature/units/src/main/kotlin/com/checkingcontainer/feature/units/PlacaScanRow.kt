@@ -55,26 +55,6 @@ internal fun PlacaScanRow(
 ) {
     val context = LocalContext.current
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
-    var verTextoOcr by remember { mutableStateOf(false) }
-
-    if (verTextoOcr) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { verTextoOcr = false },
-            title = { Text("Texto leído por el OCR") },
-            text = {
-                androidx.compose.foundation.text.selection.SelectionContainer {
-                    Text(
-                        textoOcr.ifBlank { "(vacío)" },
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.verticalScroll(rememberScrollState()),
-                    )
-                }
-            },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = { verTextoOcr = false }) { Text("Cerrar") }
-            },
-        )
-    }
 
     val galeria = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let(onFoto)
@@ -132,12 +112,6 @@ internal fun PlacaScanRow(
                                 )
                             }
                             OutlinedButton(onClick = onReanalizar) { Text("Volver a leer placa") }
-                            if (textoOcr.isNotBlank()) {
-                                androidx.compose.material3.TextButton(
-                                    onClick = { verTextoOcr = true },
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-                                ) { Text("Ver texto OCR", style = MaterialTheme.typography.labelSmall) }
-                            }
                         }
                     }
                 }
