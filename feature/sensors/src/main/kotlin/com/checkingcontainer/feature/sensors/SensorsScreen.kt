@@ -194,6 +194,17 @@ private fun SensorsScreen(
                     CardRendimiento(COLOR_ALTA, "Alta / Descarga", "Sat. líquido", state.satLiquidoC, "Subcooling", state.subcoolingC)
                 }
             }
+            if (state.presionFueraDeRango) {
+                item(key = "hint-presion") {
+                    Text(
+                        "Conecta el sensor a un sistema con presión para ver saturación, " +
+                            "superheat y subcooling (al aire, ≈0 PSIG, no hay dato).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
+            }
 
             // Diagnóstico de campo (temporal): todo lo que la app recibe y calcula.
             if (state.hayDatos) {
@@ -366,6 +377,7 @@ private fun FilaAltaBaja(
                 valor = if (activo) fmt(convertir(valorActual)) else "—",
                 unidad = unidad,
                 deviceName = if (activo) tarjeta.deviceName else "",
+                bateria = if (activo) tarjeta.ultima.bateria else 0,
                 tomas = tomas,
                 onToggle = { if (tarjeta != null) onToggleRol(tarjeta.deviceName, tipo, idx) },
             )
@@ -387,6 +399,7 @@ private fun RowScope.TarjetaRol(
     valor: String,
     unidad: String,
     deviceName: String,
+    bateria: Int = 0,
     tomas: List<String>,
     onToggle: () -> Unit,
 ) {
@@ -421,7 +434,13 @@ private fun RowScope.TarjetaRol(
                     Text(" $unidad", style = MaterialTheme.typography.bodySmall, color = fg.copy(alpha = 0.9f), modifier = Modifier.padding(bottom = 3.dp))
                 }
                 if (deviceName.isNotEmpty()) {
-                    Text(deviceName, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        deviceName + if (bateria > 0) "  ·  🔋$bateria%" else "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fg.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             // Tomas cada 5 s, columna vertical, la más reciente arriba.
@@ -458,7 +477,13 @@ private fun TarjetaCorriente(tarjeta: TarjetaSensor?) {
                     Text(" A", style = MaterialTheme.typography.bodyMedium, color = fg.copy(alpha = 0.9f), modifier = Modifier.padding(bottom = 3.dp))
                 }
                 if (activo) {
-                    Text(tarjeta.deviceName, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        tarjeta.deviceName + if (tarjeta.ultima.bateria > 0) "  ·  🔋${tarjeta.ultima.bateria}%" else "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fg.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             Column(horizontalAlignment = Alignment.End) {

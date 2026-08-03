@@ -79,6 +79,16 @@ data class SensorsUiState(
     val subcoolingC get() = Saturacion.subcooling(satLiquidoC, YjackParser.aCelsius(tempDescargaRaw))
 
     /**
+     * Hay presión conectada pero la saturación no calcula → casi siempre porque
+     * el sensor está al aire (≈0 PSIG), fuera del rango útil del gas. Sirve para
+     * avisar que hay que conectar a un sistema con presión (no es un error).
+     */
+    val presionFueraDeRango: Boolean
+        get() = presion != null &&
+            satVaporC == SensorReading.SIN_DATO &&
+            satLiquidoC == SensorReading.SIN_DATO
+
+    /**
      * Diagnóstico de campo (temporal): TODO lo que la app recibe y calcula, para
      * ver por qué no salen temperatura/saturación sin adivinar.
      */
