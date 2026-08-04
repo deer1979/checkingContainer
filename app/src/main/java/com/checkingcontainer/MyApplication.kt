@@ -51,10 +51,10 @@ class MyApplication :
         // debug publicado por el CI, así que ahí es donde hay que ver los crashes.
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = true
 
-        // Durante la migración se conserva una sesión compatible. Si el usuario
-        // ya obtuvo un UID confiable mediante custom token, ensureSignedInAsync
-        // no lo reemplaza por una identidad anónima.
-        firebaseSession.ensureSignedInAsync()
+        // La sesión local no persiste entre procesos. Al arrancar se descartan
+        // claims confiables anteriores para que otro usuario no los herede; el
+        // login podrá elevar nuevamente la identidad mediante custom token.
+        firebaseSession.resetToCompatibilitySessionAsync()
     }
 
     // AppFunctions: las funciones se construyen vía Hilt para reutilizar los
