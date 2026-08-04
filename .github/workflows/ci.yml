@@ -2,25 +2,22 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, review-navigation-stability]
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 concurrency:
-  # Use the head SHA so that re-runs of older commits don't cancel the run
-  # for the current commit (and vice versa). A new push to the branch is the
-  # only thing that should kill a stale in-progress run.
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: false
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-  contents: write       # needed to create/move release tags
+  contents: write
   pull-requests: write
 
 jobs:
   build:
-    name: Lint · Test · Build
+    name: Validate and build APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -30,7 +27,6 @@ jobs:
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
-        continue-on-error: true
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -38,212 +34,82 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
+      - name: Set up Android SDK 37
+        shell: bash
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;android-36" "build-tools;36.0.0" "platform-tools" \
-            2>&1 | grep -v "^\[=" || true
+          set -euo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-37" \
+            "build-tools;36.0.0" \
+            "platform-tools"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Inject Supabase credentials
-        # Writes local.properties so the Gradle build can read SUPABASE_URL /
-        # SUPABASE_ANON_KEY. When the secrets are absent the app builds fine
-        # in local-only mode (empty strings).
+      - name: Prepare local properties
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          echo "SUPABASE_URL=${SUPABASE_URL:-}" >> local.properties
-          echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}" >> local.properties
+          {
+            echo "SUPABASE_URL=${SUPABASE_URL:-}"
+            echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}"
+          } > local.properties
 
-      - name: Compile debug
-        id: compile
-        continue-on-error: true
+      - name: Compile, test, lint and assemble
         shell: bash
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          set -o pipefail
-          ./gradlew :app:compileDebugKotlin --stacktrace 2>&1 | tee /tmp/compile.log
-
-      - name: Lint (debug)
-        id: lint
-        if: steps.compile.outcome == 'success'
-        continue-on-error: true
-        run: ./gradlew :app:lintDebug --stacktrace
-
-      - name: Print lint text report
-        if: always()
-        run: |
-          report="app/build/reports/lint-results-debug.txt"
-          if [ -f "$report" ]; then
-            echo "::group::Lint text report"
-            cat "$report"
-            echo "::endgroup::"
-          else
-            echo "Lint text report not found at $report"
-            find app/build/reports -type f 2>/dev/null || true
-          fi
-
-      - name: Post compile error as PR comment
-        if: steps.compile.outcome == 'failure' && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          {
-            echo "## Compile debug failed (run ${{ github.run_id }})"
-            echo ""
-            echo "### Kotlin compiler errors (lines starting with \`e:\`)"
-            echo '```'
-            grep -E '^(e:|w:|FAILURE|Caused by|\* What went wrong|> Task .* FAILED)' /tmp/compile.log 2>/dev/null \
-              | head -n 80 \
-              || echo "(no compiler errors matched)"
-            echo '```'
-            echo ""
-            echo "### First 80 lines around the failed task"
-            echo '```'
-            awk '/Task :.*compileDebugKotlin/{p=1} p' /tmp/compile.log 2>/dev/null | head -n 80 \
-              || echo "(no task section found)"
-            echo '```'
-          } > /tmp/compile-comment.md
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --repo "${{ github.repository }}" \
-            --body-file /tmp/compile-comment.md
-
-      - name: Post lint report as PR comment
-        if: always() && steps.lint.outcome != 'skipped' && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          report="app/build/reports/lint-results-debug.txt"
-          {
-            echo "## Lint debug report (run ${{ github.run_id }})"
-            echo ""
-            if [ -f "$report" ]; then
-              echo '```'
-              cat "$report"
-              echo '```'
-            else
-              echo "_Text report not produced. Files under \`app/build/reports\`:_"
-              echo ''
-              echo '```'
-              find app/build/reports -type f 2>/dev/null || echo "(none)"
-              echo '```'
-            fi
-          } > /tmp/lint-comment.md
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --repo "${{ github.repository }}" \
-            --body-file /tmp/lint-comment.md
-
-      # Los unit tests son obligatorios: si fallan, el build falla y no se
-      # publica APK. Corren en todos los módulos (Android + JVM puro).
-      - name: Unit tests
-        id: unit_tests
-        if: steps.compile.outcome == 'success'
-        shell: bash
-        run: |
-          set -o pipefail
-          ./gradlew testDebugUnitTest :core:model:test --stacktrace 2>&1 | tee /tmp/unit-tests.log
-
-      - name: Post unit test failure as PR comment
-        if: failure() && steps.unit_tests.outcome == 'failure' && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          {
-            echo "## Unit tests failed (run ${{ github.run_id }})"
-            echo ""
-            echo "_Last 200 lines of test output:_"
-            echo ''
-            echo '```'
-            tail -n 200 /tmp/unit-tests.log 2>/dev/null || echo "(no log)"
-            echo '```'
-          } > /tmp/tests-comment.md
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --repo "${{ github.repository }}" \
-            --body-file /tmp/tests-comment.md
-
-      - name: Assemble debug APK
-        id: assemble
-        if: steps.compile.outcome == 'success'
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: ./gradlew :app:assembleDebug --stacktrace
-
-      - name: Upload debug APK
-        if: steps.assemble.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Publish APK as rolling release (mobile-downloadable)
-        if: steps.assemble.outcome == 'success' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag="latest-debug"
-          short_sha="${GITHUB_SHA:0:7}"
-          src_apk=$(find app/build/outputs/apk/debug -name '*.apk' | head -n 1)
-          if [ -z "$src_apk" ]; then
-            echo "No APK produced"; exit 1
-          fi
-          renamed="checkingContainer-debug-${short_sha}.apk"
-          cp "$src_apk" "/tmp/$renamed"
+          ./gradlew \
+            :app:compileDebugKotlin \
+            testDebugUnitTest \
+            :core:model:test \
+            :app:lintDebug \
+            :app:assembleDebug \
+            --stacktrace
 
-          # Move the rolling tag: delete old release+tag, create new one.
-          gh release delete "$tag" --yes --cleanup-tag \
-            --repo "${{ github.repository }}" || true
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkingcontainer-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
 
-          gh release create "$tag" "/tmp/$renamed" \
-            --repo "${{ github.repository }}" \
-            --target "${GITHUB_SHA}" \
-            --title "Latest debug build" \
-            --prerelease \
-            --notes "$(cat <<EOF
-          Auto-generated debug APK — commit \`${short_sha}\` en \`${{ github.ref_name }}\`.
-
-          **Instalar en Android:**
-          1. Tocá el archivo \`checkingContainer-debug-*.apk\` de abajo.
-          2. Permitir la instalación desde fuentes desconocidas si lo pide.
-          3. Abrí el instalador.
-
-          El tag se mueve en cada CI exitoso, siempre es el build más reciente.
-          EOF
-          )"
-
-      - name: Fail if compile or assemble failed
-        if: steps.compile.outcome == 'failure' || steps.assemble.outcome == 'failure'
-        run: |
-          echo "Build failed: compile=${{ steps.compile.outcome }} assemble=${{ steps.assemble.outcome }}"
-          echo "Lint and unit-tests are informational and do not fail the build."
-          exit 1
-
-      - name: Upload lint report
+      - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lint-report
+          name: checkingcontainer-quality-reports
           path: |
             app/build/reports/lint-results-*.html
             app/build/reports/lint-results-*.xml
+            **/build/reports/tests/**
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 30
 
-      - name: Upload unit test report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-report
-          path: app/build/reports/tests/testDebugUnitTest/
-          if-no-files-found: ignore
-          retention-days: 14
+      - name: Publish rolling debug release
+        if: success() && (github.event_name == 'pull_request' || github.ref == 'refs/heads/review-navigation-stability')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="navigation-review-debug"
+          short_sha="${GITHUB_SHA:0:7}"
+          src_apk=$(find app/build/outputs/apk/debug -name '*.apk' | head -n 1)
+          renamed="checkingContainer-navigation-review-${short_sha}.apk"
+          cp "$src_apk" "/tmp/$renamed"
+          gh release delete "$tag" --yes --cleanup-tag --repo "${{ github.repository }}" || true
+          gh release create "$tag" "/tmp/$renamed" \
+            --repo "${{ github.repository }}" \
+            --target "$GITHUB_SHA" \
+            --title "Navigation stability review" \
+            --prerelease \
+            --notes "APK de diagnóstico generado por CI para el commit ${short_sha}."
