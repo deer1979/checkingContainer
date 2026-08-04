@@ -33,10 +33,8 @@ class FirebaseSession @Inject constructor(
     fun hasTrustedIdentity(): Boolean = currentIdentity()?.isTrusted == true
 
     /**
-     * Garantiza que exista alguna sesión Firebase.
-     *
-     * Nunca reemplaza una identidad confiable por una anónima. La autenticación
-     * anónima solo se usa como compatibilidad mientras finaliza la migración.
+     * Garantiza que exista alguna sesión Firebase durante una sesión local
+     * activa. Nunca degrada un UID confiable ya obtenido por custom token.
      */
     suspend fun ensureSignedIn(): Boolean {
         if (auth.currentUser != null) return true
@@ -47,12 +45,24 @@ class FirebaseSession @Inject constructor(
             .isSuccess
     }
 
-    /** Variante no bloqueante para el arranque de la aplicación. */
+    /** Garantiza una sesión compatible sin bloquear el hilo de arranque. */
     fun ensureSignedInAsync() {
         if (auth.currentUser != null) return
         auth.signInAnonymously().addOnFailureListener { error ->
             warn("Sin sesión Firebase aún (se reintentará): ${error.message}")
         }
+    }
+
+    /**
+     * Borra cualquier identidad confiable anterior y vuelve al modo compatible.
+     * Se usa al iniciar el proceso y al cerrar sesión local para impedir que los
+     * claims de un usuario queden disponibles para el siguiente.
+     */
+    fun resetToCompatibilitySessionAsync() {
+        if (auth.currentUser?.isAnonymous == false) {
+            auth.signOut()
+        }
+        ensureSignedInAsync()
     }
 
     /**
@@ -74,10 +84,6 @@ class FirebaseSession @Inject constructor(
         }.onFailure { error ->
             warn("No se pudo elevar la identidad Firebase: ${error.message}")
         }
-    }
-
-    fun signOut() {
-        auth.signOut()
     }
 
     private fun FirebaseUser.toIdentity(): FirebaseIdentity = FirebaseIdentity(
