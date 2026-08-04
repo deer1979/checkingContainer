@@ -56,6 +56,16 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Verify debug signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -list -v \
+            -keystore debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            | grep 'SHA256:'
+
       - name: Set up Android SDK 37
         shell: bash
         run: |
