@@ -63,57 +63,57 @@ class EstimadoViewModel @Inject constructor(
     private var activePhotoUploads = 0
 
     init {
-    viewModelScope.launch {
-        try {
-            val inspectionDeferred = async { inspectionRepo.findById(inspectionId) }
-            val existingDeferred = async { estimadosRepo.findByInspectionId(inspectionId) }
-            val inspection = inspectionDeferred.await()
-            val unit = inspection?.containerNo?.let { reeferUnitRepo.findByContainerNo(it) }
-            val existing = existingDeferred.await()
-            _state.update {
-                it.copy(
-                    isLoading = false,
-                    containerNo = inspection?.containerNo ?: "",
-                    technicianName = inspection?.technicianName ?: "",
-                    manufacturer = unit?.manufacturer ?: "",
-                    unitModel = unit?.unitModel ?: "",
-                    unitModelNo = unit?.unitModelNo ?: "",
-                    unitSerialNo = unit?.unitSerialNo ?: "",
-                    yearOfBuilt = unit?.yearOfBuilt ?: "",
-                    unitType = unit?.unitType ?: "",
-                    fichaTecnica = unit?.fichaTecnica ?: emptyList(),
-                    estimadoId = existing?.id ?: 0L,
-                    clientName = existing?.clientName ?: "",
-                    location = existing?.location ?: inspection?.location ?: "",
-                    createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                    approvedAt = existing?.approvedAt,
-                    status = existing?.status ?: EstimadoStatus.ABIERTO,
-                    damages = existing?.damages ?: emptyList(),
-                    mediciones = existing?.mediciones ?: emptyList(),
-                    clientId = existing?.clientId,
-                    clientIdNumber = existing?.clientIdNumber ?: "",
-                    clientDireccion = existing?.clientDireccion ?: "",
-                    clientTelefono = existing?.clientTelefono ?: "",
-                    clientEmail = existing?.clientEmail ?: "",
-                    sitioClienteId = existing?.sitioClienteId,
-                    sitioNombre = existing?.sitioNombre ?: "",
-                    ordenTrabajo = existing?.ordenTrabajo ?: "",
-                    hasIva = existing?.hasIva ?: false,
-                )
-            }
-        } catch (error: Throwable) {
-            if (error is kotlinx.coroutines.CancellationException) throw error
-            _state.update {
-                it.copy(
-                    isLoading = false,
-                    errorMessage = error.message ?: "No se pudo cargar el estimado",
-                )
+        viewModelScope.launch {
+            try {
+                val inspectionDeferred = async { inspectionRepo.findById(inspectionId) }
+                val existingDeferred = async { estimadosRepo.findByInspectionId(inspectionId) }
+                val inspection = inspectionDeferred.await()
+                val unit = inspection?.containerNo?.let { reeferUnitRepo.findByContainerNo(it) }
+                val existing = existingDeferred.await()
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        containerNo = inspection?.containerNo ?: "",
+                        technicianName = inspection?.technicianName ?: "",
+                        manufacturer = unit?.manufacturer ?: "",
+                        unitModel = unit?.unitModel ?: "",
+                        unitModelNo = unit?.unitModelNo ?: "",
+                        unitSerialNo = unit?.unitSerialNo ?: "",
+                        yearOfBuilt = unit?.yearOfBuilt ?: "",
+                        unitType = unit?.unitType ?: "",
+                        fichaTecnica = unit?.fichaTecnica ?: emptyList(),
+                        estimadoId = existing?.id ?: 0L,
+                        clientName = existing?.clientName ?: "",
+                        location = existing?.location ?: inspection?.location ?: "",
+                        createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                        approvedAt = existing?.approvedAt,
+                        status = existing?.status ?: EstimadoStatus.ABIERTO,
+                        damages = existing?.damages ?: emptyList(),
+                        mediciones = existing?.mediciones ?: emptyList(),
+                        clientId = existing?.clientId,
+                        clientIdNumber = existing?.clientIdNumber ?: "",
+                        clientDireccion = existing?.clientDireccion ?: "",
+                        clientTelefono = existing?.clientTelefono ?: "",
+                        clientEmail = existing?.clientEmail ?: "",
+                        sitioClienteId = existing?.sitioClienteId,
+                        sitioNombre = existing?.sitioNombre ?: "",
+                        ordenTrabajo = existing?.ordenTrabajo ?: "",
+                        hasIva = existing?.hasIva ?: false,
+                    )
+                }
+            } catch (error: Throwable) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = error.message ?: "No se pudo cargar el estimado",
+                    )
+                }
             }
         }
     }
-}
 
-fun onEvent(event: EstimadoEvent) {
+    fun onEvent(event: EstimadoEvent) {
         when (event) {
             is EstimadoEvent.ClientNameChange ->
                 _state.update { it.copy(clientName = event.value, savedMessage = null) }
@@ -269,50 +269,50 @@ fun onEvent(event: EstimadoEvent) {
     fun addRepairPhoto(itemId: String, uri: Uri) = uploadPhoto(itemId, isDano = false, uri = uri)
 
     private fun uploadPhoto(itemId: String, isDano: Boolean, uri: Uri) {
-    viewModelScope.launch {
-        activePhotoUploads += 1
-        _state.update { it.copy(isUploadingPhoto = true, errorMessage = null) }
-        try {
-            val bytes = withContext(Dispatchers.IO) {
-                compressForUpload(uri)
-                    ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            }
-            if (bytes == null) {
-                _state.update { it.copy(errorMessage = "No se pudo leer la foto") }
-                return@launch
-            }
-            runCatching {
-                estimadosRepo.uploadItemPhoto(inspectionId, itemId, isDano, bytes)
-            }.onSuccess { url ->
-                coil3.SingletonImageLoader.get(context).enqueue(
-                    coil3.request.ImageRequest.Builder(context).data(url).build(),
-                )
-                _state.update { state ->
-                    state.copy(
-                        isDirty = true,
-                        damages = state.damages.map { item ->
-                            if (item.id != itemId) item
-                            else if (isDano && item.damagePhotos.size < MAX_FOTOS_POR_GRUPO)
-                                item.copy(damagePhotos = item.damagePhotos + url)
-                            else if (!isDano && item.repairPhotos.size < MAX_FOTOS_POR_GRUPO)
-                                item.copy(repairPhotos = item.repairPhotos + url)
-                            else item
-                        },
+        viewModelScope.launch {
+            activePhotoUploads += 1
+            _state.update { it.copy(isUploadingPhoto = true, errorMessage = null) }
+            try {
+                val bytes = withContext(Dispatchers.IO) {
+                    compressForUpload(uri)
+                        ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                }
+                if (bytes == null) {
+                    _state.update { it.copy(errorMessage = "No se pudo leer la foto") }
+                    return@launch
+                }
+                runCatching {
+                    estimadosRepo.uploadItemPhoto(inspectionId, itemId, isDano, bytes)
+                }.onSuccess { url ->
+                    coil3.SingletonImageLoader.get(context).enqueue(
+                        coil3.request.ImageRequest.Builder(context).data(url).build(),
                     )
+                    _state.update { state ->
+                        state.copy(
+                            isDirty = true,
+                            damages = state.damages.map { item ->
+                                if (item.id != itemId) item
+                                else if (isDano && item.damagePhotos.size < MAX_FOTOS_POR_GRUPO)
+                                    item.copy(damagePhotos = item.damagePhotos + url)
+                                else if (!isDano && item.repairPhotos.size < MAX_FOTOS_POR_GRUPO)
+                                    item.copy(repairPhotos = item.repairPhotos + url)
+                                else item
+                            },
+                        )
+                    }
+                }.onFailure { error ->
+                    _state.update {
+                        it.copy(errorMessage = error.message ?: "Error al subir foto")
+                    }
                 }
-            }.onFailure { error ->
-                _state.update {
-                    it.copy(errorMessage = error.message ?: "Error al subir foto")
-                }
+            } finally {
+                activePhotoUploads = (activePhotoUploads - 1).coerceAtLeast(0)
+                _state.update { it.copy(isUploadingPhoto = activePhotoUploads > 0) }
             }
-        } finally {
-            activePhotoUploads = (activePhotoUploads - 1).coerceAtLeast(0)
-            _state.update { it.copy(isUploadingPhoto = activePhotoUploads > 0) }
         }
     }
-}
 
-/** Crea el cliente en el catálogo y lo asigna como sitio del trabajo. */
+    /** Crea el cliente en el catálogo y lo asigna como sitio del trabajo. */
     fun createClientAndSelectSitio(client: Client, onDone: () -> Unit) {
         viewModelScope.launch {
             _state.update { it.copy(isSavingClient = true) }
