@@ -164,6 +164,7 @@ class UnitEntryViewModel @Inject constructor(
                 triggerCatalogLookup(model)
             } else if (!Iso6346.isCompleteCarrierModel(model)) {
                 catalogLookupJob?.cancel()
+                lastAutoTriggeredModel = ""
                 _state.update { it.copy(isLookingUpCatalog = false) }
             }
         }
