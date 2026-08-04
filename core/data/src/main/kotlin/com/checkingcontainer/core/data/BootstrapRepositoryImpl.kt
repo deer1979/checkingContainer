@@ -1,24 +1,30 @@
 package com.checkingcontainer.core.data
 
 import android.util.Log
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
 import com.checkingcontainer.core.common.di.AppDispatcher
+import com.checkingcontainer.core.common.di.ApplicationScope
 import com.checkingcontainer.core.common.di.Dispatcher
 import com.checkingcontainer.core.database.dao.ClientDao
 import com.checkingcontainer.core.database.dao.EstimadoDao
 import com.checkingcontainer.core.database.dao.InspectionDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
-import com.checkingcontainer.core.common.di.ApplicationScope
 import com.checkingcontainer.core.domain.BootstrapRepository
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.core.network.AnonymousAuth
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val BOOT_TAG = "BootstrapSync"
 
@@ -31,51 +37,77 @@ class BootstrapRepositoryImpl @Inject constructor(
     private val reeferUnitDao: ReeferUnitDao,
     private val firestoreService: FirestoreService,
     private val anonymousAuth: AnonymousAuth,
+    private val dataStore: DataStore<Preferences>,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : BootstrapRepository {
 
     override suspend fun syncIfNeeded(): Unit = withContext(ioDispatcher) {
-        // Reintento de la sesión anónima en cada login: las reglas de
-        // Firestore/Storage exigen auth y el arranque pudo estar offline.
-        anonymousAuth.ensureSignedIn()
+        try {
+            if (dataStore.data.first()[KEY_BOOTSTRAP_COMPLETED] == true) {
+                return@withContext
+            }
 
-        if (userDao.count() > 0) return@withContext  // ya hay datos locales
+            // Reintento de la sesión anónima en cada arranque pendiente. Las
+            // reglas de Firestore/Storage exigen auth y el primer inicio puede
+            // haber ocurrido sin conexión.
+            anonymousAuth.ensureSignedIn()
 
-        Log.i(BOOT_TAG, "Primera instalación — descargando datos de Firestore...")
+            Log.i(BOOT_TAG, "Bootstrap pendiente — descargando datos de Firestore...")
 
-        // 1. Usuarios (necesarios para el login)
-        val users = firestoreService.fetchAllUsers()
-        users.forEach { runCatching { userDao.upsert(it) } }
-        Log.i(BOOT_TAG, "Usuarios: ${users.size}")
+            // Usuarios se consultan primero porque son necesarios para iniciar
+            // sesión. Una respuesta vacía se considera intento incompleto: el
+            // marcador no se guarda y se reintentará en el próximo arranque.
+            val users = firestoreService.fetchAllUsers()
+            if (users.isEmpty()) {
+                Log.w(BOOT_TAG, "Bootstrap aplazado: Firestore no devolvió usuarios")
+                return@withContext
+            }
+            users.forEach { userDao.upsert(it) }
+            Log.i(BOOT_TAG, "Usuarios: ${users.size}")
 
-        // 2. Equipos (reefer_units) — FK requerida por inspecciones
-        val units = firestoreService.fetchAllReeferUnits()
-        units.forEach { runCatching { reeferUnitDao.upsert(it) } }
-        Log.i(BOOT_TAG, "Equipos: ${units.size}")
+            // Equipos antes de inspecciones para respetar la relación local.
+            val units = firestoreService.fetchAllReeferUnits()
+            units.forEach { reeferUnitDao.upsert(it) }
+            Log.i(BOOT_TAG, "Equipos: ${units.size}")
 
-        // 3. Inspecciones (después de equipos para respetar FK)
-        val inspections = firestoreService.fetchAllInspections()
-        inspections.forEach { runCatching { inspectionDao.upsert(it) } }
-        Log.i(BOOT_TAG, "Inspecciones: ${inspections.size}")
+            val inspections = firestoreService.fetchAllInspections()
+            inspections.forEach { inspectionDao.upsert(it) }
+            Log.i(BOOT_TAG, "Inspecciones: ${inspections.size}")
 
-        // 4. Estimados
-        val estimados = firestoreService.fetchAllEstimados()
-        estimados.forEach { runCatching { estimadoDao.upsert(it) } }
-        Log.i(BOOT_TAG, "Estimados: ${estimados.size}")
+            val estimados = firestoreService.fetchAllEstimados()
+            estimados.forEach { estimadoDao.upsert(it) }
+            Log.i(BOOT_TAG, "Estimados: ${estimados.size}")
 
-        // 5. Clientes (catálogo para estimados)
-        val clients = firestoreService.fetchAllClients()
-        clients.forEach { runCatching { clientDao.upsert(it) } }
-        Log.i(BOOT_TAG, "Clientes: ${clients.size}")
+            val clients = firestoreService.fetchAllClients()
+            clients.forEach { clientDao.upsert(it) }
+            Log.i(BOOT_TAG, "Clientes: ${clients.size}")
 
-        Log.i(BOOT_TAG, "Sincronización completa.")
+            dataStore.edit { preferences ->
+                preferences[KEY_BOOTSTRAP_COMPLETED] = true
+            }
+            Log.i(BOOT_TAG, "Bootstrap completo.")
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            // No se marca como completo. La base local sigue disponible y el
+            // proceso se reintentará en el próximo arranque de login.
+            Log.w(BOOT_TAG, "Bootstrap pendiente: ${error.message}")
+        }
     }
 
     override fun syncRecentAsync(user: User) {
         applicationScope.launch(ioDispatcher) {
-            runCatching { syncRecent(user) }
-                .onFailure { Log.w(BOOT_TAG, "syncRecent falló (se reintenta en el próximo login): ${it.message}") }
+            try {
+                syncRecent(user)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.w(
+                    BOOT_TAG,
+                    "syncRecent falló (se reintenta en el próximo login): ${error.message}",
+                )
+            }
         }
     }
 
@@ -93,7 +125,7 @@ class BootstrapRepositoryImpl @Inject constructor(
         val incoming = (remoteOpen + recent)
             .distinctBy { it.id }
             .filter { isAdmin || it.technicianId == user.id }
-        incoming.forEach { runCatching { estimadoDao.upsert(it) } }
+        incoming.forEach { estimadoDao.upsert(it) }
 
         // Reconciliar cierres viejos: abiertos locales que ya no aparecen abiertos
         // en remoto ni entre los recientes → se consultan uno a uno (suelen ser 0-2).
@@ -103,7 +135,7 @@ class BootstrapRepositoryImpl @Inject constructor(
         val staleOpenIds = estimadoDao.findOpenIds()
             .filter { it !in remoteOpenIds && it !in incomingIds }
         staleOpenIds.forEach { id ->
-            firestoreService.fetchEstimadoById(id)?.let { runCatching { estimadoDao.upsert(it) } }
+            firestoreService.fetchEstimadoById(id)?.let { estimadoDao.upsert(it) }
         }
 
         Log.i(
@@ -114,6 +146,7 @@ class BootstrapRepositoryImpl @Inject constructor(
     }
 
     private companion object {
+        val KEY_BOOTSTRAP_COMPLETED = booleanPreferencesKey("bootstrap_completed_v1")
         const val RECENT_WINDOW_MS = 24 * 60 * 60 * 1000L
     }
 }
