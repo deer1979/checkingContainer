@@ -1,5 +1,6 @@
 package com.checkingcontainer.core.network
 
+import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
@@ -44,18 +45,17 @@ class FirebaseSessionTest {
     @Test
     fun `reset limpia identidad confiable y crea sesion compatible`() {
         val trustedUser = mockUser(uid = "uid-stable", isAnonymous = false)
-        val anonymousUser = mockUser(uid = "uid-anon", isAnonymous = true)
-        val authResult = mockk<AuthResult>()
+        val anonymousTask = mockk<Task<AuthResult>>(relaxed = true)
 
         every { auth.currentUser } returnsMany listOf(trustedUser, null)
         every { auth.signOut() } just Runs
-        every { authResult.user } returns anonymousUser
-        every { auth.signInAnonymously() } returns Tasks.forResult(authResult)
+        every { auth.signInAnonymously() } returns anonymousTask
 
         FirebaseSession(auth).resetToCompatibilitySessionAsync()
 
         verify(exactly = 1) { auth.signOut() }
         verify(exactly = 1) { auth.signInAnonymously() }
+        verify(exactly = 1) { anonymousTask.addOnFailureListener(any()) }
     }
 
     @Test
