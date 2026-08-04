@@ -16,6 +16,26 @@ permissions:
   pull-requests: write
 
 jobs:
+  identity-functions:
+    name: Validate Firebase identity function
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Functions dependencies
+        run: npm install --prefix functions --no-audit --no-fund
+
+      - name: Build and test Functions
+        run: npm --prefix functions test
+
   build:
     name: Validate debug and release APKs
     runs-on: ubuntu-latest
