@@ -25,6 +25,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Apply Firestore cancellation fix once
+        if: github.event_name == 'pull_request' && github.head_ref == 'review-architecture-stability' && hashFiles('.github/scripts/apply_firestore_cancellation_fix.py') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin review-architecture-stability
+          git checkout -B review-architecture-stability origin/review-architecture-stability
+          python .github/scripts/apply_firestore_cancellation_fix.py
+          if git diff --quiet -- core/data/src/main/kotlin/com/checkingcontainer/core/data/FirestoreService.kt; then
+            echo "FirestoreService ya estaba corregido"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add core/data/src/main/kotlin/com/checkingcontainer/core/data/FirestoreService.kt
+          git commit -m "fix: conservar cancelaciones en lecturas Firestore"
+          git push origin HEAD:review-architecture-stability
+
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
 
