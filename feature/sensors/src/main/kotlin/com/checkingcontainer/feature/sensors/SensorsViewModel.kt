@@ -14,6 +14,8 @@ import com.checkingcontainer.core.model.TipoExpansion
 import com.checkingcontainer.feature.sensors.navigation.SENSORS_CONTAINER_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -137,6 +139,7 @@ class SensorsViewModel @Inject constructor(
 
     private var scanJob: Job? = null
     private var muestreoJob: Job? = null
+    private var scanGeneration = 0L
 
     init {
         val nombres = refrigerantes.nombres
@@ -180,28 +183,58 @@ class SensorsViewModel @Inject constructor(
     }
 
     private fun iniciar() {
-        if (!scanner.bluetoothDisponible()) {
-            _state.update { it.copy(bluetoothApagado = true) }
+        if (_state.value.escaneando || scanJob?.isActive == true || muestreoJob?.isActive == true) {
             return
         }
+        if (!scanner.bluetoothDisponible()) {
+            _state.update { it.copy(bluetoothApagado = true, escaneando = false) }
+            return
+        }
+
+        val generation = ++scanGeneration
         _state.update { it.copy(escaneando = true, bluetoothApagado = false) }
-        scanJob = viewModelScope.launch {
-            scanner.observe().collect { lectura ->
-                // Cada anuncio actualiza solo el valor EN VIVO (número grande).
-                _state.update { s ->
-                    val clave = "${lectura.deviceName}-${lectura.type}"
-                    val previa = s.tarjetas[clave]
-                    val tarjeta = previa?.copy(ultima = lectura)
-                        ?: TarjetaSensor(lectura.deviceName, lectura, emptyList())
-                    s.copy(tarjetas = s.tarjetas + (clave to tarjeta))
+
+        val newScanJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                scanner.observe().collect { lectura ->
+                    // Cada anuncio actualiza solo el valor EN VIVO (número grande).
+                    _state.update { s ->
+                        val clave = "${lectura.deviceName}-${lectura.type}"
+                        val previa = s.tarjetas[clave]
+                        val tarjeta = previa?.copy(ultima = lectura)
+                            ?: TarjetaSensor(lectura.deviceName, lectura, emptyList())
+                        s.copy(tarjetas = s.tarjetas + (clave to tarjeta))
+                    }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                // El estado final se normaliza en finally. La UI ya distingue
+                // Bluetooth apagado de un flujo que terminó sin lecturas.
+            } finally {
+                if (scanGeneration == generation) {
+                    val currentMuestreo = muestreoJob
+                    muestreoJob = null
+                    currentMuestreo?.cancel()
+                    scanJob = null
+                    _state.update {
+                        it.copy(
+                            escaneando = false,
+                            bluetoothApagado = !scanner.bluetoothDisponible(),
+                            tarjetas = emptyMap(),
+                        )
+                    }
                 }
             }
         }
-        // Muestreo cada 5 s: registra la lectura actual en el historial (5 tomas = 25 s).
-        // Empieza vacío y se va llenando una muestra a la vez.
+
+        scanJob = newScanJob
         muestreoJob = viewModelScope.launch {
-            while (isActive) {
+            // Muestreo cada 5 s: registra la lectura actual en el historial
+            // (5 tomas = 25 s). Una sesión vieja nunca modifica la nueva.
+            while (isActive && scanGeneration == generation) {
                 delay(INTERVALO_MUESTREO_MS)
+                if (scanGeneration != generation) break
                 _state.update { s ->
                     s.copy(
                         tarjetas = s.tarjetas.mapValues { (_, t) ->
@@ -211,13 +244,17 @@ class SensorsViewModel @Inject constructor(
                 }
             }
         }
+        newScanJob.start()
     }
 
     fun detener() {
-        scanJob?.cancel()
+        scanGeneration += 1
+        val currentScan = scanJob
+        val currentMuestreo = muestreoJob
         scanJob = null
-        muestreoJob?.cancel()
         muestreoJob = null
+        currentScan?.cancel()
+        currentMuestreo?.cancel()
         // Limpiar las tarjetas al detener: las lecturas dejan de ser válidas.
         _state.update { it.copy(escaneando = false, tarjetas = emptyMap()) }
     }
