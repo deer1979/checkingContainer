@@ -16,6 +16,28 @@ permissions:
   pull-requests: write
 
 jobs:
+  identity-functions:
+    name: Validate Firebase identity function
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install locked Functions dependencies
+        run: npm ci --prefix functions --no-audit --no-fund
+
+      - name: Build and test Functions
+        run: npm --prefix functions test
+
   build:
     name: Validate debug and release APKs
     runs-on: ubuntu-latest
@@ -33,6 +55,16 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Verify debug signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -list -v \
+            -keystore debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            | grep 'SHA256:'
 
       - name: Set up Android SDK 37
         shell: bash

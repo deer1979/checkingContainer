@@ -6,6 +6,7 @@ import com.checkingcontainer.core.common.security.PinHasher
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.domain.AuthRepository
 import com.checkingcontainer.core.domain.AuthState
+import com.checkingcontainer.core.network.FirebaseSession
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
@@ -17,6 +18,7 @@ import kotlinx.coroutines.withContext
 class AuthRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
     private val firestoreService: FirestoreService,
+    private val firebaseSession: FirebaseSession,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : AuthRepository {
 
@@ -61,5 +63,8 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun logout() {
         _state.value = AuthState.Unauthenticated
+        // El UID confiable y sus claims pertenecen al usuario que acaba de salir.
+        // Se vuelve inmediatamente al modo compatible para impedir herencia de rol.
+        firebaseSession.resetToCompatibilitySessionAsync()
     }
 }

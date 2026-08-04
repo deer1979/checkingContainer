@@ -151,6 +151,7 @@ firebase-bom      = { group = "com.google.firebase", name = "firebase-bom", vers
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-storage   = { group = "com.google.firebase", name = "firebase-storage" }
 firebase-auth      = { group = "com.google.firebase", name = "firebase-auth" }
+firebase-appcheck-playintegrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
 
 # Build-logic accessors — needed inside convention plugins so they can reference
@@ -180,4 +181,3 @@ checkingcontainer-android-hilt = { id = "checkingcontainer.android.hilt", versio
 checkingcontainer-android-room = { id = "checkingcontainer.android.room", version = "unspecified" }
 checkingcontainer-jvm-library = { id = "checkingcontainer.jvm.library", version = "unspecified" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-
