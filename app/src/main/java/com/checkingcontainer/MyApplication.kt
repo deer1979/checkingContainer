@@ -10,7 +10,7 @@ import coil3.disk.directory
 import coil3.memory.MemoryCache
 import coil3.request.crossfade
 import com.checkingcontainer.appfunctions.ContainerFunctions
-import com.checkingcontainer.core.network.AnonymousAuth
+import com.checkingcontainer.core.network.FirebaseSession
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -25,7 +25,7 @@ class MyApplication :
     lateinit var containerFunctions: ContainerFunctions
 
     @Inject
-    lateinit var anonymousAuth: AnonymousAuth
+    lateinit var firebaseSession: FirebaseSession
 
     override fun onCreate() {
         super.onCreate()
@@ -34,10 +34,10 @@ class MyApplication :
         // debug publicado por el CI, así que ahí es donde hay que ver los crashes.
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = true
 
-        // Sesión anónima de Firebase: requerida por las reglas de seguridad
-        // (request.auth != null). Persiste entre arranques; sin red se
-        // reintenta en el próximo arranque o login.
-        anonymousAuth.ensureSignedInAsync()
+        // Durante la migración se conserva una sesión compatible. Si el usuario
+        // ya obtuvo un UID confiable mediante custom token, ensureSignedInAsync
+        // no lo reemplaza por una identidad anónima.
+        firebaseSession.ensureSignedInAsync()
     }
 
     // AppFunctions: las funciones se construyen vía Hilt para reutilizar los
