@@ -277,7 +277,7 @@ class UnitEntryViewModel @Inject constructor(
 
                 val equipment = current.toEquipment()
                 val inspection = current.toInspection(authUser.id, authUser.fullName, authUser.location)
-                equipmentRepo.upsert(equipment).getOrThrow()
+                equipmentRepo.upsert(equipment)
 
                 val savedInspectionId = if (current.inspectionId != null) {
                     inspectionRepo.update(inspection.copy(id = current.inspectionId)).getOrThrow()
