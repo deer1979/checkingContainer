@@ -16,7 +16,7 @@ import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.domain.BootstrapRepository
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.core.model.UserRole
-import com.checkingcontainer.core.network.AnonymousAuth
+import com.checkingcontainer.core.network.FirebaseSession
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -36,7 +36,7 @@ class BootstrapRepositoryImpl @Inject constructor(
     private val inspectionDao: InspectionDao,
     private val reeferUnitDao: ReeferUnitDao,
     private val firestoreService: FirestoreService,
-    private val anonymousAuth: AnonymousAuth,
+    private val firebaseSession: FirebaseSession,
     private val dataStore: DataStore<Preferences>,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
@@ -48,10 +48,9 @@ class BootstrapRepositoryImpl @Inject constructor(
                 return@withContext
             }
 
-            // Reintento de la sesión anónima en cada arranque pendiente. Las
-            // reglas de Firestore/Storage exigen auth y el primer inicio puede
-            // haber ocurrido sin conexión.
-            anonymousAuth.ensureSignedIn()
+            // Garantiza una sesión compatible mientras termina la migración a
+            // identidades estables. Una sesión confiable existente se conserva.
+            firebaseSession.ensureSignedIn()
 
             Log.i(BOOT_TAG, "Bootstrap pendiente — descargando datos de Firestore...")
 
@@ -112,7 +111,7 @@ class BootstrapRepositoryImpl @Inject constructor(
     }
 
     private suspend fun syncRecent(user: User) {
-        anonymousAuth.ensureSignedIn()
+        firebaseSession.ensureSignedIn()
 
         val isAdmin = user.role == UserRole.SuperAdmin || user.role == UserRole.Admin
         val since = System.currentTimeMillis() - RECENT_WINDOW_MS
