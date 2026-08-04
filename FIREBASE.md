@@ -35,12 +35,29 @@ Los valores `pin` antiguos en texto plano o formato `v1` se aceptan solo para
 compatibilidad. Después de un login correcto se sustituyen automáticamente por
 PBKDF2-HMAC-SHA256 `v2` en Room y Firestore.
 
+## Capa de identidad: `FirebaseSession`
+
+La aplicación ya no depende directamente de una clase de autenticación
+anónima. `FirebaseSession`, en `core:network`, concentra el estado de Firebase:
+
+- conserva un UID confiable existente y nunca lo reemplaza por uno anónimo;
+- mantiene temporalmente `signInAnonymously()` para que los APK instalados y el
+  funcionamiento offline sigan operativos durante la migración;
+- acepta `signInWithCustomToken()` para elevar la sesión a un UID estable
+  emitido por un backend confiable;
+- no persiste ni registra custom tokens;
+- permite consultar si la identidad activa es anónima o confiable.
+
+Esta capa es solo la primera fase de la incidencia #8. Todavía falta el servicio
+servidor que valide `usuario + PIN`, emita el custom token y agregue claims de
+rol, empresa y alcance operativo.
+
 ## Seguridad actual: autenticación anónima transitoria
 
-La app obtiene una **sesión anónima de Firebase** al arrancar
-(`AnonymousAuth` en `core:network`; reintento en cada login vía
-`BootstrapRepositoryImpl`). Esta sesión mantiene operativos los APK actuales,
-pero **no identifica al usuario interno ni su rol**.
+Mientras el backend de intercambio no esté desplegado, `FirebaseSession` crea
+una **sesión anónima compatible** al arrancar y la reintenta desde
+`BootstrapRepositoryImpl` cuando hace falta. Esta sesión mantiene operativos los
+APK actuales, pero **no identifica al usuario interno ni su rol**.
 
 La configuración actualmente documentada es transitoria:
 
@@ -73,20 +90,27 @@ service firebase.storage {
 > inspecciones, estimados o archivos frente a otra sesión anónima válida.
 
 La migración obligatoria está registrada en la incidencia **#8: reemplazar
-autenticación anónima y cerrar reglas Firebase**. El diseño acordado debe
-mantener la pantalla `usuario + PIN`, pero obtener una identidad Firebase
-confiable por usuario, aplicar roles mediante custom claims o un servicio
-seguro, versionar las reglas y cubrirlas con Firebase Emulator Suite.
+autenticación anónima y cerrar reglas Firebase**. El diseño mantiene la pantalla
+`usuario + PIN`, pero debe obtener una identidad Firebase confiable por usuario,
+aplicar roles mediante custom claims, versionar reglas y cubrirlas con Firebase
+Emulator Suite.
 
 Requisitos actuales en la consola:
 1. **Authentication → Sign-in method → Anonymous → habilitar**, mientras los
    APK existentes dependan de este flujo transitorio.
-2. No endurecer las reglas directamente en producción sin desplegar antes la
-   identidad por usuario y una migración compatible. Los APK antiguos quedarían
-   bloqueados.
+2. No endurecer las reglas directamente en producción sin desplegar antes el
+   intercambio de custom token y una migración compatible. Los APK antiguos
+   quedarían bloqueados.
 
-La sesión anónima persiste entre arranques. El primer inicio conectado necesita
-red para crearla.
+## Secuencia de migración prevista
+
+1. Incorporar `FirebaseSession` sin cambiar el comportamiento de campo.
+2. Crear un backend confiable que valide `nick + PIN` y emita custom tokens.
+3. Elevar la sesión después del login local, manteniendo acceso offline.
+4. Separar credenciales de perfiles operativos y dejar de listar hashes.
+5. Versionar y probar reglas por UID, rol, empresa y ruta.
+6. Desplegar el APK compatible antes de bloquear sesiones anónimas.
+7. Retirar el fallback anónimo cuando ya no existan APK antiguos activos.
 
 ## Crashlytics (reporte de fallos)
 
