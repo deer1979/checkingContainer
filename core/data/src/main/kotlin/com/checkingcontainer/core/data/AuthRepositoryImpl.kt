@@ -42,14 +42,20 @@ class AuthRepositoryImpl @Inject constructor(
                 IllegalArgumentException("PIN incorrecto"),
             )
         }
-        // Migración perezosa: si el PIN guardado era texto plano legado y el
-        // login fue correcto, se re-guarda hasheado (Room + nube).
-        if (!PinHasher.isHashed(row.pin)) {
+
+        // Migración perezosa: texto plano y hashes v1 siguen siendo válidos,
+        // pero después del login correcto se sustituyen por PBKDF2 v2 en Room
+        // y Firestore. La sesión nunca conserva el valor legado.
+        val authenticatedRow = if (PinHasher.needsUpgrade(row.pin)) {
             val migrated = row.copy(pin = PinHasher.hash(pin))
             userDao.update(migrated)
             firestoreService.upsertUser(migrated)
+            migrated
+        } else {
+            row
         }
-        _state.value = AuthState.Authenticated(row.toDomain())
+
+        _state.value = AuthState.Authenticated(authenticatedRow.toDomain())
         Result.success(Unit)
     }
 
