@@ -4,7 +4,9 @@ import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import io.mockk.Runs
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
@@ -37,6 +39,23 @@ class FirebaseSessionTest {
 
         assertTrue(result)
         verify(exactly = 0) { auth.signInAnonymously() }
+    }
+
+    @Test
+    fun `reset limpia identidad confiable y crea sesion compatible`() {
+        val trustedUser = mockUser(uid = "uid-stable", isAnonymous = false)
+        val anonymousUser = mockUser(uid = "uid-anon", isAnonymous = true)
+        val authResult = mockk<AuthResult>()
+
+        every { auth.currentUser } returnsMany listOf(trustedUser, null)
+        every { auth.signOut() } just Runs
+        every { authResult.user } returns anonymousUser
+        every { auth.signInAnonymously() } returns Tasks.forResult(authResult)
+
+        FirebaseSession(auth).resetToCompatibilitySessionAsync()
+
+        verify(exactly = 1) { auth.signOut() }
+        verify(exactly = 1) { auth.signInAnonymously() }
     }
 
     @Test
