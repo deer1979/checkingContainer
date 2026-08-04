@@ -1,6 +1,7 @@
 package com.checkingcontainer
 
 import android.app.Application
+import android.util.Log
 import androidx.appfunctions.service.AppFunctionConfiguration
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -11,6 +12,9 @@ import coil3.memory.MemoryCache
 import coil3.request.crossfade
 import com.checkingcontainer.appfunctions.ContainerFunctions
 import com.checkingcontainer.core.network.FirebaseSession
+import com.google.firebase.FirebaseApp
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -29,6 +33,19 @@ class MyApplication :
 
     override fun onCreate() {
         super.onCreate()
+
+        // App Check se instala antes de cualquier operación explícita de
+        // Firebase. En esta fase solo se envían tokens; enforcement permanece
+        // desactivado en consola hasta validar métricas y dispositivos de campo.
+        runCatching {
+            FirebaseApp.initializeApp(this)
+            FirebaseAppCheck.getInstance().installAppCheckProviderFactory(
+                PlayIntegrityAppCheckProviderFactory.getInstance(),
+            )
+        }.onFailure { error ->
+            Log.w(APP_CHECK_TAG, "App Check no disponible aún: ${error.message}")
+        }
+
         // Crashlytics captura los fallos no controlados automáticamente (instala
         // su propio handler). Activo también en debug: el propietario usa el APK
         // debug publicado por el CI, así que ahí es donde hay que ver los crashes.
@@ -67,4 +84,8 @@ class MyApplication :
             }
             .crossfade(true)
             .build()
+
+    private companion object {
+        const val APP_CHECK_TAG = "FirebaseAppCheck"
+    }
 }
