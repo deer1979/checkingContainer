@@ -42,7 +42,7 @@ class FirebaseSession @Inject constructor(
         if (auth.currentUser != null) return true
         return runCatching { auth.signInAnonymously().await() }
             .onFailure { error ->
-                Log.w(TAG, "Sin sesión Firebase aún (se reintentará): ${error.message}")
+                warn("Sin sesión Firebase aún (se reintentará): ${error.message}")
             }
             .isSuccess
     }
@@ -51,7 +51,7 @@ class FirebaseSession @Inject constructor(
     fun ensureSignedInAsync() {
         if (auth.currentUser != null) return
         auth.signInAnonymously().addOnFailureListener { error ->
-            Log.w(TAG, "Sin sesión Firebase aún (se reintentará): ${error.message}")
+            warn("Sin sesión Firebase aún (se reintentará): ${error.message}")
         }
     }
 
@@ -72,7 +72,7 @@ class FirebaseSession @Inject constructor(
                 check(identity.isTrusted) { "El custom token produjo una sesión anónima" }
             }
         }.onFailure { error ->
-            Log.w(TAG, "No se pudo elevar la identidad Firebase: ${error.message}")
+            warn("No se pudo elevar la identidad Firebase: ${error.message}")
         }
     }
 
@@ -84,6 +84,11 @@ class FirebaseSession @Inject constructor(
         uid = uid,
         isAnonymous = isAnonymous,
     )
+
+    /** El logging nunca debe alterar el resultado de una operación de auth. */
+    private fun warn(message: String) {
+        runCatching { Log.w(TAG, message) }
+    }
 
     private companion object {
         const val TAG = "FirebaseSession"
