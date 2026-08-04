@@ -94,7 +94,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Publish rolling debug release
+      - name: Publish review debug release
         if: success() && (github.event_name == 'pull_request' || github.ref == 'refs/heads/review-navigation-stability')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -113,3 +113,23 @@ jobs:
             --title "Navigation stability review" \
             --prerelease \
             --notes "APK de diagnóstico generado por CI para el commit ${short_sha}."
+
+      - name: Publish main rolling debug release
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="latest-debug"
+          short_sha="${GITHUB_SHA:0:7}"
+          src_apk=$(find app/build/outputs/apk/debug -name '*.apk' | head -n 1)
+          renamed="checkingContainer-debug-${short_sha}.apk"
+          cp "$src_apk" "/tmp/$renamed"
+          gh release delete "$tag" --yes --cleanup-tag --repo "${{ github.repository }}" || true
+          gh release create "$tag" "/tmp/$renamed" \
+            --repo "${{ github.repository }}" \
+            --target "$GITHUB_SHA" \
+            --title "Latest debug build" \
+            --prerelease \
+            --notes "APK debug más reciente generado desde main para el commit ${short_sha}."
