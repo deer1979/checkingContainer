@@ -24,6 +24,49 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Apply pending Estimado fix once
+        if: github.event_name == 'pull_request' && github.head_ref == 'review-architecture-stability'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/one-shot-estimado-fix.yml').read_text(encoding='utf-8')
+          start_marker = '''      - name: Apply safe loading and concurrent upload fixes
+                  shell: python
+                  run: |
+          '''
+          end_marker = '\n      - name: Commit generated change'
+          start = source.find(start_marker)
+          if start < 0:
+              raise SystemExit('Patch source marker not found')
+          start += len(start_marker)
+          end = source.find(end_marker, start)
+          if end < 0:
+              raise SystemExit('Patch end marker not found')
+          block = source[start:end]
+          script = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in block.splitlines()
+          )
+          exec(compile(script, 'one-shot-estimado-fix', 'exec'))
+          PY
+
+          if git diff --quiet -- feature/units/src/main/kotlin/com/checkingcontainer/feature/units/EstimadoViewModel.kt; then
+            echo "EstimadoViewModel already patched"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add feature/units/src/main/kotlin/com/checkingcontainer/feature/units/EstimadoViewModel.kt
+          git commit -m "fix: estabilizar carga y fotos de estimados"
+          git push origin HEAD:review-architecture-stability
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
