@@ -25,20 +25,27 @@ Storage para fotos/adjuntos), configurado vía `app/google-services.json`.
 
 | Colección | Documento | Contenido |
 |---|---|---|
-| `users` | `{id}` | nombre, nick, **pin (hash v1, ya no texto plano)**, rol, activo |
+| `users` | `{id}` | nombre, nick, PIN PBKDF2 v2, rol, activo |
 | `reefer_units` | `{containerNo}` | datos del equipo frigorífico |
 | `reefer_units/{containerNo}/inspections` | `{id}` | inspecciones + campos de digitación |
 | `estimados` | `{id}` | estimado con ítems de daño (JSON) y costos |
 | `announcements` | `{id}` | anuncios con adjuntos (URLs de Storage) |
 
-## Seguridad: autenticación anónima + reglas (jul 2026)
+Los valores `pin` antiguos en texto plano o formato `v1` se aceptan solo para
+compatibilidad. Después de un login correcto se sustituyen automáticamente por
+PBKDF2-HMAC-SHA256 `v2` en Room y Firestore.
+
+## Seguridad actual: autenticación anónima transitoria
 
 La app obtiene una **sesión anónima de Firebase** al arrancar
 (`AnonymousAuth` en `core:network`; reintento en cada login vía
-`BootstrapRepositoryImpl`). Las reglas de producción exigen esa sesión:
+`BootstrapRepositoryImpl`). Esta sesión mantiene operativos los APK actuales,
+pero **no identifica al usuario interno ni su rol**.
+
+La configuración actualmente documentada es transitoria:
 
 ```
-// Firestore (consola → Firestore Database → Reglas)
+// Firestore
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -48,7 +55,7 @@ service cloud.firestore {
   }
 }
 
-// Storage (consola → Storage → Rules, bucket checking-container.firebasestorage.app)
+// Storage
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
@@ -59,14 +66,27 @@ service firebase.storage {
 }
 ```
 
-Requisitos en la consola (una sola vez):
-1. **Authentication → Sign-in method → Anonymous → habilitar.**
-2. Publicar las reglas de arriba **solo después** de que todos los
-   dispositivos tengan el APK con sesión anónima — un APK viejo sin auth
-   quedaría bloqueado.
+> **No considerar estas reglas seguras para producción multiusuario.**
+> `request.auth != null` solo confirma que existe una sesión Firebase. Con
+> autenticación anónima no demuestra que la persona sea técnico, administrador
+> ni miembro de una empresa concreta. Tampoco protege `users`, roles, PIN,
+> inspecciones, estimados o archivos frente a otra sesión anónima válida.
 
-La sesión anónima persiste entre arranques (solo el primer arranque necesita
-red). Nunca caduca, a diferencia de las reglas del modo de prueba.
+La migración obligatoria está registrada en la incidencia **#8: reemplazar
+autenticación anónima y cerrar reglas Firebase**. El diseño acordado debe
+mantener la pantalla `usuario + PIN`, pero obtener una identidad Firebase
+confiable por usuario, aplicar roles mediante custom claims o un servicio
+seguro, versionar las reglas y cubrirlas con Firebase Emulator Suite.
+
+Requisitos actuales en la consola:
+1. **Authentication → Sign-in method → Anonymous → habilitar**, mientras los
+   APK existentes dependan de este flujo transitorio.
+2. No endurecer las reglas directamente en producción sin desplegar antes la
+   identidad por usuario y una migración compatible. Los APK antiguos quedarían
+   bloqueados.
+
+La sesión anónima persiste entre arranques. El primer inicio conectado necesita
+red para crearla.
 
 ## Crashlytics (reporte de fallos)
 
@@ -79,8 +99,11 @@ Activo también en el APK debug (que es el que se usa en campo).
 
 - Todo se guarda primero en Room; luego se hace upsert a Firestore.
 - Los writes tienen **timeout de ack de 10s**: sin conexión, el cambio queda en
-  la caché local del SDK de Firestore y se reenvía solo al volver la red
+  la caché local del SDK de Firestore y se reenvía al volver la red
   (estado visible en **Ajustes → Sincronización**).
-- Cambios de digitación llegan por listener `collectionGroup` solo mientras la
-  app autenticada está en primer plano.
-- Las fotos se comprimen a JPEG 80 / máx 1600px antes de subir a Storage.
+- El bootstrap inicial usa un marcador persistente. Si la primera descarga
+  ocurre sin conexión o Firestore no devuelve usuarios, queda pendiente y se
+  reintenta en el siguiente arranque de login.
+- Cambios de digitación llegan por listener `collectionGroup` mientras la app
+  autenticada está en primer plano.
+- Las fotos se comprimen a JPEG 80 / máx. 1600 px antes de subir a Storage.
