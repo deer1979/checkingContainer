@@ -1,5 +1,6 @@
 package com.checkingcontainer.feature.units.navigation
 
+import android.net.Uri
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -34,15 +35,15 @@ internal const val CLIENTE_FORM_ID_ARG = "clienteId"
 private const val CLIENTE_FORM_ROUTE = "clientes/form?clienteId={$CLIENTE_FORM_ID_ARG}"
 private fun clienteFormRoute(clienteId: Long) = "clientes/form?clienteId=$clienteId"
 
-fun unitDetailRoute(containerNo: String) = "units/detail/$containerNo"
+fun unitDetailRoute(containerNo: String) = "units/detail/${Uri.encode(containerNo)}"
 fun unitEntryEditRoute(unitId: Long) = "$UNITS_ENTRY_BASE?unitId=$unitId"
 fun estimadoRoute(inspectionId: Long) = "estimado/$inspectionId"
 
 fun NavGraphBuilder.unitsGraph(
     navController: NavHostController,
     user: User? = null,
-    onSettingsClick: () -> Unit = {},
-    onLogout: () -> Unit = {},
+    onSettingsClick: () -> Unit,
+    onLogout: () -> Unit,
 ) {
     composable(route = UNITS_ROUTE) {
         UnitListRoute(
@@ -73,6 +74,7 @@ fun NavGraphBuilder.unitsGraph(
             onNavigateToEstimado = { inspId ->
                 navController.navigate(estimadoRoute(inspId)) {
                     popUpTo(UNITS_ROUTE)
+                    launchSingleTop = true
                 }
             },
         )
@@ -89,7 +91,11 @@ fun NavGraphBuilder.unitsGraph(
     composable(route = UNITS_SEARCH_ROUTE) {
         ReeferSearchRoute(
             onBack = { navController.popBackStack() },
-            onResultClick = { containerNo -> navController.navigate(unitDetailRoute(containerNo)) },
+            onResultClick = { containerNo ->
+                navController.navigate(unitDetailRoute(containerNo)) {
+                    launchSingleTop = true
+                }
+            },
         )
     }
     composable(
@@ -104,20 +110,29 @@ fun NavGraphBuilder.unitsGraph(
 
 fun NavGraphBuilder.estimadosGraph(
     navController: NavHostController,
-    onMeasureClick: (String) -> Unit = {},
+    onMeasureClick: (String) -> Unit,
 ) {
     composable(route = ESTIMADOS_LIST_ROUTE) {
         EstimadosListRoute(
-            onEstimadoClick = { inspId -> navController.navigate(estimadoRoute(inspId)) },
+            onEstimadoClick = { inspId ->
+                navController.navigate(estimadoRoute(inspId)) {
+                    launchSingleTop = true
+                }
+            },
             onMeasureClick = onMeasureClick,
-            onSearchClick = { navController.navigate(ESTIMADOS_SEARCH_ROUTE) },
+            onSearchClick = {
+                navController.navigate(ESTIMADOS_SEARCH_ROUTE) {
+                    launchSingleTop = true
+                }
+            },
         )
     }
     composable(route = ESTIMADOS_SEARCH_ROUTE) {
         ContainerSearchRoute(
             onEstimadoClick = { inspId ->
+                // Mantiene la búsqueda y sus filtros en la pila.
                 navController.navigate(estimadoRoute(inspId)) {
-                    popUpTo(ESTIMADOS_LIST_ROUTE)
+                    launchSingleTop = true
                 }
             },
             onBack = { navController.popBackStack() },
@@ -130,8 +145,16 @@ fun NavGraphBuilder.clientesGraph(navController: NavHostController) {
     composable(route = CLIENTES_LIST_ROUTE) {
         ClientesListRoute(
             onBack = { navController.popBackStack() },
-            onClientClick = { id -> navController.navigate(clienteFormRoute(id)) },
-            onNewClient = { navController.navigate(clienteFormRoute(-1L)) },
+            onClientClick = { id ->
+                navController.navigate(clienteFormRoute(id)) {
+                    launchSingleTop = true
+                }
+            },
+            onNewClient = {
+                navController.navigate(clienteFormRoute(-1L)) {
+                    launchSingleTop = true
+                }
+            },
         )
     }
     composable(

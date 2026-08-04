@@ -25,7 +25,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.checkingcontainer.navigation.TopLevelDestination
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.feature.admin.navigation.ADMIN_ROUTE
 import com.checkingcontainer.feature.admin.navigation.adminScreen
@@ -40,13 +39,13 @@ import com.checkingcontainer.feature.units.navigation.estimadosGraph
 import com.checkingcontainer.feature.units.navigation.unitsGraph
 import com.checkingcontainer.feature.users.navigation.USERS_LIST_ROUTE
 import com.checkingcontainer.feature.users.navigation.usersGraph
+import com.checkingcontainer.navigation.TopLevelDestination
 
 /**
- * Post-login shell adaptativo (M3 Adaptive):
- *  - Ancho Compact (teléfono): barra inferior tipo pill ([AppBottomBar]).
- *  - Ancho Medium/Expanded (tablet de campo, plegable): rail lateral
- *    ([AppNavigationRail]) y el contenido ocupa el resto.
- * Ajustes y Usuarios se acceden desde el avatar del TopAppBar de cada raíz.
+ * Post-login shell adaptativo:
+ *  - Compact: barra inferior.
+ *  - Medium/Expanded: rail lateral.
+ * La navegación global solo aparece en destinos raíz.
  */
 @Composable
 fun AuthenticatedShell(user: User) {
@@ -55,23 +54,23 @@ fun AuthenticatedShell(user: User) {
     val currentRoute = currentEntry?.destination?.route
 
     val shellViewModel: ShellViewModel = hiltViewModel()
-    // Activa la sync de digitación solo mientras el shell está en primer plano.
     shellViewModel.digitacionSync.collectAsStateWithLifecycle()
 
-    val onSettingsClick = { navController.navigate(SETTINGS_ROUTE) }
-    val onLogout       = { shellViewModel.logout() }
+    val onSettingsClick = {
+        navController.navigate(SETTINGS_ROUTE) {
+            launchSingleTop = true
+        }
+    }
+    val onLogout = { shellViewModel.logout() }
 
-    // M3 Adaptive: la clase de tamaño de ventana decide la navegación global.
     val useRail = rememberUseRail()
-    // Ocultar la nav global en pantallas con su propia barra de acciones.
-    // Se usa visibleEntries (no la ruta actual): al retroceder, la pantalla del
-    // estimado sigue visible mientras anima su salida; mostrar la barra global
-    // antes de tiempo encogía el contenido y su barra propia "saltaba" arriba
-    // con un parpadeo fantasma.
+    val topLevelRoutes = TopLevelDestination.entries.mapTo(mutableSetOf()) { it.route }
+
+    // visibleEntries evita que la barra reaparezca antes de terminar la animación
+    // de salida. Cualquier pantalla que no sea raíz oculta la navegación global.
     val visibleEntries by navController.visibleEntries.collectAsStateWithLifecycle()
-    val hideGlobalNav = visibleEntries.any {
-        val r = it.destination.route
-        r?.startsWith("estimado/") == true || r?.startsWith("sensors/") == true
+    val hideGlobalNav = visibleEntries.any { entry ->
+        entry.destination.route !in topLevelRoutes
     }
 
     if (useRail) {
@@ -95,14 +94,8 @@ fun AuthenticatedShell(user: User) {
     } else {
         Scaffold(
             bottomBar = {
-                // Los badges se colectan aquí dentro para que sus cambios solo
-                // recompongan la barra inferior y no el shell completo.
                 val unreadAnnouncements by shellViewModel.unreadAnnouncements.collectAsStateWithLifecycle()
                 val openEstimados by shellViewModel.openEstimados.collectAsStateWithLifecycle()
-                // Asimétrico a propósito: al IR al estimado la barra se quita
-                // instantánea (animar su altura hacía que la barra propia del
-                // estimado entrara "bajando" a trompicones); al VOLVER sí entra
-                // deslizando desde abajo.
                 AnimatedVisibility(
                     visible = !hideGlobalNav,
                     enter = slideInVertically { it } + fadeIn(),
@@ -130,7 +123,6 @@ fun AuthenticatedShell(user: User) {
     }
 }
 
-/** True si la ventana es Medium/Expanded (M3 window size class). */
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 private fun rememberUseRail(): Boolean {
@@ -139,7 +131,6 @@ private fun rememberUseRail(): Boolean {
     return windowSize.widthSizeClass != WindowWidthSizeClass.Compact
 }
 
-/** Rail con badges; recompone solo aquí cuando cambian los contadores. */
 @Composable
 private fun ShellRail(
     shellViewModel: ShellViewModel,
@@ -178,7 +169,9 @@ private fun ShellNavHost(
                 navController = navController,
                 sharedTransitionScope = this@SharedTransitionLayout,
                 isAdmin = user.role.isAdmin,
-                onCreateAnnouncement = { navController.navigate(ADMIN_ROUTE) },
+                onCreateAnnouncement = {
+                    navController.navigate(ADMIN_ROUTE) { launchSingleTop = true }
+                },
                 user = user,
                 onSettingsClick = onSettingsClick,
                 onLogout = onLogout,
@@ -197,15 +190,28 @@ private fun ShellNavHost(
             estimadosGraph(
                 navController = navController,
                 onMeasureClick = { containerNo ->
-                    navController.navigate(com.checkingcontainer.feature.sensors.navigation.sensorsRoute(containerNo))
+                    navController.navigate(
+                        com.checkingcontainer.feature.sensors.navigation.sensorsRoute(containerNo),
+                    ) {
+                        launchSingleTop = true
+                    }
                 },
             )
             sensorsGraph(navController = navController)
             clientesGraph(navController = navController)
             settingsScreen(
+                navController = navController,
                 isAdmin = user.role.isAdmin,
-                onUsersClick = { navController.navigate(USERS_LIST_ROUTE) },
-                onClientsClick = { navController.navigate(CLIENTES_LIST_ROUTE) },
+                onUsersClick = {
+                    navController.navigate(USERS_LIST_ROUTE) {
+                        launchSingleTop = true
+                    }
+                },
+                onClientsClick = {
+                    navController.navigate(CLIENTES_LIST_ROUTE) {
+                        launchSingleTop = true
+                    }
+                },
             )
         }
     }
