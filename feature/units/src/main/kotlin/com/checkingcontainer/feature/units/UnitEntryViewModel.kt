@@ -17,14 +17,15 @@ import com.checkingcontainer.feature.units.navigation.UNIT_ENTRY_ID_ARG
 import com.checkingcontainer.feature.units.navigation.UNIT_ENTRY_TIPO_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.UUID
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class UnitEntryViewModel @Inject constructor(
@@ -49,10 +51,12 @@ class UnitEntryViewModel @Inject constructor(
     val state: StateFlow<UnitEntryUiState> = _state.asStateFlow()
 
     private var lastAutoTriggeredModel = ""
+    private var catalogLookupJob: Job? = null
+    private var duplicateCheckJob: Job? = null
+    private var catalogLookupGeneration = 0L
+    private var duplicateCheckGeneration = 0L
 
     init {
-        // Tipo elegido en el asistente del "+" (solo para creación; en edición
-        // manda el tipo guardado del equipo).
         savedStateHandle.get<String>(UNIT_ENTRY_TIPO_ARG)?.let { arg ->
             val tipo = runCatching { TipoEquipo.valueOf(arg) }.getOrDefault(TipoEquipo.REEFER)
             _state.update {
@@ -67,37 +71,44 @@ class UnitEntryViewModel @Inject constructor(
 
     private fun loadInspection(id: Long) {
         viewModelScope.launch {
-            val inspection = inspectionRepo.findById(id) ?: return@launch
-            val equipment = equipmentRepo.findByContainerNo(inspection.containerNo)
-            _state.update {
-                it.copy(
-                    inspectionId = id,
-                    containerNo = inspection.containerNo,
-                    unitModelNo = equipment?.unitModelNo ?: "",
-                    unitModel = equipment?.unitModel ?: "",
-                    unitType = equipment?.unitType ?: "",
-                    manufacturer = equipment?.manufacturer ?: "",
-                    unitSerialNo = equipment?.unitSerialNo ?: "",
-                    yearOfBuilt = equipment?.yearOfBuilt ?: "",
-                    brand = equipment?.brand ?: Brand.CARRIER,
-                    tipoEquipo = equipment?.tipoEquipo ?: TipoEquipo.REEFER,
-                    fichaTecnica = equipment?.fichaTecnica ?: emptyList(),
-                    fotoPlacaUrl = equipment?.fotoPlacaUrl,
-                    status = inspection.status,
-                    ptiInstruction = inspection.ptiInstruction,
-                    deployedAs = inspection.deployedAs,
-                    observations = inspection.observations,
-                )
+            runCatching {
+                val inspection = inspectionRepo.findById(id) ?: return@runCatching null
+                inspection to equipmentRepo.findByContainerNo(inspection.containerNo)
+            }.onSuccess { loaded ->
+                val (inspection, equipment) = loaded ?: return@onSuccess
+                _state.update {
+                    it.copy(
+                        inspectionId = id,
+                        containerNo = inspection.containerNo,
+                        unitModelNo = equipment?.unitModelNo ?: "",
+                        unitModel = equipment?.unitModel ?: "",
+                        unitType = equipment?.unitType ?: "",
+                        manufacturer = equipment?.manufacturer ?: "",
+                        unitSerialNo = equipment?.unitSerialNo ?: "",
+                        yearOfBuilt = equipment?.yearOfBuilt ?: "",
+                        brand = equipment?.brand ?: Brand.CARRIER,
+                        tipoEquipo = equipment?.tipoEquipo ?: TipoEquipo.REEFER,
+                        fichaTecnica = equipment?.fichaTecnica ?: emptyList(),
+                        fotoPlacaUrl = equipment?.fotoPlacaUrl,
+                        status = inspection.status,
+                        ptiInstruction = inspection.ptiInstruction,
+                        deployedAs = inspection.deployedAs,
+                        observations = inspection.observations,
+                    )
+                }
+            }.onFailure { error ->
+                _state.update { it.copy(errorMessage = error.message ?: "No se pudo cargar la inspección") }
             }
         }
     }
 
     fun onEvent(event: UnitEntryEvent) {
         if (event == UnitEntryEvent.TriggerManualLookup) {
-            val modelNo = _state.value.unitModelNo
+            val modelNo = _state.value.unitModelNo.trim()
             if (modelNo.isNotBlank()) triggerCatalogLookup(modelNo)
             return
         }
+
         _state.update { s ->
             when (event) {
                 is UnitEntryEvent.ContainerNoChange ->
@@ -111,8 +122,7 @@ class UnitEntryViewModel @Inject constructor(
                 is UnitEntryEvent.StatusChange -> s.copy(status = event.value)
                 is UnitEntryEvent.PtiInstructionChange -> s.copy(ptiInstruction = event.value)
                 is UnitEntryEvent.DeployedAsChange -> s.copy(deployedAs = event.value)
-                is UnitEntryEvent.ManufacturerChange ->
-                    s.copy(manufacturer = event.value, errorMessage = null)
+                is UnitEntryEvent.ManufacturerChange -> s.copy(manufacturer = event.value, errorMessage = null)
                 is UnitEntryEvent.ObservationsChange -> s.copy(observations = event.value)
                 UnitEntryEvent.OpenOrientationPicker -> s.copy(showOrientationPicker = true)
                 UnitEntryEvent.DismissOrientationPicker -> s.copy(showOrientationPicker = false)
@@ -127,35 +137,46 @@ class UnitEntryViewModel @Inject constructor(
                 is UnitEntryEvent.FichaExtraida -> s.copy(fichaTecnica = event.ficha)
                 is UnitEntryEvent.RemoveFichaCampo ->
                     s.copy(fichaTecnica = s.fichaTecnica.filterIndexed { i, _ -> i != event.index })
-                is UnitEntryEvent.UpdateFichaCampo ->
-                    s.copy(
-                        fichaTecnica = s.fichaTecnica.mapIndexed { i, c ->
-                            if (i == event.index) event.campo else c
-                        },
-                    )
-                is UnitEntryEvent.AddFichaCampo ->
-                    s.copy(fichaTecnica = s.fichaTecnica + event.campo)
+                is UnitEntryEvent.UpdateFichaCampo -> s.copy(
+                    fichaTecnica = s.fichaTecnica.mapIndexed { i, c ->
+                        if (i == event.index) event.campo else c
+                    },
+                )
+                is UnitEntryEvent.AddFichaCampo -> s.copy(fichaTecnica = s.fichaTecnica + event.campo)
                 UnitEntryEvent.ShowDeleteConfirm -> s.copy(showDeleteConfirm = true)
                 UnitEntryEvent.DismissDeleteConfirm -> s.copy(showDeleteConfirm = false)
                 UnitEntryEvent.TriggerManualLookup -> s
                 UnitEntryEvent.DismissDuplicateWarning -> s.copy(duplicateWarning = null)
             }
         }
+
         if (event is UnitEntryEvent.OcrResult) {
-            val modelNo = _state.value.unitModelNo
-            if (event.fields.containsKey("Unit Model") && modelNo.isNotBlank()) {
-                triggerCatalogLookup(modelNo)
+            val modelNo = _state.value.unitModelNo.trim()
+            if (event.fields.containsKey("Unit Model") && modelNo.isNotBlank()) triggerCatalogLookup(modelNo)
+        }
+
+        if (event is UnitEntryEvent.ContainerNoChange && editId == null) {
+            val containerNo = event.value.uppercase().trim()
+            if (_state.value.isContainerValid) {
+                checkDuplicate(containerNo)
+            } else {
+                duplicateCheckGeneration += 1
+                duplicateCheckJob?.cancel()
+                duplicateCheckJob = null
             }
         }
-        if (event is UnitEntryEvent.ContainerNoChange && editId == null) {
-            val containerNo = event.value.uppercase()
-            if (_state.value.isContainerValid) checkDuplicate(containerNo)
-        }
+
         if (event is UnitEntryEvent.UnitModelNoChange) {
-            val model = event.value
+            val model = event.value.trim()
             if (Iso6346.isCompleteCarrierModel(model) && model != lastAutoTriggeredModel) {
                 lastAutoTriggeredModel = model
                 triggerCatalogLookup(model)
+            } else if (!Iso6346.isCompleteCarrierModel(model)) {
+                catalogLookupGeneration += 1
+                catalogLookupJob?.cancel()
+                catalogLookupJob = null
+                lastAutoTriggeredModel = ""
+                _state.update { it.copy(isLookingUpCatalog = false) }
             }
         }
     }
@@ -163,60 +184,56 @@ class UnitEntryViewModel @Inject constructor(
     fun deleteUnit() {
         val id = _state.value.inspectionId ?: return
         viewModelScope.launch {
-            _state.update { it.copy(isDeleting = true, showDeleteConfirm = false) }
-            inspectionRepo.delete(id)
-            _state.update { it.copy(isDeleting = false, deletedSuccessfully = true) }
+            _state.update { it.copy(isDeleting = true, showDeleteConfirm = false, errorMessage = null) }
+            runCatching { inspectionRepo.delete(id) }
+                .onSuccess { _state.update { it.copy(isDeleting = false, deletedSuccessfully = true) } }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(isDeleting = false, errorMessage = error.message ?: "No se pudo eliminar la inspección")
+                    }
+                }
         }
     }
 
-    /**
-     * Foto de la placa: se guarda al instante (copia local persistente) y el
-     * análisis corre en segundo plano en el ViewModel — el usuario sigue
-     * llenando el formulario y la ficha aparece sola. La subida a Storage es
-     * best-effort (sin conexión, queda la copia local).
-     */
     fun onFotoPlaca(uri: Uri) {
         viewModelScope.launch {
             val local = withContext(Dispatchers.IO) {
                 runCatching {
                     val dir = File(context.filesDir, "placas").apply { mkdirs() }
-                    val f = File(dir, "${UUID.randomUUID()}.jpg")
-                    context.contentResolver.openInputStream(uri)?.use { inp ->
-                        f.outputStream().use { out -> inp.copyTo(out) }
+                    val file = File(dir, "${UUID.randomUUID()}.jpg")
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        file.outputStream().use { output -> input.copyTo(output) }
                     } ?: return@runCatching null
-                    f
+                    file
                 }.getOrNull()
             }
             val localUri = local?.let(Uri::fromFile) ?: uri
             _state.update { it.copy(fotoPlacaUrl = localUri.toString()) }
             analizarPlaca(localUri)
-            // Subida en paralelo; si logra, la URL remota reemplaza la local.
-            local?.let { f ->
+            local?.let { file ->
                 launch(Dispatchers.IO) {
-                    runCatching { equipmentRepo.uploadFotoPlaca(f.readBytes()) }
+                    runCatching { equipmentRepo.uploadFotoPlaca(file.readBytes()) }
                         .onSuccess { url -> _state.update { it.copy(fotoPlacaUrl = url) } }
                 }
             }
         }
     }
 
-    /** Vuelve a leer la placa desde la foto guardada (local o remota). */
     fun reanalizarPlaca() {
         val actual = _state.value.fotoPlacaUrl ?: return
         viewModelScope.launch {
             val uri = if (actual.startsWith("http")) {
-                // Remota: bajarla a un archivo temporal vía la caché de Coil.
                 withContext(Dispatchers.IO) {
                     runCatching {
                         val loader = coil3.SingletonImageLoader.get(context)
-                        val req = coil3.request.ImageRequest.Builder(context).data(actual).build()
-                        val bmp = (loader.execute(req) as? coil3.request.SuccessResult)
+                        val request = coil3.request.ImageRequest.Builder(context).data(actual).build()
+                        val bitmap = (loader.execute(request) as? coil3.request.SuccessResult)
                             ?.image?.let { (it as? coil3.BitmapImage)?.bitmap } ?: return@runCatching null
-                        val f = File(context.cacheDir, "placa_reanalisis.jpg")
-                        f.outputStream().use { out ->
-                            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, out)
+                        val file = File(context.cacheDir, "placa_reanalisis.jpg")
+                        file.outputStream().use { output ->
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, output)
                         }
-                        Uri.fromFile(f)
+                        Uri.fromFile(file)
                     }.getOrNull()
                 }
             } else {
@@ -231,19 +248,23 @@ class UnitEntryViewModel @Inject constructor(
     private fun analizarPlaca(uri: Uri) {
         viewModelScope.launch {
             _state.update { it.copy(analizandoPlaca = true, metodoLectura = null) }
-            val r = runCatching {
+            val result = runCatching {
                 PlacaEquipoExtractor.desdeImagen(context, uri, _state.value.tipoEquipo)
             }.getOrNull()
-            _state.update { s ->
-                if (r == null || (r.ficha.isEmpty() && r.fields.isEmpty())) {
-                    s.copy(analizandoPlaca = false, metodoLectura = "No se pudo leer la placa")
+            _state.update { current ->
+                if (result == null || (result.ficha.isEmpty() && result.fields.isEmpty())) {
+                    current.copy(analizandoPlaca = false, metodoLectura = "No se pudo leer la placa")
                 } else {
-                    val fields = if (s.containerNo.isNotBlank()) r.fields - "Container No." else r.fields
-                    s.applyOcrFields(fields).copy(
-                        fichaTecnica = if (r.ficha.isNotEmpty()) r.ficha else s.fichaTecnica,
+                    val fields = if (current.containerNo.isNotBlank()) {
+                        result.fields - "Container No."
+                    } else {
+                        result.fields
+                    }
+                    current.applyOcrFields(fields).copy(
+                        fichaTecnica = if (result.ficha.isNotEmpty()) result.ficha else current.fichaTecnica,
                         analizandoPlaca = false,
-                        metodoLectura = "${r.ficha.size} datos leídos con ${r.metodo}",
-                        textoOcrDiag = r.textoOcr,
+                        metodoLectura = "${result.ficha.size} datos leídos con ${result.metodo}",
+                        textoOcrDiag = result.textoOcr,
                     )
                 }
             }
@@ -256,83 +277,122 @@ class UnitEntryViewModel @Inject constructor(
             _state.update { it.copy(showValidation = true) }
             return
         }
+        if (current.isSaving) return
+
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true, errorMessage = null) }
-            val authUser = authRepository.state
-                .filterIsInstance<AuthState.Authenticated>()
-                .first()
-                .user
+            try {
+                val authUser = authRepository.state
+                    .filterIsInstance<AuthState.Authenticated>()
+                    .first()
+                    .user
 
-            val equipment = current.toEquipment()
-            val inspection = current.toInspection(authUser.id, authUser.fullName, authUser.location)
-
-            var savedInspectionId = current.inspectionId ?: 0L
-
-            val result: Result<Unit> = if (current.inspectionId != null) {
+                val equipment = current.toEquipment()
+                val inspection = current.toInspection(authUser.id, authUser.fullName, authUser.location)
                 equipmentRepo.upsert(equipment)
-                inspectionRepo.update(inspection.copy(id = current.inspectionId))
-            } else {
-                equipmentRepo.upsert(equipment)
-                inspectionRepo.create(inspection).also { r ->
-                    savedInspectionId = r.getOrElse { 0L }
-                }.map {}
+
+                val savedInspectionId = if (current.inspectionId != null) {
+                    inspectionRepo.update(inspection.copy(id = current.inspectionId)).getOrThrow()
+                    current.inspectionId
+                } else {
+                    inspectionRepo.create(inspection).getOrThrow()
+                }
+
+                val esEstimable = current.status == InspStatus.EST ||
+                    current.status == InspStatus.REPARACION ||
+                    current.status == InspStatus.MANT_CORRECTIVO
+                val navTarget = savedInspectionId.takeIf { esEstimable && it != 0L }
+
+                _state.update {
+                    it.copy(
+                        isSaving = false,
+                        savedSuccessfully = true,
+                        navigateToEstimado = navTarget,
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        isSaving = false,
+                        errorMessage = error.message ?: "No se pudo guardar la inspección",
+                    )
+                }
             }
-
-            result
-                .onSuccess {
-                    // Correctivo y Reparación se cobran → generan estimado.
-                    // Preventivo es visita de contrato (solo historial).
-                    val esEstimable = current.status == InspStatus.EST ||
-                        current.status == InspStatus.REPARACION ||
-                        current.status == InspStatus.MANT_CORRECTIVO
-                    val navTarget = if (esEstimable && savedInspectionId != 0L) {
-                        savedInspectionId
-                    } else null
-                    _state.update { it.copy(isSaving = false, savedSuccessfully = true, navigateToEstimado = navTarget) }
-                }
-                .onFailure { error ->
-                    _state.update {
-                        it.copy(
-                            isSaving = false,
-                            errorMessage = error.message ?: "No se pudo guardar la inspección",
-                        )
-                    }
-                }
         }
     }
 
     private fun checkDuplicate(containerNo: String) {
-        viewModelScope.launch {
-            val existing = inspectionRepo.findTodayByContainerNo(containerNo) ?: return@launch
-            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(existing.createdAt))
-            _state.update { it.copy(duplicateWarning = DuplicateWarning(timeStr, existing.technicianName)) }
+        val generation = ++duplicateCheckGeneration
+        duplicateCheckJob?.cancel()
+        duplicateCheckJob = viewModelScope.launch {
+            try {
+                val existing = inspectionRepo.findTodayByContainerNo(containerNo)
+                if (duplicateCheckGeneration != generation) return@launch
+                if (_state.value.containerNo.trim() != containerNo) return@launch
+
+                if (existing == null) {
+                    _state.update { it.copy(duplicateWarning = null) }
+                    return@launch
+                }
+
+                val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(existing.createdAt))
+                _state.update {
+                    it.copy(duplicateWarning = DuplicateWarning(time, existing.technicianName))
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                if (duplicateCheckGeneration == generation) {
+                    _state.update { it.copy(duplicateWarning = null) }
+                }
+            } finally {
+                if (duplicateCheckGeneration == generation) {
+                    duplicateCheckJob = null
+                }
+            }
         }
     }
 
     private fun triggerCatalogLookup(unitModelNo: String) {
-        viewModelScope.launch {
+        val requestedModel = unitModelNo.trim()
+        val generation = ++catalogLookupGeneration
+        catalogLookupJob?.cancel()
+        catalogLookupJob = viewModelScope.launch {
             _state.update { it.copy(isLookingUpCatalog = true, catalogError = null) }
-            val lookup = runCatching { catalogLookupUseCase(unitModelNo) }
-            _state.update { current ->
-                lookup.fold(
-                    onSuccess = { result ->
-                        current.copy(
-                            isLookingUpCatalog = false,
-                            brand = result.brand,
-                            manufacturer = result.manufacturer,
-                            unitModel = result.unitModel,
-                            unitType = result.unitType,
-                            deployedAs = if (result.brand == Brand.STAR_COOL) result.deployedAs else null,
-                            catalogError = null,
-                        )
-                    },
-                    onFailure = { ex ->
-                        current.copy(
-                            isLookingUpCatalog = false,
-                            catalogError = ex.message,
-                        )
-                    },
-                )
+            try {
+                val result = catalogLookupUseCase(requestedModel)
+                if (catalogLookupGeneration != generation) return@launch
+                if (_state.value.unitModelNo.trim() != requestedModel) return@launch
+
+                _state.update { current ->
+                    current.copy(
+                        isLookingUpCatalog = false,
+                        brand = result.brand,
+                        manufacturer = result.manufacturer,
+                        unitModel = result.unitModel,
+                        unitType = result.unitType,
+                        deployedAs = if (result.brand == Brand.STAR_COOL) result.deployedAs else null,
+                        catalogError = null,
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (catalogLookupGeneration != generation) return@launch
+                if (_state.value.unitModelNo.trim() != requestedModel) return@launch
+
+                _state.update {
+                    it.copy(
+                        isLookingUpCatalog = false,
+                        catalogError = error.message,
+                    )
+                }
+            } finally {
+                if (catalogLookupGeneration == generation) {
+                    catalogLookupJob = null
+                }
             }
         }
     }

@@ -8,10 +8,11 @@ import org.junit.Test
 class PinHasherTest {
 
     @Test
-    fun `hash nunca contiene el PIN en claro`() {
+    fun `hash actual usa v2 y nunca contiene el PIN en claro`() {
         val hash = PinHasher.hash("123456")
-        assertTrue(hash.startsWith("v1:"))
+        assertTrue(hash.startsWith("v2:600000:"))
         assertFalse(hash.contains("123456"))
+        assertFalse(PinHasher.needsUpgrade(hash))
     }
 
     @Test
@@ -24,37 +25,57 @@ class PinHasherTest {
 
     @Test
     fun `dos hashes del mismo PIN difieren por el salt pero ambos verifican`() {
-        val h1 = PinHasher.hash("123456")
-        val h2 = PinHasher.hash("123456")
-        assertNotEquals(h1, h2)
-        assertTrue(PinHasher.verify("123456", h1))
-        assertTrue(PinHasher.verify("123456", h2))
+        val first = PinHasher.hash("123456")
+        val second = PinHasher.hash("123456")
+        assertNotEquals(first, second)
+        assertTrue(PinHasher.verify("123456", first))
+        assertTrue(PinHasher.verify("123456", second))
+    }
+
+    @Test
+    fun `verify conserva compatibilidad con hash v1`() {
+        val legacyV1 =
+            "v1:MDEyMzQ1Njc4OWFiY2RlZg==:vUD/8HwIkQDMfmXuaKWdRSn5k8A+uWTdsMV2OxuIzHg="
+        assertTrue(PinHasher.verify("123456", legacyV1))
+        assertFalse(PinHasher.verify("654321", legacyV1))
+        assertTrue(PinHasher.isHashed(legacyV1))
+        assertTrue(PinHasher.needsUpgrade(legacyV1))
     }
 
     @Test
     fun `verify contra valor legado en texto plano`() {
         assertTrue(PinHasher.verify("123456", "123456"))
         assertFalse(PinHasher.verify("123456", "000000"))
+        assertTrue(PinHasher.needsUpgrade("123456"))
     }
 
     @Test
-    fun `ensureHashed es idempotente`() {
-        val hash = PinHasher.ensureHashed("123456")
-        assertTrue(PinHasher.isHashed(hash))
-        // Volver a pasar el hash no lo re-hashea
-        assertTrue(PinHasher.ensureHashed(hash) === hash || PinHasher.ensureHashed(hash) == hash)
-        assertTrue(PinHasher.verify("123456", PinHasher.ensureHashed(hash)))
+    fun `ensureHashed es idempotente para hashes reconocidos`() {
+        val current = PinHasher.ensureHashed("123456")
+        assertTrue(PinHasher.isHashed(current))
+        assertTrue(PinHasher.ensureHashed(current) == current)
+
+        val legacyV1 =
+            "v1:MDEyMzQ1Njc4OWFiY2RlZg==:vUD/8HwIkQDMfmXuaKWdRSn5k8A+uWTdsMV2OxuIzHg="
+        assertTrue(PinHasher.ensureHashed(legacyV1) == legacyV1)
     }
 
     @Test
-    fun `isHashed distingue legado de hasheado`() {
+    fun `isHashed distingue texto plano de formatos versionados`() {
         assertFalse(PinHasher.isHashed("123456"))
         assertTrue(PinHasher.isHashed(PinHasher.hash("123456")))
+        assertTrue(
+            PinHasher.isHashed(
+                "v1:MDEyMzQ1Njc4OWFiY2RlZg==:vUD/8HwIkQDMfmXuaKWdRSn5k8A+uWTdsMV2OxuIzHg=",
+            ),
+        )
     }
 
     @Test
     fun `verify rechaza hashes corruptos sin lanzar excepcion`() {
         assertFalse(PinHasher.verify("123456", "v1:no-es-base64"))
         assertFalse(PinHasher.verify("123456", "v1:::"))
+        assertFalse(PinHasher.verify("123456", "v2:600000:no-es-base64:tampoco"))
+        assertFalse(PinHasher.verify("123456", "v2:999999999:AA==:AA=="))
     }
 }
