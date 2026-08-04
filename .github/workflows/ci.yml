@@ -36,6 +36,14 @@ jobs:
       - name: Build and test Functions
         run: npm --prefix functions test
 
+      - name: Upload generated Functions lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkingcontainer-functions-lockfile
+          path: functions/package-lock.json
+          if-no-files-found: error
+          retention-days: 7
+
   build:
     name: Validate debug and release APKs
     runs-on: ubuntu-latest
