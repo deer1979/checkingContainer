@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.checkingcontainer.core.common.security.PinHasher
 import com.checkingcontainer.core.database.AppDatabase
 import com.checkingcontainer.core.database.dao.AnnouncementDao
 import com.checkingcontainer.core.database.dao.CatalogDao
@@ -113,7 +114,7 @@ object DatabaseModule {
                 put("firstName", firstName)
                 put("lastName", lastName)
                 put("nick", generateNick(firstName, lastName))
-                put("pin", "000000")
+                put("pin", PinHasher.hash("000000"))
                 put("jobTitle", JobTitle.Lider.name)
                 put("role", UserRole.SuperAdmin.name)
                 put("company", "CheckingContainer")
