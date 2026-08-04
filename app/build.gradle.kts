@@ -94,8 +94,10 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:network"))
 
-    // Firebase Crashlytics: reporte de fallos en campo (BOM viene de core:network)
+    // Firebase: el APK envía tokens App Check mediante Play Integrity. La
+    // aplicación forzosa en consola se habilita solo tras validar métricas.
     implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.appcheck.playintegrity)
     implementation(libs.firebase.crashlytics)
 
     // AndroidX
