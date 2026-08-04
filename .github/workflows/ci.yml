@@ -22,45 +22,21 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Checkout identity branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref }}
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
 
-      - name: Install Functions dependencies
-        run: npm install --prefix functions --no-audit --no-fund
+      - name: Install locked Functions dependencies
+        run: npm ci --prefix functions --no-audit --no-fund
 
       - name: Build and test Functions
         run: npm --prefix functions test
-
-      - name: Commit generated Functions lockfile
-        if: github.event_name == 'pull_request'
-        env:
-          HEAD_REF: ${{ github.head_ref }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "$(git status --porcelain -- functions/package-lock.json)" ]]; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add functions/package-lock.json
-          git commit -m "build: fijar dependencias de Firebase Functions"
-          git push origin "HEAD:${HEAD_REF}"
-
-      - name: Upload generated Functions lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: checkingcontainer-functions-lockfile
-          path: functions/package-lock.json
-          if-no-files-found: error
-          retention-days: 7
 
   build:
     name: Validate debug and release APKs
