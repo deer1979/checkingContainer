@@ -60,10 +60,11 @@ class EstimadoViewModel @Inject constructor(
     private var pendingRepairAction = ""
     private var pendingLaborCost = ""
     private var pendingMaterialCost = ""
+    private var activePhotoUploads = 0
 
     init {
-        viewModelScope.launch {
-            // findById y findByInspectionId son independientes: en paralelo.
+    viewModelScope.launch {
+        try {
             val inspectionDeferred = async { inspectionRepo.findById(inspectionId) }
             val existingDeferred = async { estimadosRepo.findByInspectionId(inspectionId) }
             val inspection = inspectionDeferred.await()
@@ -100,10 +101,19 @@ class EstimadoViewModel @Inject constructor(
                     hasIva = existing?.hasIva ?: false,
                 )
             }
+        } catch (error: Throwable) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    errorMessage = error.message ?: "No se pudo cargar el estimado",
+                )
+            }
         }
     }
+}
 
-    fun onEvent(event: EstimadoEvent) {
+fun onEvent(event: EstimadoEvent) {
         when (event) {
             is EstimadoEvent.ClientNameChange ->
                 _state.update { it.copy(clientName = event.value, savedMessage = null) }
@@ -259,34 +269,29 @@ class EstimadoViewModel @Inject constructor(
     fun addRepairPhoto(itemId: String, uri: Uri) = uploadPhoto(itemId, isDano = false, uri = uri)
 
     private fun uploadPhoto(itemId: String, isDano: Boolean, uri: Uri) {
-        viewModelScope.launch {
-            _state.update { it.copy(isUploadingPhoto = true, errorMessage = null) }
+    viewModelScope.launch {
+        activePhotoUploads += 1
+        _state.update { it.copy(isUploadingPhoto = true, errorMessage = null) }
+        try {
             val bytes = withContext(Dispatchers.IO) {
-                // Si la compresión falla (formato exótico), suben los bytes originales.
                 compressForUpload(uri)
                     ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             }
             if (bytes == null) {
-                _state.update { it.copy(isUploadingPhoto = false, errorMessage = "No se pudo leer la foto") }
+                _state.update { it.copy(errorMessage = "No se pudo leer la foto") }
                 return@launch
             }
             runCatching {
                 estimadosRepo.uploadItemPhoto(inspectionId, itemId, isDano, bytes)
             }.onSuccess { url ->
-                // Precalienta la caché de disco de Coil con la conexión aún viva:
-                // la foto recién subida queda visible offline y tras reiniciar la
-                // app, sin depender de una re-descarga posterior.
                 coil3.SingletonImageLoader.get(context).enqueue(
                     coil3.request.ImageRequest.Builder(context).data(url).build(),
                 )
-                _state.update { s ->
-                    s.copy(
-                        isUploadingPhoto = false,
+                _state.update { state ->
+                    state.copy(
                         isDirty = true,
-                        damages = s.damages.map { item ->
+                        damages = state.damages.map { item ->
                             if (item.id != itemId) item
-                            // Ignora la foto si el grupo ya llegó al máximo (defensa extra;
-                            // la UI ya oculta el botón al alcanzar MAX_FOTOS_POR_GRUPO).
                             else if (isDano && item.damagePhotos.size < MAX_FOTOS_POR_GRUPO)
                                 item.copy(damagePhotos = item.damagePhotos + url)
                             else if (!isDano && item.repairPhotos.size < MAX_FOTOS_POR_GRUPO)
@@ -296,12 +301,18 @@ class EstimadoViewModel @Inject constructor(
                     )
                 }
             }.onFailure { error ->
-                _state.update { it.copy(isUploadingPhoto = false, errorMessage = error.message ?: "Error al subir foto") }
+                _state.update {
+                    it.copy(errorMessage = error.message ?: "Error al subir foto")
+                }
             }
+        } finally {
+            activePhotoUploads = (activePhotoUploads - 1).coerceAtLeast(0)
+            _state.update { it.copy(isUploadingPhoto = activePhotoUploads > 0) }
         }
     }
+}
 
-    /** Crea el cliente en el catálogo y lo asigna como sitio del trabajo. */
+/** Crea el cliente en el catálogo y lo asigna como sitio del trabajo. */
     fun createClientAndSelectSitio(client: Client, onDone: () -> Unit) {
         viewModelScope.launch {
             _state.update { it.copy(isSavingClient = true) }
