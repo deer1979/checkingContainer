@@ -23,6 +23,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +53,8 @@ class UnitEntryViewModel @Inject constructor(
     private var lastAutoTriggeredModel = ""
     private var catalogLookupJob: Job? = null
     private var duplicateCheckJob: Job? = null
+    private var catalogLookupGeneration = 0L
+    private var duplicateCheckGeneration = 0L
 
     init {
         savedStateHandle.get<String>(UNIT_ENTRY_TIPO_ARG)?.let { arg ->
@@ -154,7 +157,13 @@ class UnitEntryViewModel @Inject constructor(
 
         if (event is UnitEntryEvent.ContainerNoChange && editId == null) {
             val containerNo = event.value.uppercase().trim()
-            if (_state.value.isContainerValid) checkDuplicate(containerNo) else duplicateCheckJob?.cancel()
+            if (_state.value.isContainerValid) {
+                checkDuplicate(containerNo)
+            } else {
+                duplicateCheckGeneration += 1
+                duplicateCheckJob?.cancel()
+                duplicateCheckJob = null
+            }
         }
 
         if (event is UnitEntryEvent.UnitModelNoChange) {
@@ -163,7 +172,9 @@ class UnitEntryViewModel @Inject constructor(
                 lastAutoTriggeredModel = model
                 triggerCatalogLookup(model)
             } else if (!Iso6346.isCompleteCarrierModel(model)) {
+                catalogLookupGeneration += 1
                 catalogLookupJob?.cancel()
+                catalogLookupJob = null
                 lastAutoTriggeredModel = ""
                 _state.update { it.copy(isLookingUpCatalog = false) }
             }
@@ -299,6 +310,8 @@ class UnitEntryViewModel @Inject constructor(
                         navigateToEstimado = navTarget,
                     )
                 }
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Throwable) {
                 _state.update {
                     it.copy(
@@ -311,46 +324,75 @@ class UnitEntryViewModel @Inject constructor(
     }
 
     private fun checkDuplicate(containerNo: String) {
+        val generation = ++duplicateCheckGeneration
         duplicateCheckJob?.cancel()
         duplicateCheckJob = viewModelScope.launch {
-            val existing = runCatching { inspectionRepo.findTodayByContainerNo(containerNo) }.getOrNull()
-            if (_state.value.containerNo.trim() != containerNo) return@launch
-            if (existing == null) {
-                _state.update { it.copy(duplicateWarning = null) }
-                return@launch
+            try {
+                val existing = inspectionRepo.findTodayByContainerNo(containerNo)
+                if (duplicateCheckGeneration != generation) return@launch
+                if (_state.value.containerNo.trim() != containerNo) return@launch
+
+                if (existing == null) {
+                    _state.update { it.copy(duplicateWarning = null) }
+                    return@launch
+                }
+
+                val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(existing.createdAt))
+                _state.update {
+                    it.copy(duplicateWarning = DuplicateWarning(time, existing.technicianName))
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                if (duplicateCheckGeneration == generation) {
+                    _state.update { it.copy(duplicateWarning = null) }
+                }
+            } finally {
+                if (duplicateCheckGeneration == generation) {
+                    duplicateCheckJob = null
+                }
             }
-            val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(existing.createdAt))
-            _state.update { it.copy(duplicateWarning = DuplicateWarning(time, existing.technicianName)) }
         }
     }
 
     private fun triggerCatalogLookup(unitModelNo: String) {
         val requestedModel = unitModelNo.trim()
+        val generation = ++catalogLookupGeneration
         catalogLookupJob?.cancel()
         catalogLookupJob = viewModelScope.launch {
             _state.update { it.copy(isLookingUpCatalog = true, catalogError = null) }
-            val lookup = runCatching { catalogLookupUseCase(requestedModel) }
-            if (_state.value.unitModelNo.trim() != requestedModel) return@launch
-            _state.update { current ->
-                lookup.fold(
-                    onSuccess = { result ->
-                        current.copy(
-                            isLookingUpCatalog = false,
-                            brand = result.brand,
-                            manufacturer = result.manufacturer,
-                            unitModel = result.unitModel,
-                            unitType = result.unitType,
-                            deployedAs = if (result.brand == Brand.STAR_COOL) result.deployedAs else null,
-                            catalogError = null,
-                        )
-                    },
-                    onFailure = { error ->
-                        current.copy(
-                            isLookingUpCatalog = false,
-                            catalogError = error.message,
-                        )
-                    },
-                )
+            try {
+                val result = catalogLookupUseCase(requestedModel)
+                if (catalogLookupGeneration != generation) return@launch
+                if (_state.value.unitModelNo.trim() != requestedModel) return@launch
+
+                _state.update { current ->
+                    current.copy(
+                        isLookingUpCatalog = false,
+                        brand = result.brand,
+                        manufacturer = result.manufacturer,
+                        unitModel = result.unitModel,
+                        unitType = result.unitType,
+                        deployedAs = if (result.brand == Brand.STAR_COOL) result.deployedAs else null,
+                        catalogError = null,
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (catalogLookupGeneration != generation) return@launch
+                if (_state.value.unitModelNo.trim() != requestedModel) return@launch
+
+                _state.update {
+                    it.copy(
+                        isLookingUpCatalog = false,
+                        catalogError = error.message,
+                    )
+                }
+            } finally {
+                if (catalogLookupGeneration == generation) {
+                    catalogLookupJob = null
+                }
             }
         }
     }
