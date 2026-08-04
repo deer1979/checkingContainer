@@ -109,6 +109,8 @@ class FirestoreService @Inject constructor(
                         attachments = doc.getString("attachments") ?: "[]",
                     )
                 }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchAllAnnouncements deferred (offline?): ${e.message}")
             emptyList()
@@ -147,6 +149,8 @@ class FirestoreService @Inject constructor(
                 fichaTecnica = parseFichaJson(doc.getString("fichaTecnica") ?: "[]"),
                 fotoPlacaUrl = doc.getString("fotoPlacaUrl"),
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchEquipment deferred (offline?): ${e.message}")
             null
@@ -245,6 +249,8 @@ class FirestoreService @Inject constructor(
                     isActive = doc.getBoolean("isActive") ?: true,
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchAllUsers: ${e.message}")
             emptyList()
@@ -271,6 +277,8 @@ class FirestoreService @Inject constructor(
                     fotoPlacaUrl = doc.getString("fotoPlacaUrl"),
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchAllReeferUnits: ${e.message}")
             emptyList()
@@ -304,6 +312,8 @@ class FirestoreService @Inject constructor(
                     diasPendiente = doc.safeInt("diasPendiente"),
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchAllInspections: ${e.message}")
             emptyList()
@@ -314,6 +324,8 @@ class FirestoreService @Inject constructor(
         try {
             firestore.collection(COL_ESTIMADOS).get().await()
                 .documents.mapNotNull { it.toEstimadoEntity() }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchAllEstimados: ${e.message}")
             emptyList()
@@ -329,6 +341,8 @@ class FirestoreService @Inject constructor(
                 .await()
                 .documents
                 .mapNotNull { it.toEstimadoEntity() }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchEstimadosByContainerNo: ${e.message}")
             emptyList()
@@ -344,6 +358,8 @@ class FirestoreService @Inject constructor(
                 .await()
                 .documents
                 .mapNotNull { it.toEstimadoEntity() }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchOpenEstimados: ${e.message}")
             emptyList()
@@ -359,6 +375,8 @@ class FirestoreService @Inject constructor(
                 .await()
                 .documents
                 .mapNotNull { it.toEstimadoEntity() }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchEstimadosCreatedSince: ${e.message}")
             emptyList()
@@ -373,6 +391,8 @@ class FirestoreService @Inject constructor(
                 .get()
                 .await()
                 .toEstimadoEntity()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchEstimadoById: ${e.message}")
             null
@@ -446,6 +466,8 @@ class FirestoreService @Inject constructor(
                     updatedAt = doc.safeLong("updatedAt") ?: 0L,
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "fetchAllClients: ${e.message}")
             emptyList()
