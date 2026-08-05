@@ -178,6 +178,24 @@ class LienzoPdf(
         return layout.height.toFloat()
     }
 
+    /**
+     * Igual que [parrafo] pero alineando la PRIMERA LÍNEA BASE con `y`, como hace
+     * `drawText`.
+     *
+     * `drawText` toma `y` como línea base (el texto queda encima) y `StaticLayout`
+     * como borde superior (queda debajo). Mezclar ambos en la misma fila hacía que
+     * cada valor del encabezado apareciera una línea más abajo que su etiqueta.
+     */
+    fun parrafoEnLineaBase(t: String, paint: TextPaint, ancho: Float, x: Float): Float {
+        if (t.isEmpty()) return 0f
+        val layout = construir(t, paint, ancho)
+        canvas.save()
+        canvas.translate(x, y - layout.getLineBaseline(0))
+        layout.draw(canvas)
+        canvas.restore()
+        return layout.height.toFloat()
+    }
+
     /** Cierra la última hoja y devuelve cuántas salieron en total. */
     fun finalizar(): Int {
         cerrarPagina()

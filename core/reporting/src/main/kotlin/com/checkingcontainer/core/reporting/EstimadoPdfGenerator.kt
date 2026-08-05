@@ -52,7 +52,7 @@ class EstimadoPdfGenerator @Inject constructor(
 
         val p = Pinceles()
         val esContenedor = Iso6346.isValid(estimado.containerNo)
-        val referencia = "Estimado N° ${numeroEstimado(estimado)}"
+        val referencia = "Estimado N.º ${numeroEstimado(estimado)}"
 
         // Todo el documento se dibuja con esta función, que se ejecuta DOS veces.
         val dibujarTodo: (LienzoPdf) -> Unit = { l ->
@@ -154,7 +154,7 @@ class EstimadoPdfGenerator @Inject constructor(
     private fun fila(l: LienzoPdf, p: Pinceles, etiqueta: String, valor: String, x: Float, ancho: Float) {
         val anchoEtiqueta = 72f
         l.texto(etiqueta, x, p.etiqueta)
-        val alto = l.parrafo(valor, p.cuerpo, ancho - anchoEtiqueta, x + anchoEtiqueta)
+        val alto = l.parrafoEnLineaBase(valor, p.cuerpo, ancho - anchoEtiqueta, x + anchoEtiqueta)
         l.y += maxOf(alto, 12f) + 1f
     }
 
