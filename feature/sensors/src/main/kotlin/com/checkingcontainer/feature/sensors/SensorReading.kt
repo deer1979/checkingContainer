@@ -43,7 +43,11 @@ data class SensorReading(
     val tieneValor3: Boolean get() = valor3 != SIN_DATO
 
     companion object {
-        /** Centinela "sin dato" del protocolo YJACK (32767/10 y SFLOAT 3276.7). */
-        const val SIN_DATO = 3276.7
+        /**
+         * Centinela "sin dato" del protocolo YJACK (32767/10 y SFLOAT 3276.7).
+         * El valor canónico vive en `core:model` junto a los cálculos que lo
+         * propagan; aquí se reexporta para no tocar el resto del módulo.
+         */
+        const val SIN_DATO = com.checkingcontainer.core.model.SIN_DATO
     }
 }

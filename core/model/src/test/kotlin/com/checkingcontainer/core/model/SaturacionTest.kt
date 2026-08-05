@@ -1,4 +1,4 @@
-package com.checkingcontainer.feature.sensors
+package com.checkingcontainer.core.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -20,32 +20,32 @@ class SaturacionTest {
 
     @Test
     fun `sin dato devuelve sin dato`() {
-        assertEquals(SensorReading.SIN_DATO, Saturacion.satTempC(axis, tempsX10, SensorReading.SIN_DATO), 0.001)
+        assertEquals(SIN_DATO, Saturacion.satTempC(axis, tempsX10, SIN_DATO), 0.001)
     }
 
     @Test
     fun `presion por debajo del primer punto del eje es invalida`() {
         // 10.0 < axis[0]=16.0 → indexOf 0 → invalido
-        assertEquals(SensorReading.SIN_DATO, Saturacion.satTempC(axis, tempsX10, 10.0), 0.001)
+        assertEquals(SIN_DATO, Saturacion.satTempC(axis, tempsX10, 10.0), 0.001)
     }
 
     @Test
     fun `centinela -300 marca fuera de rango`() {
         val conCentinela = listOf(-3000, -77, -42)
-        assertEquals(SensorReading.SIN_DATO, Saturacion.satTempC(axis, conCentinela, 16.8), 0.001)
+        assertEquals(SIN_DATO, Saturacion.satTempC(axis, conCentinela, 16.8), 0.001)
     }
 
     @Test
     fun `superheat resta saturacion de la succion`() {
         // succión 5°C, sat vapor -23.14°C → SH ≈ 28.14
         assertEquals(28.14, Saturacion.superheat(5.0, -23.14), 0.01)
-        assertEquals(SensorReading.SIN_DATO, Saturacion.superheat(SensorReading.SIN_DATO, -23.0), 0.001)
+        assertEquals(SIN_DATO, Saturacion.superheat(SIN_DATO, -23.0), 0.001)
     }
 
     @Test
     fun `subcooling resta liquido de la saturacion`() {
         // sat líquido 40°C, líquido medido 33°C → SC = 7
         assertEquals(7.0, Saturacion.subcooling(40.0, 33.0), 0.01)
-        assertEquals(SensorReading.SIN_DATO, Saturacion.subcooling(40.0, SensorReading.SIN_DATO), 0.001)
+        assertEquals(SIN_DATO, Saturacion.subcooling(40.0, SIN_DATO), 0.001)
     }
 }

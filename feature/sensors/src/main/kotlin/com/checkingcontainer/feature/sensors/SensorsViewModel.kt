@@ -10,6 +10,7 @@ import com.checkingcontainer.core.model.Observacion
 import com.checkingcontainer.core.model.ObjetivoRefrigeracion
 import com.checkingcontainer.core.model.ObjetivosEfectivos
 import com.checkingcontainer.core.model.RangoObjetivo
+import com.checkingcontainer.core.model.Saturacion
 import com.checkingcontainer.core.model.TipoExpansion
 import com.checkingcontainer.feature.sensors.navigation.SENSORS_CONTAINER_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
