@@ -169,3 +169,34 @@ línea 1.12, que sigue en beta (beta02 a jul 2026; el BOM estable trae 1.11.4).
 `compileSdk 37` ya NO es bloqueador (adoptado jul 2026). Re-evaluar cuando
 Compose 1.12 llegue a estable en el BOM y Material3 la soporte. La superficie de la API ya está estudiada
 (`Style { background/shape/minHeight; disabled{} }`, `rememberUpdatedStyleState`).
+
+---
+
+## PDF del estimado — pendientes (ago 2026)
+
+Orden acordado con el propietario:
+
+1. **Alinear etiqueta/valor del encabezado** 🔴 — `fila()` dibuja la etiqueta con
+   `drawText` (la `y` es la línea base) y el valor con `StaticLayout` (la `y` es
+   el borde superior). Desfase de ~10 pt: cada valor cae una línea más abajo que
+   su etiqueta. Arreglo: desplazar el layout con el *ascent* de la fuente.
+2. **Sincronizar clientes** 🔴 — solo se descargan en la primera instalación;
+   `syncRecent` trae estimados pero NO clientes. Un cliente creado en otro
+   teléfono no llega nunca. Agregarlos al login y al deslizar-refrescar.
+   Además: búsqueda insensible a tildes ("compania" → "Compañía").
+3. **`N.º` en vez de `N°`** — se usa el signo de grados, no el ordinal.
+4. **"Sin valores asignados"** cuando la tabla de valores no tiene filas: hoy
+   salen los encabezados y $0.00, que queda mal en un documento al cliente.
+5. **Test que genere un PDF real** de varias páginas y verifique que no lanza.
+   Habría cazado "Current page not finished!" antes de llegar a producción.
+6. Afinar el hueco al pie cuando un ítem no cabe y salta de página.
+
+### Investigar antes de tocar (petición del propietario)
+
+Cómo presentan los documentos comerciales modernos **el bloque de datos del
+cliente** (nombre, empresa, RUC, teléfono, correo): jerarquía, agrupación y
+alineación. El propietario quiere que ese bloque se vea impecable porque es la
+cara del documento ante su cliente.
+
+Igual para el **bloque de mediciones** (presión y temperatura capturadas por
+BLE): formato de números, unidades y disposición para que se lea profesional.
