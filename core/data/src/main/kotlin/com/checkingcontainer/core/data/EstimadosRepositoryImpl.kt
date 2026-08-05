@@ -53,7 +53,7 @@ class EstimadosRepositoryImpl @Inject constructor(
      */
     override suspend fun save(estimado: Estimado, base: Estimado?): ResultadoGuardado =
         withContext(ioDispatcher) {
-            val fusion = fusionarConRemoto(estimado, base)
+            val fusion = fusionarConRemoto(protegerIdentidad(estimado), base)
             val ahora = System.currentTimeMillis()
             val marcado = fusion.estimado.copy(updatedAt = ahora)
             val entity = marcado.toEntity()
@@ -70,6 +70,29 @@ class EstimadosRepositoryImpl @Inject constructor(
                 camposEnConflicto = fusion.camposEnConflicto,
             )
         }
+
+    /**
+     * Impide que un guardado borre la identidad del equipo.
+     *
+     * Si la pantalla se abrió sin poder resolver la inspección, el contenedor y
+     * los datos de placa llegan vacíos; guardar así los borraba de un estimado que
+     * sí los tenía. Ante un valor vacío se conserva el que ya estaba en la base:
+     * un campo en blanco nunca es una edición deliberada de estos datos.
+     */
+    private suspend fun protegerIdentidad(estimado: Estimado): Estimado {
+        if (estimado.id == 0L) return estimado
+        val guardado = dao.findById(estimado.id)?.toDomain() ?: return estimado
+        return estimado.copy(
+            containerNo = estimado.containerNo.ifBlank { guardado.containerNo },
+            manufacturer = estimado.manufacturer.ifBlank { guardado.manufacturer },
+            unitModel = estimado.unitModel.ifBlank { guardado.unitModel },
+            unitModelNo = estimado.unitModelNo.ifBlank { guardado.unitModelNo },
+            unitSerialNo = estimado.unitSerialNo.ifBlank { guardado.unitSerialNo },
+            yearOfBuilt = estimado.yearOfBuilt.ifBlank { guardado.yearOfBuilt },
+            unitType = estimado.unitType.ifBlank { guardado.unitType },
+            technicianName = estimado.technicianName.ifBlank { guardado.technicianName },
+        )
+    }
 
     /**
      * Trae la copia remota y la fusiona con la mía. Si no hay remota, o es la

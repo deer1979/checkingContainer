@@ -152,6 +152,61 @@ class BootstrapRepositoryImpl @Inject constructor(
                 .onFailure { Log.w(BOOT_TAG, "equipo descartado: ${it.message}") }
         }
         if (equipos.isNotEmpty()) Log.i(BOOT_TAG, "Equipos sincronizados: $okEquipos/${equipos.size}")
+
+        restaurarInspeccionesFaltantes()
+        repararEstimadosSinContenedor()
+    }
+
+    /**
+     * Rellena el número de contenedor de los estimados que se quedaron sin él.
+     *
+     * Cuando la cascada borró la inspección, la pantalla del estimado se abría con
+     * el contenedor vacío y al guardar escribía ese vacío encima del bueno. El
+     * dato se recupera desde la inspección a la que pertenece el estimado.
+     */
+    private suspend fun repararEstimadosSinContenedor() {
+        val rotos = estimadoDao.findSinContenedor()
+        if (rotos.isEmpty()) return
+
+        var reparados = 0
+        rotos.forEach { estimado ->
+            runCatching {
+                val inspeccion = inspectionDao.findById(estimado.inspectionId) ?: return@runCatching
+                if (inspeccion.containerNo.isBlank()) return@runCatching
+                val arreglado = estimado.copy(containerNo = inspeccion.containerNo)
+                estimadoDao.upsert(arreglado)
+                firestoreService.upsertEstimado(arreglado)
+                reparados += 1
+            }.onFailure { Log.w(BOOT_TAG, "no se pudo reparar el estimado ${estimado.id}: ${it.message}") }
+        }
+        Log.i(BOOT_TAG, "Estimados con contenedor recuperado: $reparados/${rotos.size}")
+    }
+
+    /**
+     * Repone las inspecciones que existen en la nube pero no en el teléfono.
+     *
+     * Recupera las que borró la cascada del `@Insert(REPLACE)` sobre `reefer_units`
+     * (ver ReeferUnitDao): al reinsertar un equipo se llevaba por delante sus
+     * inspecciones, y el estimado se quedaba sin contenedor ni datos de placa.
+     *
+     * Solo INSERTA las que faltan: una inspección que ya está en local no se toca,
+     * para no pisar lo que se haya editado en campo.
+     */
+    private suspend fun restaurarInspeccionesFaltantes() {
+        if (inspectionDao.count() > 0) {
+            // Camino normal: hay inspecciones locales, no hay nada que reponer.
+            return
+        }
+        val remotas = firestoreService.fetchAllInspections()
+        if (remotas.isEmpty()) return
+
+        var repuestas = 0
+        remotas.forEach { fila ->
+            runCatching { inspectionDao.upsert(fila) }
+                .onSuccess { repuestas += 1 }
+                .onFailure { Log.w(BOOT_TAG, "inspección no repuesta: ${it.message}") }
+        }
+        Log.i(BOOT_TAG, "Inspecciones restauradas desde la nube: $repuestas/${remotas.size}")
     }
 
     /**
@@ -183,6 +238,10 @@ class BootstrapRepositoryImpl @Inject constructor(
             }
         }
     }
+
+    /** Punto de entrada directo para los tests: [syncRecentAsync] es fire-and-forget. */
+    @androidx.annotation.VisibleForTesting
+    internal suspend fun syncRecentPublico(user: User) = syncRecent(user)
 
     private suspend fun syncRecent(user: User) {
         anonymousAuth.ensureSignedIn()

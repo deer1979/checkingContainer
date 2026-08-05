@@ -40,6 +40,10 @@ interface EstimadoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: EstimadoEntity): Long
 
+    /** Estimados que se quedaron sin número de contenedor (dato corrupto). */
+    @Query("SELECT * FROM estimados WHERE containerNo = ''")
+    suspend fun findSinContenedor(): List<EstimadoEntity>
+
     /** Guardados en el teléfono cuya subida la nube nunca confirmó. */
     @Query("SELECT * FROM estimados WHERE subidoEn IS NULL OR subidoEn < updatedAt")
     suspend fun findPendientesDeSubir(): List<EstimadoEntity>
