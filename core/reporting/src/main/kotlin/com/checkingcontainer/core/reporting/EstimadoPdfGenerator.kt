@@ -50,33 +50,46 @@ class EstimadoPdfGenerator @Inject constructor(
             }
         }
 
-        val doc = PdfDocument()
         val p = Pinceles()
-        val l = LienzoPdf(doc, p)
-
         val esContenedor = Iso6346.isValid(estimado.containerNo)
         val referencia = "Estimado N° ${numeroEstimado(estimado)}"
 
-        // A partir de la página 2 se repite quién es quién: si una hoja se
-        // separa del juego, sigue identificada.
-        l.encabezadoContinuacion = {
-            l.texto(referencia, Hoja.MARGEN, p.etiqueta)
-            l.textoDerecha(
-                "${if (esContenedor) "Contenedor" else "Equipo"} ${estimado.containerNo}" +
-                    if (estimado.clientName.isNotEmpty()) "  ·  ${estimado.clientName}" else "",
-                Hoja.ANCHO - Hoja.MARGEN, p.etiqueta,
-            )
-            l.linea(4f)
-            l.y += 14f
+        // Todo el documento se dibuja con esta función, que se ejecuta DOS veces.
+        val dibujarTodo: (LienzoPdf) -> Unit = { l ->
+            // A partir de la página 2 se repite quién es quién: si una hoja se
+            // separa del juego, sigue identificada.
+            l.encabezadoContinuacion = {
+                l.texto(referencia, Hoja.MARGEN, p.etiqueta)
+                l.textoDerecha(
+                    "${if (esContenedor) "Contenedor" else "Equipo"} ${estimado.containerNo}" +
+                        if (estimado.clientName.isNotEmpty()) "  ·  ${estimado.clientName}" else "",
+                    Hoja.ANCHO - Hoja.MARGEN, p.etiqueta,
+                )
+                l.linea(4f)
+                l.y += 14f
+            }
+            dibujarEncabezado(l, p, estimado, referencia, esContenedor)
+            dibujarEquipo(l, p, estimado, fichaTecnica)
+            dibujarMediciones(l, p, estimado)
+            dibujarItems(l, p, estimado, fotos)
+            dibujarValores(l, p, estimado)
         }
 
-        dibujarEncabezado(l, p, estimado, referencia, esContenedor)
-        dibujarEquipo(l, p, estimado, fichaTecnica)
-        dibujarMediciones(l, p, estimado)
-        dibujarItems(l, p, estimado, fotos)
-        dibujarValores(l, p, estimado)
+        // Primera pasada: solo para saber cuántas hojas salen. El pie necesita el
+        // total ("Página 2 de 5") y no hay forma de saberlo sin maquetar antes;
+        // PdfDocument no deja volver atrás a retocar una hoja ya cerrada.
+        val conteo = PdfDocument()
+        val totalPaginas = try {
+            LienzoPdf(conteo, p).let { dibujarTodo(it); it.finalizar() }
+        } finally {
+            conteo.close()
+        }
 
-        l.finalizar()
+        // Segunda pasada: la de verdad, ya con la numeración completa. Las fotos
+        // están decodificadas en memoria, así que repetirla sale barato.
+        val doc = PdfDocument()
+        LienzoPdf(doc, p, totalPaginas).also { dibujarTodo(it) }.finalizar()
+
         ByteArrayOutputStream().use { out ->
             doc.writeTo(out)
             doc.close()

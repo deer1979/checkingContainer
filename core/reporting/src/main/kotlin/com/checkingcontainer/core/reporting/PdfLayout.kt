@@ -80,11 +80,18 @@ class Pinceles {
  * El truco para numerar "Página 2 de 5" sin saber el total de antemano es
  * guardar las páginas terminadas y estampar el pie al final, en [finalizar].
  */
-class LienzoPdf(private val doc: PdfDocument, private val p: Pinceles) {
+class LienzoPdf(
+    private val doc: PdfDocument,
+    private val p: Pinceles,
+    /**
+     * Total de hojas, si ya se conoce. En la primera pasada es null (aún se está
+     * contando) y el pie sale sin el "de N".
+     */
+    private val totalPaginas: Int? = null,
+) {
 
     private var numero = 1
     private var pagina = nuevaPagina(1)
-    private val terminadas = mutableListOf<PdfDocument.Page>()
 
     var canvas: Canvas = pagina.canvas
         private set
@@ -96,6 +103,25 @@ class LienzoPdf(private val doc: PdfDocument, private val p: Pinceles) {
     private fun nuevaPagina(n: Int) =
         doc.startPage(PdfDocument.PageInfo.Builder(Hoja.ANCHO, Hoja.ALTO, n).create())
 
+    /**
+     * Estampa el pie y CIERRA la hoja.
+     *
+     * `PdfDocument` solo admite una página abierta a la vez: hay que terminarla
+     * antes de pedir la siguiente. Intentar guardarlas todas abiertas para
+     * numerarlas al final rompía la generación entera con
+     * "Current page not finished!".
+     */
+    private fun cerrarPagina() {
+        val etiqueta = if (totalPaginas != null) "Página $numero de $totalPaginas" else "Página $numero"
+        canvas.drawText(
+            etiqueta,
+            Hoja.ANCHO - Hoja.MARGEN - p.pie.measureText(etiqueta),
+            Hoja.ALTO - Hoja.MARGEN + 8f,
+            p.pie,
+        )
+        doc.finishPage(pagina)
+    }
+
     val espacioLibre: Float get() = Hoja.limiteInferior - y
 
     /** Abre página nueva si [alto] no cabe en lo que queda. Devuelve true si saltó. */
@@ -106,7 +132,7 @@ class LienzoPdf(private val doc: PdfDocument, private val p: Pinceles) {
     }
 
     fun saltarPagina() {
-        terminadas += pagina
+        cerrarPagina()
         numero++
         pagina = nuevaPagina(numero)
         canvas = pagina.canvas
@@ -152,20 +178,10 @@ class LienzoPdf(private val doc: PdfDocument, private val p: Pinceles) {
         return layout.height.toFloat()
     }
 
-    /** Cierra el documento estampando "Página N de M" en todas las hojas. */
-    fun finalizar() {
-        terminadas += pagina
-        val total = terminadas.size
-        terminadas.forEachIndexed { indice, hoja ->
-            val etiqueta = "Página ${indice + 1} de $total"
-            hoja.canvas.drawText(
-                etiqueta,
-                Hoja.ANCHO - Hoja.MARGEN - p.pie.measureText(etiqueta),
-                Hoja.ALTO - Hoja.MARGEN + 8f,
-                p.pie,
-            )
-            doc.finishPage(hoja)
-        }
+    /** Cierra la última hoja y devuelve cuántas salieron en total. */
+    fun finalizar(): Int {
+        cerrarPagina()
+        return numero
     }
 
     companion object {
