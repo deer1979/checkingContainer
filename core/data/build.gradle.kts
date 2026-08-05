@@ -5,6 +5,13 @@ plugins {
 
 android {
     namespace = "com.checkingcontainer.core.data"
+
+    testOptions {
+        // El repositorio de bootstrap registra con android.util.Log; en test JVM
+        // los métodos del framework devuelven el valor por defecto en vez de
+        // lanzar "not mocked".
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -15,4 +22,8 @@ dependencies {
     implementation(project(":core:network"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.datastore.preferences)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

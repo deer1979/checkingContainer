@@ -17,10 +17,36 @@ object PinHasher {
     private const val CURRENT_PREFIX = "v2"
     private const val LEGACY_HASH_PREFIX = "v1"
     private const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
-    private const val PBKDF2_ITERATIONS = 600_000
+
+    /**
+     * Coste de derivación. 150k mantiene el hash fuera del alcance de un ataque
+     * casual sin penalizar el login en gama baja: 600k costaba ~0,8 s en JVM de
+     * escritorio, lo que en ARM son varios segundos por inicio de sesión.
+     *
+     * El número de iteraciones va dentro del propio hash, así que los valores
+     * `v2:600000:` ya emitidos siguen verificando sin migración.
+     *
+     * OJO: frente a un atacante con el hash en la mano, un PIN de 6 dígitos
+     * (10^6 combinaciones) es forzable en minutos con GPU a cualquier coste
+     * razonable. La protección real es que el hash NO sea legible: ver la
+     * incidencia de identidad/reglas en FIREBASE.md.
+     */
+    private const val PBKDF2_ITERATIONS = 150_000
     private const val MAX_ACCEPTED_ITERATIONS = 2_000_000
     private const val KEY_LENGTH_BITS = 256
     private const val SALT_LENGTH_BYTES = 16
+
+    /**
+     * Hash precomputado del PIN por defecto `000000` del SuperAdmin sembrado en
+     * la primera instalación. Se deja fijo para no pagar la derivación PBKDF2
+     * dentro del `onCreate` de Room, que corre en el hilo que abra la base.
+     *
+     * El salt compartido no debilita nada aquí: el PIN por defecto es público y
+     * debe cambiarse en el primer uso. `PinHasherTest` verifica que este valor
+     * sigue correspondiendo a `000000` para que no se desincronice del algoritmo.
+     */
+    const val DEFAULT_SEED_PIN_HASH: String =
+        "v2:150000:S2U/Pb54Vy2RKjMsJD/UHQ==:q/HNlYoWn/CHpOjc5J/sm+DUnsvjSTZn4fToqQtQDI4="
 
     /** Reconoce tanto el formato actual como el hash v1 heredado. */
     fun isHashed(stored: String): Boolean =

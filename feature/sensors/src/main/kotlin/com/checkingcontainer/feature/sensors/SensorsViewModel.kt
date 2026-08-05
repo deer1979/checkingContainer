@@ -139,6 +139,17 @@ class SensorsViewModel @Inject constructor(
 
     private var scanJob: Job? = null
     private var muestreoJob: Job? = null
+
+    /**
+     * Identifica la sesión de escaneo en curso. Al detener (o reiniciar) se
+     * incrementa, de modo que un job viejo que aún esté terminando no pisa el
+     * estado de la sesión nueva.
+     *
+     * No lleva sincronización a propósito: solo se lee y escribe desde
+     * `viewModelScope`, que despacha en `Main.immediate`, así que todos los
+     * accesos ocurren en el hilo principal. Si alguna vez se mueve el escaneo a
+     * otro dispatcher, esto necesita volverse atómico.
+     */
     private var scanGeneration = 0L
 
     init {

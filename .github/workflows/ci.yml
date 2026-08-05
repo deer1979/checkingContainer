@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, review-navigation-stability]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -106,24 +106,24 @@ jobs:
           retention-days: 30
 
       - name: Publish review debug release
-        if: success() && (github.event_name == 'pull_request' || github.ref == 'refs/heads/review-navigation-stability')
+        if: success() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          tag="navigation-review-debug"
+          tag="review-debug"
           short_sha="${GITHUB_SHA:0:7}"
           src_apk=$(find app/build/outputs/apk/debug -name '*.apk' | head -n 1)
-          renamed="checkingContainer-navigation-review-${short_sha}.apk"
+          renamed="checkingContainer-review-${short_sha}.apk"
           cp "$src_apk" "/tmp/$renamed"
           gh release delete "$tag" --yes --cleanup-tag --repo "${{ github.repository }}" || true
           gh release create "$tag" "/tmp/$renamed" \
             --repo "${{ github.repository }}" \
             --target "$GITHUB_SHA" \
-            --title "Architecture stability review" \
+            --title "APK de revisión (PR abierta)" \
             --prerelease \
-            --notes "APK de diagnóstico generado por CI para el commit ${short_sha}."
+            --notes "APK debug generado por CI para revisar el commit ${short_sha}."
 
       - name: Publish main rolling debug release
         if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'

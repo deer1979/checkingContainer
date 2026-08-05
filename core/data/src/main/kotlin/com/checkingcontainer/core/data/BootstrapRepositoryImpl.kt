@@ -48,6 +48,17 @@ class BootstrapRepositoryImpl @Inject constructor(
                 return@withContext
             }
 
+            // Instalación anterior al marcador: ya tiene datos locales, así que
+            // el bootstrap NO debe volver a correr. Bajar de nuevo todo Firestore
+            // sobreescribiría con la copia remota lo que se hizo en campo sin red
+            // y aún no se ha subido (la app es offline-first: el write-through
+            // falla justamente cuando no hay cobertura).
+            if (userDao.count() > 0) {
+                marcarCompletado()
+                Log.i(BOOT_TAG, "Bootstrap omitido: la instalación ya tenía datos locales.")
+                return@withContext
+            }
+
             // Reintento de la sesión anónima en cada arranque pendiente. Las
             // reglas de Firestore/Storage exigen auth y el primer inicio puede
             // haber ocurrido sin conexión.
@@ -63,36 +74,57 @@ class BootstrapRepositoryImpl @Inject constructor(
                 Log.w(BOOT_TAG, "Bootstrap aplazado: Firestore no devolvió usuarios")
                 return@withContext
             }
-            users.forEach { userDao.upsert(it) }
-            Log.i(BOOT_TAG, "Usuarios: ${users.size}")
+
+            // Cada fila se inserta aislada: un registro remoto corrupto se salta
+            // y se cuenta, en vez de abortar el bootstrap entero. Sin esto una
+            // sola fila mala bloquea la primera instalación para siempre, porque
+            // el reintento vuelve a fallar en el mismo punto en cada arranque.
+            var fallos = 0
+            suspend fun <T> insertar(filas: List<T>, etiqueta: String, bloque: suspend (T) -> Unit): Int {
+                var ok = 0
+                filas.forEach { fila ->
+                    runCatching { bloque(fila) }
+                        .onSuccess { ok += 1 }
+                        .onFailure {
+                            fallos += 1
+                            Log.w(BOOT_TAG, "$etiqueta: fila descartada (${it.message})")
+                        }
+                }
+                return ok
+            }
+
+            Log.i(BOOT_TAG, "Usuarios: ${insertar(users, "usuarios") { userDao.upsert(it) }}")
 
             // Equipos antes de inspecciones para respetar la relación local.
             val units = firestoreService.fetchAllReeferUnits()
-            units.forEach { reeferUnitDao.upsert(it) }
-            Log.i(BOOT_TAG, "Equipos: ${units.size}")
+            Log.i(BOOT_TAG, "Equipos: ${insertar(units, "equipos") { reeferUnitDao.upsert(it) }}")
 
             val inspections = firestoreService.fetchAllInspections()
-            inspections.forEach { inspectionDao.upsert(it) }
-            Log.i(BOOT_TAG, "Inspecciones: ${inspections.size}")
+            Log.i(BOOT_TAG, "Inspecciones: ${insertar(inspections, "inspecciones") { inspectionDao.upsert(it) }}")
 
             val estimados = firestoreService.fetchAllEstimados()
-            estimados.forEach { estimadoDao.upsert(it) }
-            Log.i(BOOT_TAG, "Estimados: ${estimados.size}")
+            Log.i(BOOT_TAG, "Estimados: ${insertar(estimados, "estimados") { estimadoDao.upsert(it) }}")
 
             val clients = firestoreService.fetchAllClients()
-            clients.forEach { clientDao.upsert(it) }
-            Log.i(BOOT_TAG, "Clientes: ${clients.size}")
+            Log.i(BOOT_TAG, "Clientes: ${insertar(clients, "clientes") { clientDao.upsert(it) }}")
 
-            dataStore.edit { preferences ->
-                preferences[KEY_BOOTSTRAP_COMPLETED] = true
-            }
-            Log.i(BOOT_TAG, "Bootstrap completo.")
+            // Se marca completo aunque se hayan descartado filas sueltas: los
+            // usuarios entraron y la app es utilizable. Repetir el bootstrap no
+            // arreglaría un registro que está mal en origen.
+            marcarCompletado()
+            Log.i(BOOT_TAG, "Bootstrap completo. Filas descartadas: $fallos")
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
             // No se marca como completo. La base local sigue disponible y el
             // proceso se reintentará en el próximo arranque de login.
             Log.w(BOOT_TAG, "Bootstrap pendiente: ${error.message}")
+        }
+    }
+
+    private suspend fun marcarCompletado() {
+        dataStore.edit { preferences ->
+            preferences[KEY_BOOTSTRAP_COMPLETED] = true
         }
     }
 
@@ -125,7 +157,12 @@ class BootstrapRepositoryImpl @Inject constructor(
         val incoming = (remoteOpen + recent)
             .distinctBy { it.id }
             .filter { isAdmin || it.technicianId == user.id }
-        incoming.forEach { estimadoDao.upsert(it) }
+        // Aislado por fila: un estimado remoto corrupto no debe impedir que se
+        // sincronicen los demás en cada login.
+        incoming.forEach { estimado ->
+            runCatching { estimadoDao.upsert(estimado) }
+                .onFailure { Log.w(BOOT_TAG, "syncRecent: estimado ${estimado.id} descartado (${it.message})") }
+        }
 
         // Reconciliar cierres viejos: abiertos locales que ya no aparecen abiertos
         // en remoto ni entre los recientes → se consultan uno a uno (suelen ser 0-2).
@@ -135,7 +172,8 @@ class BootstrapRepositoryImpl @Inject constructor(
         val staleOpenIds = estimadoDao.findOpenIds()
             .filter { it !in remoteOpenIds && it !in incomingIds }
         staleOpenIds.forEach { id ->
-            firestoreService.fetchEstimadoById(id)?.let { estimadoDao.upsert(it) }
+            runCatching { firestoreService.fetchEstimadoById(id)?.let { estimadoDao.upsert(it) } }
+                .onFailure { Log.w(BOOT_TAG, "syncRecent: reconciliación de $id falló (${it.message})") }
         }
 
         Log.i(

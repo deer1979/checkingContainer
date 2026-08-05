@@ -114,7 +114,9 @@ object DatabaseModule {
                 put("firstName", firstName)
                 put("lastName", lastName)
                 put("nick", generateNick(firstName, lastName))
-                put("pin", PinHasher.hash("000000"))
+                // Hash precomputado: derivar PBKDF2 aquí bloquearía el hilo que
+                // abre la base en la primera instalación.
+                put("pin", PinHasher.DEFAULT_SEED_PIN_HASH)
                 put("jobTitle", JobTitle.Lider.name)
                 put("role", UserRole.SuperAdmin.name)
                 put("company", "CheckingContainer")

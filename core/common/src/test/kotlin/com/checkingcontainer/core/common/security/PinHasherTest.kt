@@ -10,9 +10,30 @@ class PinHasherTest {
     @Test
     fun `hash actual usa v2 y nunca contiene el PIN en claro`() {
         val hash = PinHasher.hash("123456")
-        assertTrue(hash.startsWith("v2:600000:"))
+        assertTrue(hash.startsWith("v2:"))
         assertFalse(hash.contains("123456"))
         assertFalse(PinHasher.needsUpgrade(hash))
+    }
+
+    @Test
+    fun `el hash del seed corresponde al PIN por defecto y no necesita upgrade`() {
+        // Guarda contra que el valor precomputado se desincronice del algoritmo:
+        // si alguien cambia iteraciones o formato sin regenerarlo, el SuperAdmin
+        // sembrado no podría iniciar sesión en una instalación nueva.
+        assertTrue(PinHasher.verify("000000", PinHasher.DEFAULT_SEED_PIN_HASH))
+        assertFalse(PinHasher.verify("123456", PinHasher.DEFAULT_SEED_PIN_HASH))
+        assertFalse(PinHasher.needsUpgrade(PinHasher.DEFAULT_SEED_PIN_HASH))
+    }
+
+    @Test
+    fun `hashes v2 emitidos con 600k iteraciones siguen verificando`() {
+        // El coste va dentro del propio hash, así que bajar las iteraciones por
+        // defecto no invalida los PIN ya guardados por versiones anteriores.
+        val emitidoCon600k =
+            "v2:600000:MDEyMzQ1Njc4OWFiY2RlZg==:/V4olk4XJPnStEnsMtkTKlqWuFbI9fA58YIKQGlFNKk="
+        assertTrue(PinHasher.verify("123456", emitidoCon600k))
+        assertFalse(PinHasher.verify("654321", emitidoCon600k))
+        assertFalse(PinHasher.needsUpgrade(emitidoCon600k))
     }
 
     @Test

@@ -18,6 +18,7 @@ import com.checkingcontainer.core.model.MAX_FOTOS_POR_GRUPO
 import com.checkingcontainer.feature.units.navigation.ESTIMADO_INSPECTION_ID_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -101,8 +102,9 @@ class EstimadoViewModel @Inject constructor(
                         hasIva = existing?.hasIva ?: false,
                     )
                 }
-            } catch (error: Throwable) {
-                if (error is kotlinx.coroutines.CancellationException) throw error
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
                 _state.update {
                     it.copy(
                         isLoading = false,
