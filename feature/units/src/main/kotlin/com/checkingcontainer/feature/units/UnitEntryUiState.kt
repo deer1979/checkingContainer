@@ -1,5 +1,6 @@
 package com.checkingcontainer.feature.units
 
+import com.checkingcontainer.core.model.Iso6346
 import androidx.compose.runtime.Immutable
 import com.checkingcontainer.core.model.Brand
 import com.checkingcontainer.core.model.CampoFicha

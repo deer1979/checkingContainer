@@ -1,4 +1,4 @@
-package com.checkingcontainer.feature.units
+package com.checkingcontainer.core.model
 
 /**
  * ISO 6346 container number validator.
@@ -33,7 +33,7 @@ object Iso6346 {
         return (sum % 11) % 10
     }
 
-    internal fun isCompleteCarrierModel(model: String): Boolean {
+    fun isCompleteCarrierModel(model: String): Boolean {
         val parts = model.split("-")
         if (parts.size != 3) return false
         val prefix = parts[0].uppercase()

@@ -1,5 +1,6 @@
 package com.checkingcontainer.feature.units
 
+import com.checkingcontainer.core.model.Iso6346
 import android.content.Intent
 import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
@@ -100,7 +101,6 @@ import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.DiagnosticoRefrigeracion
 import com.checkingcontainer.core.model.EstimadoStatus
-import com.checkingcontainer.core.model.EstimadoTotals
 import com.checkingcontainer.core.model.MAX_FOTOS_POR_GRUPO
 import com.checkingcontainer.core.model.MedicionSnapshot
 import com.checkingcontainer.core.model.Severidad

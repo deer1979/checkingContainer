@@ -1,5 +1,6 @@
 package com.checkingcontainer.feature.units
 
+import com.checkingcontainer.core.model.Iso6346
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.checkingcontainer.core.domain.InspectionRepository

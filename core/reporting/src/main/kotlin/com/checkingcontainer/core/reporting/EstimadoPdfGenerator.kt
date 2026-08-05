@@ -1,5 +1,6 @@
-package com.checkingcontainer.feature.units
+package com.checkingcontainer.core.reporting
 
+import com.checkingcontainer.core.model.Iso6346
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas

@@ -123,6 +123,39 @@
    con cientos de inspecciones (hoy mitigado con 2 + confirmación).
 6. **Renombrar secrets SUPABASE_* → FIREBASE_*** — opcional; coordinar cambio
    simultáneo en GitHub Secrets + ci.yml + BuildConfig (documentado en FIREBASE.md).
+
+---
+
+## 🔴 Borrado sin resolución de conflictos (reportado en campo, ago 2026)
+
+**Síntoma que reportó el propietario:** dos técnicos trabajando sobre el mismo
+equipo. Uno borra los datos de la unidad. El otro sigue viéndolos en su teléfono,
+pero al sincronizar los detalles ya no existen y **no los puede recuperar ni
+corregir desde su lado**: hay que volver a ingresarlos a mano.
+
+**Causa de fondo:** el borrado es **físico**, no lógico. Al desaparecer el
+documento, un dispositivo no puede distinguir entre:
+
+- *"esto lo borraron a propósito"* → debo reflejar el borrado, y
+- *"esto todavía no me ha llegado"* → debo conservar lo mío.
+
+Hoy `EstimadosRepositoryImpl.deleteEstimado()` borra en Room y en Firestore sin
+dejar rastro, y `BootstrapRepositoryImpl.syncRecent()` solo sabe reconciliar
+estimados que **siguen existiendo** (`fetchEstimadoById`); si el documento ya no
+está, no toca nada. El caso de "borrado remoto" nunca se decide.
+
+**Dirección propuesta (borrado lógico):**
+1. Marcar en vez de borrar: `deletedAt: Long?` + `deletedBy: Long?` en las
+   entidades sincronizadas (estimados, equipos, clientes).
+2. Las consultas de UI filtran `deletedAt == null`; la sincronización sí ve los
+   marcados y puede propagar el borrado.
+3. Con `updatedAt` por registro, resolver conflicto por "gana el más reciente",
+   y **avisar en pantalla** cuando lo que estás editando fue borrado por otro,
+   ofreciendo restaurar en vez de perder el trabajo.
+4. Purga diferida de los marcados (p. ej. a los 90 días).
+
+**Impacto:** toca esquema Room (migración), Firestore y las consultas de todas
+las listas. No es un parche pequeño — planificarlo como pasada propia.
 7. **Gradle wrapper 9.5.1 → 9.6.1** — hacerlo desde el PC (`./gradlew wrapper
    --gradle-version 9.6.1`); el contenedor remoto no puede descargar la
    distribución (bloqueo de red a github.com).

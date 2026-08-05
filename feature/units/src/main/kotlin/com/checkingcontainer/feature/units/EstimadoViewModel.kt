@@ -1,5 +1,6 @@
 package com.checkingcontainer.feature.units
 
+import com.checkingcontainer.core.reporting.EstimadoPdfGenerator
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
@@ -41,6 +42,7 @@ class EstimadoViewModel @Inject constructor(
     private val inspectionRepo: InspectionRepository,
     private val reeferUnitRepo: ReeferEquipmentRepository,
     private val pdfGenerator: EstimadoPdfGenerator,
+    private val compresorDeFotos: CompresorDeFotos,
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -276,7 +278,7 @@ class EstimadoViewModel @Inject constructor(
             _state.update { it.copy(isUploadingPhoto = true, errorMessage = null) }
             try {
                 val bytes = withContext(Dispatchers.IO) {
-                    compressForUpload(uri)
+                    compresorDeFotos.comprimir(uri)
                         ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 }
                 if (bytes == null) {
@@ -375,70 +377,6 @@ class EstimadoViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) { estimadosRepo.deletePhoto(url) }
     }
 
-    /**
-     * Reescala (máx 1600px) y comprime a JPEG 80 antes de subir: la cámara entrega
-     * 3-6 MB por foto y sin esto se subían los bytes crudos a Storage. Aplica la
-     * rotación EXIF porque al re-codificar se pierde ese metadato.
-     */
-    private fun compressForUpload(uri: Uri): ByteArray? = runCatching {
-        val resolver = context.contentResolver
-        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use {
-            android.graphics.BitmapFactory.decodeStream(it, null, bounds)
-        } ?: return null
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_PHOTO_DIM) sample *= 2
-
-        val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
-        var bmp = resolver.openInputStream(uri)?.use {
-            android.graphics.BitmapFactory.decodeStream(it, null, opts)
-        } ?: return null
-
-        // EXIF es mejor-esfuerzo: PNG/HEIC u otros formatos pueden lanzar al leer
-        // metadatos y eso NO debe descartar la foto (bug: "No se pudo leer la foto").
-        val orientation = runCatching {
-            resolver.openInputStream(uri)?.use {
-                android.media.ExifInterface(it).getAttributeInt(
-                    android.media.ExifInterface.TAG_ORIENTATION,
-                    android.media.ExifInterface.ORIENTATION_NORMAL,
-                )
-            }
-        }.getOrNull() ?: android.media.ExifInterface.ORIENTATION_NORMAL
-        val degrees = when (orientation) {
-            android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-            android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-            android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-            else -> 0f
-        }
-        if (degrees != 0f) {
-            val matrix = android.graphics.Matrix().apply { postRotate(degrees) }
-            val rotated = android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
-            if (rotated !== bmp) bmp.recycle()
-            bmp = rotated
-        }
-
-        // inSampleSize solo reduce por potencias de 2: una foto de 4000px quedaba en
-        // 2000px y pesaba 1-3 MB (lento de subir Y de volver a bajar — fotos "que no
-        // se ven" con datos móviles). Escalado final exacto: garantiza ≤1600px.
-        val mayor = maxOf(bmp.width, bmp.height)
-        if (mayor > MAX_PHOTO_DIM) {
-            val factor = MAX_PHOTO_DIM.toFloat() / mayor
-            val scaled = android.graphics.Bitmap.createScaledBitmap(
-                bmp,
-                (bmp.width * factor).toInt().coerceAtLeast(1),
-                (bmp.height * factor).toInt().coerceAtLeast(1),
-                true,
-            )
-            if (scaled !== bmp) bmp.recycle()
-            bmp = scaled
-        }
-
-        java.io.ByteArrayOutputStream().use { out ->
-            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
-            bmp.recycle()
-            out.toByteArray()
-        }
-    }.getOrNull()
 
     fun save() {
         viewModelScope.launch {
@@ -561,5 +499,3 @@ class EstimadoViewModel @Inject constructor(
     fun clearPdfPath() = _state.update { it.copy(pdfPreviewPath = null) }
 }
 
-private const val MAX_PHOTO_DIM = 1600
-private const val JPEG_QUALITY = 80

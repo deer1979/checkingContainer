@@ -1,4 +1,4 @@
-package com.checkingcontainer.feature.units
+package com.checkingcontainer.core.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

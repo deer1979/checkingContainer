@@ -23,21 +23,32 @@ los cambios automáticamente solo de la rama **`main`**. Por eso:
 > avisa al usuario y mergea el PR a `main` (o pídele que lo haga) — el trabajo NO debe
 > quedarse en una rama sin integrar.
 
-## Tamaño de archivos (RECORDAR SIEMPRE)
+## Tamaño y responsabilidad de los archivos (RECORDAR SIEMPRE)
 
-**Límite: ~300 líneas por archivo Kotlin.**
+**La falta no es el tamaño: es mezclar responsabilidades.** Las ~300 líneas son la
+señal de alarma, no la regla.
 
-Antes de agregar una función nueva a un archivo existente, **mira cuántas líneas
-tiene**. Si al agregarla se acerca o pasa el límite:
+Antes de agregar una función nueva a un archivo existente:
 
-1. **Avísale al usuario ANTES de escribir**, con el número concreto:
-   *"`EstimadoScreen.kt` va por 280 líneas; esta función lo pasa de 300. ¿Lo parto
-   primero?"*
-2. Parte el archivo primero y **después** agrega la función.
+1. **Mira cuántas líneas tiene.** Si al agregarla pasa de ~300, para y pregúntate
+   qué hay dentro.
+2. **Si el archivo hace UNA sola cosa** y es grande porque esa cosa es grande, se
+   queda como está. Ejemplos válidos en este repo:
+   - `EstimadoPdfGenerator.kt` (461) — solo dibuja el PDF sobre un canvas.
+   - `EstimadoScreen.kt` (446) — solo estructura la pantalla; ni cálculo ni repos.
+3. **Si mezcla responsabilidades, se parte** — sin importar el tamaño. Señales:
+   - Un `@Composable` dentro de un archivo de lógica (o al revés).
+   - Un ViewModel que decodifica bitmaps, parsea, o habla con el framework en vez
+     de coordinar estado (fue el caso de `compressForUpload`, sacado a
+     `CompresorDeFotos`).
+   - Una pantalla que calcula reglas de negocio en vez de recibirlas del estado.
+4. **Avísale al usuario ANTES de escribir**, con el número y el motivo:
+   *"`EstimadoScreen.kt` va por 280; esta función lo pasa de 300 y además mete
+   lógica de cálculo. ¿Lo parto primero?"*
 
 Esto se ignoró durante meses y `EstimadoScreen.kt` llegó a **1.341 líneas** apilando
 siete funcionalidades seguidas (fotos por ítem, aviso de cambios sin guardar,
 mediciones BLE, catálogo de clientes, tipo de equipo, orden de trabajo, diagnóstico).
-Es deuda que costó una pasada entera de refactor.
+Costó una pasada entera de refactor.
 
 No hay linter que lo verifique: **depende de que lo recuerdes en cada cambio.**

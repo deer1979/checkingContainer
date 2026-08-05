@@ -1,5 +1,6 @@
 package com.checkingcontainer.feature.units
 
+import com.checkingcontainer.core.model.Iso6346
 import android.graphics.Bitmap
 import android.util.Log
 import com.google.mlkit.genai.common.FeatureStatus
