@@ -107,8 +107,30 @@ class BootstrapRepositoryImpl @Inject constructor(
             val units = firestoreService.fetchAllReeferUnits()
             Log.i(BOOT_TAG, "Equipos: ${insertar(units, "equipos") { reeferUnitDao.upsert(it) }}")
 
+            // Los ids de inspección son una secuencia LOCAL de cada teléfono, y
+            // esta consulta trae las de todos los contenedores mezcladas: dos
+            // equipos distintos pueden traer, cada uno, una inspección con id 5.
+            // Insertarlas a ciegas hacía que una pisara a la otra y el estimado
+            // acabara apuntando a un contenedor ajeno. Ante un id repetido con
+            // contenedor distinto se conserva la primera y se registra el choque.
             val inspections = firestoreService.fetchAllInspections()
-            Log.i(BOOT_TAG, "Inspecciones: ${insertar(inspections, "inspecciones") { inspectionDao.upsert(it) }}")
+            val idsUsados = mutableMapOf<Long, String>()
+            var choques = 0
+            val inspOk = insertar(inspections, "inspecciones") { inspeccion ->
+                val yaUsado = idsUsados[inspeccion.id]
+                if (yaUsado != null && yaUsado != inspeccion.containerNo) {
+                    choques += 1
+                    Log.w(
+                        BOOT_TAG,
+                        "id de inspección ${inspeccion.id} repetido: '$yaUsado' vs " +
+                            "'${inspeccion.containerNo}'. Se omite la segunda.",
+                    )
+                } else {
+                    idsUsados[inspeccion.id] = inspeccion.containerNo
+                    inspectionDao.upsert(inspeccion)
+                }
+            }
+            Log.i(BOOT_TAG, "Inspecciones: $inspOk (choques de id omitidos: $choques)")
 
             val estimados = firestoreService.fetchAllEstimados()
             Log.i(BOOT_TAG, "Estimados: ${insertar(estimados, "estimados") { guardarBajadoDeLaNube(it) }}")
@@ -153,8 +175,6 @@ class BootstrapRepositoryImpl @Inject constructor(
         }
         if (equipos.isNotEmpty()) Log.i(BOOT_TAG, "Equipos sincronizados: $okEquipos/${equipos.size}")
 
-        restaurarInspeccionesFaltantes()
-        repararEstimadosSinContenedor()
     }
 
     /**
@@ -181,71 +201,26 @@ class BootstrapRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Rellena el número de contenedor de los estimados que se quedaron sin él.
+     * NO se reponen inspecciones ni se rellena el contenedor de un estimado a
+     * partir de ellas, y esto no se puede reactivar sin cambiar antes el esquema.
      *
-     * Cuando la cascada borró la inspección, la pantalla del estimado se abría con
-     * el contenedor vacío y al guardar escribía ese vacío encima del bueno. El
-     * dato se recupera desde la inspección a la que pertenece el estimado.
+     * El id de `inspections` es `autoGenerate`, es decir, **una secuencia local de
+     * cada teléfono**. En Firestore las inspecciones viven bajo
+     * `reefer_units/{contenedor}/inspections/{id}`, así que el contenedor forma
+     * parte de la ruta y dos equipos distintos pueden tener, cada uno, una
+     * inspección con id 5 para contenedores diferentes.
+     *
+     * `fetchAllInspections()` es una consulta de grupo: devuelve las de TODOS los
+     * contenedores mezcladas. Reponer por id significaba meter en el hueco de una
+     * inspección borrada la de otro contenedor cualquiera, y la reparación
+     * posterior escribía ESE contenedor en el estimado y lo subía a Firestore:
+     * un estimado acababa mostrando una unidad que nunca le perteneció.
+     *
+     * No hay forma fiable de deducir el contenedor correcto a posteriori, así que
+     * se deja el campo vacío antes que inventarlo: un documento que va al cliente
+     * no puede llevar datos adivinados. La corrección definitiva es dar a las
+     * inspecciones un id único global (ver PLAN_DEUDA_TECNICA.md).
      */
-    private suspend fun repararEstimadosSinContenedor() {
-        val rotos = estimadoDao.findSinContenedor()
-        if (rotos.isEmpty()) return
-
-        var reparados = 0
-        rotos.forEach { estimado ->
-            runCatching {
-                val inspeccion = inspectionDao.findById(estimado.inspectionId) ?: return@runCatching
-                if (inspeccion.containerNo.isBlank()) return@runCatching
-                // Los datos de placa del estimado también se blanquearon: se
-                // reponen desde el equipo, que es su fuente.
-                val unidad = reeferUnitDao.findByContainerNo(inspeccion.containerNo)
-                val arreglado = estimado.copy(
-                    containerNo = inspeccion.containerNo,
-                    manufacturer = estimado.manufacturer.ifBlank { unidad?.manufacturer ?: "" },
-                    unitModel = estimado.unitModel.ifBlank { unidad?.unitModel ?: "" },
-                    unitModelNo = estimado.unitModelNo.ifBlank { unidad?.unitModelNo ?: "" },
-                    unitSerialNo = estimado.unitSerialNo.ifBlank { unidad?.unitSerialNo ?: "" },
-                    yearOfBuilt = estimado.yearOfBuilt.ifBlank { unidad?.yearOfBuilt ?: "" },
-                    unitType = estimado.unitType.ifBlank { unidad?.unitType ?: "" },
-                    technicianName = estimado.technicianName.ifBlank { inspeccion.technicianName },
-                )
-                estimadoDao.upsert(arreglado)
-                firestoreService.upsertEstimado(arreglado)
-                reparados += 1
-            }.onFailure { Log.w(BOOT_TAG, "no se pudo reparar el estimado ${estimado.id}: ${it.message}") }
-        }
-        Log.i(BOOT_TAG, "Estimados con contenedor recuperado: $reparados/${rotos.size}")
-    }
-
-    /**
-     * Repone las inspecciones que existen en la nube pero no en el teléfono.
-     *
-     * Recupera las que borró la cascada del `@Insert(REPLACE)` sobre `reefer_units`
-     * (ver ReeferUnitDao): al reinsertar un equipo se llevaba por delante sus
-     * inspecciones, y el estimado se quedaba sin contenedor ni datos de placa.
-     *
-     * Solo INSERTA las que faltan: una inspección que ya está en local no se toca,
-     * para no pisar lo que se haya editado en campo.
-     */
-    private suspend fun restaurarInspeccionesFaltantes() {
-        val remotas = firestoreService.fetchAllInspections()
-        if (remotas.isEmpty()) return
-
-        // Solo se INSERTAN las que no existen localmente: una inspección presente
-        // nunca se toca, para no pisar ediciones de campo. Se revisa una a una
-        // porque el atajo anterior ("si hay alguna local, no hacer nada") dejaba
-        // sin reponer las borradas cuando sobrevivían otras.
-        var repuestas = 0
-        remotas.forEach { fila ->
-            runCatching {
-                if (inspectionDao.findById(fila.id) == null) {
-                    inspectionDao.upsert(fila)
-                    repuestas += 1
-                }
-            }.onFailure { Log.w(BOOT_TAG, "inspección no repuesta: ${it.message}") }
-        }
-        if (repuestas > 0) Log.i(BOOT_TAG, "Inspecciones restauradas desde la nube: $repuestas/${remotas.size}")
-    }
 
     /**
      * Trabajo real hecho en este teléfono. El usuario sembrado en la primera

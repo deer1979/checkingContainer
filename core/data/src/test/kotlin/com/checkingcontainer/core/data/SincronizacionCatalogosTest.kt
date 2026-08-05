@@ -9,7 +9,6 @@ import com.checkingcontainer.core.database.dao.InspectionDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.database.entity.EstimadoEntity
-import com.checkingcontainer.core.database.entity.InspectionEntity
 import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.core.network.AnonymousAuth
@@ -76,22 +75,31 @@ class SincronizacionCatalogosTest {
     }
 
     @Test
-    fun `solo se reponen las inspecciones que faltan, una a una`() = runTest {
-        // La cascada pudo borrar UNA inspección dejando otras vivas. El atajo
-        // "si hay alguna local no hago nada" dejaba esa sin reponer para siempre
-        // y su estimado seguía sin contenedor.
+    fun `el login NO repone inspecciones ni toca su tabla`() = runTest {
+        // Los ids de inspección son una secuencia local de cada teléfono y la
+        // consulta remota mezcla todos los contenedores: reponer por id metía la
+        // inspección de OTRO contenedor en el hueco de la borrada, y el estimado
+        // acababa mostrando una unidad que nunca le perteneció.
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val existente: InspectionEntity = mockk { coEvery { id } returns 1L }
-        val borrada: InspectionEntity = mockk { coEvery { id } returns 2L }
-        coEvery { firestoreService.fetchAllInspections() } returns listOf(existente, borrada)
-        coEvery { inspectionDao.findById(1L) } returns existente
-        coEvery { inspectionDao.findById(2L) } returns null
 
         repositorio(dispatcher).syncRecentPublico(tecnico)
 
-        // La que existe NO se toca (no pisar ediciones); la borrada se repone.
-        coVerify(exactly = 0) { inspectionDao.upsert(existente) }
-        coVerify(exactly = 1) { inspectionDao.upsert(borrada) }
+        coVerify(exactly = 0) { firestoreService.fetchAllInspections() }
+        coVerify(exactly = 0) { inspectionDao.upsert(any()) }
+    }
+
+    @Test
+    fun `el login nunca reescribe el contenedor de un estimado`() = runTest {
+        // Deducir el contenedor a partir de una inspección no es fiable, y un
+        // documento que va al cliente no puede llevar datos adivinados.
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        coEvery { firestoreService.fetchOpenEstimados() } returns emptyList()
+        coEvery { firestoreService.fetchEstimadosCreatedSince(any()) } returns emptyList()
+        coEvery { estimadoDao.findOpenIds() } returns emptyList()
+
+        repositorio(dispatcher).syncRecentPublico(tecnico)
+
+        coVerify(exactly = 0) { estimadoDao.findSinContenedor() }
     }
 
     @Test

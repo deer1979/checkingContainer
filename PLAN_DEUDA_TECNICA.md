@@ -200,3 +200,28 @@ cara del documento ante su cliente.
 
 Igual para el **bloque de mediciones** (presión y temperatura capturadas por
 BLE): formato de números, unidades y disposición para que se lea profesional.
+
+---
+
+## 🔴 Los ids de inspección no son únicos entre teléfonos (ago 2026)
+
+`InspectionEntity.id` es `@PrimaryKey(autoGenerate = true)`: **cada teléfono lleva
+su propia secuencia** y ambos empiezan en 1. En Firestore las inspecciones viven
+bajo `reefer_units/{contenedor}/inspections/{id}`, así que el contenedor forma
+parte de la ruta y allí no chocan — **pero en Room el id es la clave primaria de
+una única tabla**, y `fetchAllInspections()` es una consulta de grupo que las trae
+de todos los contenedores mezcladas.
+
+Consecuencia real (vista en campo): al reponer inspecciones por id, en el hueco de
+una borrada entró la de otro contenedor, y la reparación posterior escribió ESE
+contenedor en el estimado y lo subió a Firestore. Un estimado terminó mostrando
+una unidad que nunca le perteneció.
+
+**Mitigación aplicada:** se retiró la reposición de inspecciones y la reparación
+automática del contenedor; el bootstrap inicial descarta ids repetidos con
+contenedor distinto en vez de dejar que uno pise al otro.
+
+**Corrección pendiente:** dar a las inspecciones (y a los estimados, que tienen el
+mismo esquema) un identificador único global — UUID, o prefijo de dispositivo.
+Implica migración de Room y de los documentos de Firestore, y hay que hacerla
+antes de que el número de teléfonos crezca.
