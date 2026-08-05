@@ -1,17 +1,8 @@
 package com.checkingcontainer.core.reporting
 
-import com.checkingcontainer.core.model.Iso6346
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.RectF
-import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
-import android.text.Layout
-import android.text.StaticLayout
-import android.text.TextPaint
 import coil3.BitmapImage
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
@@ -20,6 +11,7 @@ import com.checkingcontainer.core.model.CampoFicha
 import com.checkingcontainer.core.model.DiagnosticoRefrigeracion
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoTotals
+import com.checkingcontainer.core.model.Iso6346
 import com.checkingcontainer.core.model.ObjetivoRefrigeracion
 import com.checkingcontainer.core.model.ParametroGuia
 import com.checkingcontainer.core.model.Severidad
@@ -42,8 +34,7 @@ class EstimadoPdfGenerator @Inject constructor(
 
     private val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     private val sdfHora = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-    private val usd = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-US"))
-        .apply { maximumFractionDigits = 2 }
+    private val usd = NumberFormat.getCurrencyInstance(Locale.US).apply { maximumFractionDigits = 2 }
 
     // Todo el dibujo (Canvas, StaticLayout, bitmaps) fuera del main thread:
     // con varios ítems y fotos, hacerlo en Main congelaba la UI 2-3 segundos.
@@ -52,396 +43,334 @@ class EstimadoPdfGenerator @Inject constructor(
         fichaTecnica: List<CampoFicha> = emptyList(),
     ): ByteArray = withContext(Dispatchers.Default) {
         val loader = SingletonImageLoader.get(context)
-
-        // Pre-cargar todas las fotos antes de empezar a dibujar
-        val photos = mutableMapOf<String, Bitmap?>()
+        val fotos = mutableMapOf<String, Bitmap?>()
         estimado.damages.forEach { item ->
             (item.damagePhotos + item.repairPhotos).forEach { url ->
-                photos.getOrPut(url) { loadBitmap(loader, url) }
+                fotos.getOrPut(url) { loadBitmap(loader, url) }
             }
         }
 
         val doc = PdfDocument()
-        val pageW = 595
-        val pageH = 842
-        val margin = 40f
-        val contentW = pageW - 2 * margin
+        val p = Pinceles()
+        val l = LienzoPdf(doc, p)
 
-        // ── Paints ──────────────────────────────────────────────────────────
-        val pTitle = TextPaint().apply {
-            color = Color.BLACK; textSize = 18f; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true
-        }
-        val pSection = TextPaint().apply {
-            color = 0xFF1565C0.toInt(); textSize = 11f; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true
-        }
-        val pSubheader = TextPaint().apply {
-            color = Color.DKGRAY; textSize = 13f; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true
-        }
-        val pBody = TextPaint().apply {
-            color = 0xFF333333.toInt(); textSize = 10f; isAntiAlias = true
-        }
-        val pBold = TextPaint().apply {
-            color = Color.BLACK; textSize = 10f; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true
-        }
-        val pLabel = TextPaint().apply {
-            color = Color.GRAY; textSize = 9f; isAntiAlias = true
-        }
-        val pHline = Paint().apply {
-            color = Color.LTGRAY; strokeWidth = 0.5f; isAntiAlias = true
+        val esContenedor = Iso6346.isValid(estimado.containerNo)
+        val referencia = "Estimado N° ${numeroEstimado(estimado)}"
+
+        // A partir de la página 2 se repite quién es quién: si una hoja se
+        // separa del juego, sigue identificada.
+        l.encabezadoContinuacion = {
+            l.texto(referencia, Hoja.MARGEN, p.etiqueta)
+            l.textoDerecha(
+                "${if (esContenedor) "Contenedor" else "Equipo"} ${estimado.containerNo}" +
+                    if (estimado.clientName.isNotEmpty()) "  ·  ${estimado.clientName}" else "",
+                Hoja.ANCHO - Hoja.MARGEN, p.etiqueta,
+            )
+            l.linea(4f)
+            l.y += 14f
         }
 
-        // ── Estado mutable del contexto de dibujo ──────────────────────────
-        var pageNum = 1
-        var page = doc.startPage(PdfDocument.PageInfo.Builder(pageW, pageH, pageNum).create())
-        var canvas: Canvas = page.canvas
-        var y = margin
+        dibujarEncabezado(l, p, estimado, referencia, esContenedor)
+        dibujarEquipo(l, p, estimado, fichaTecnica)
+        dibujarMediciones(l, p, estimado)
+        dibujarItems(l, p, estimado, fotos)
+        dibujarValores(l, p, estimado)
 
-        fun hLine() = canvas.drawLine(margin, y, pageW - margin, y, pHline)
-
-        fun checkBreak(needed: Float) {
-            if (y + needed > pageH - margin) {
-                doc.finishPage(page)
-                pageNum++
-                page = doc.startPage(PdfDocument.PageInfo.Builder(pageW, pageH, pageNum).create())
-                canvas = page.canvas
-                y = margin
-            }
-        }
-
-        fun drawMultiline(text: String, paint: TextPaint, width: Float, x: Float = margin): Float {
-            val sl = StaticLayout.Builder
-                .obtain(text, 0, text.length, paint, width.toInt())
-                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                .setLineSpacing(2f, 1f)
-                .build()
-            canvas.save()
-            canvas.translate(x, y)
-            sl.draw(canvas)
-            canvas.restore()
-            return sl.height.toFloat()
-        }
-
-        // Alto que ocuparía un texto multilínea (sin dibujarlo): se usa para decidir
-        // saltos de página antes de empezar a escribir.
-        fun measureHeight(text: String, paint: TextPaint, width: Float): Float {
-            if (text.isEmpty()) return 0f
-            return StaticLayout.Builder
-                .obtain(text, 0, text.length, paint, width.toInt())
-                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                .setLineSpacing(2f, 1f)
-                .build().height.toFloat()
-        }
-
-        fun infoRow(label: String, value: String) {
-            canvas.drawText(label, margin, y, pLabel)
-            canvas.drawText(value, margin + 110f, y, pBody)
-            y += 13f
-        }
-
-        fun photoBox(bmp: Bitmap?, px: Float, py: Float, size: Float, caption: String) {
-            val dst = RectF(px, py, px + size, py + size)
-            if (bmp != null) {
-                canvas.drawBitmap(bmp, null, dst, null)
-            } else {
-                val bg = Paint().apply { color = 0xFFEEEEEE.toInt(); style = Paint.Style.FILL }
-                canvas.drawRect(dst, bg)
-                canvas.drawText(
-                    "Sin foto",
-                    px + (size - pLabel.measureText("Sin foto")) / 2,
-                    py + size / 2 + 4f,
-                    pLabel,
-                )
-            }
-            if (caption.isNotEmpty()) {
-                canvas.drawText(
-                    caption,
-                    px + (size - pLabel.measureText(caption)) / 2,
-                    py + size + 11f,
-                    pLabel,
-                )
-            }
-        }
-
-        // Dibuja un grupo de fotos en cuadrícula (3 por fila), precedido de su
-        // etiqueta ("Daño" / "Reparación"). Salta de página si no caben.
-        fun photoGrid(label: String, urls: List<String>) {
-            if (urls.isEmpty()) return
-            val perRow = 3
-            val gap = 8f
-            val size = (contentW - (perRow - 1) * gap) / perRow
-            // Reserva la etiqueta + la primera fila JUNTAS: si no caben, salta de
-            // página antes de dibujar el rótulo. Así la imagen queda pegada debajo
-            // de su etiqueta y no se estorba un rótulo huérfano al pie de página.
-            checkBreak(14f + size + 10f)
-            canvas.drawText(label, margin, y, pLabel); y += 14f
-            var i = 0
-            while (i < urls.size) {
-                val rowCount = minOf(perRow, urls.size - i)
-                checkBreak(size + 10f)
-                val rowY = y
-                for (c in 0 until rowCount) {
-                    val px = margin + c * (size + gap)
-                    photoBox(photos[urls[i + c]], px, rowY, size, "")
-                }
-                y += size + 10f
-                i += rowCount
-            }
-            y += 4f
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        // HEADER
-        // ════════════════════════════════════════════════════════════════════
-        canvas.drawText("CHECKING CONTAINER", margin, y, pTitle)
-        val subtitle = "ESTIMADO DE REPARACIÓN"
-        canvas.drawText(
-            subtitle,
-            pageW - margin - pSubheader.measureText(subtitle),
-            y,
-            pSubheader,
-        )
-        y += 6f; hLine(); y += 12f
-
-        // Heurística sin cambio de esquema: los reefer siempre pasan ISO 6346;
-        // los demás equipos usan código libre.
-        infoRow(if (Iso6346.isValid(estimado.containerNo)) "Contenedor:" else "Equipo:", estimado.containerNo)
-        if (estimado.clientName.isNotEmpty()) infoRow("Cliente:", estimado.clientName)
-        if (estimado.clientIdNumber.isNotEmpty()) infoRow("RUC/CI:", estimado.clientIdNumber)
-        if (estimado.clientDireccion.isNotEmpty()) infoRow("Dirección:", estimado.clientDireccion)
-        if (estimado.clientTelefono.isNotEmpty()) infoRow("Teléfono:", estimado.clientTelefono)
-        if (estimado.ordenTrabajo.isNotEmpty()) infoRow("Orden de trabajo:", estimado.ordenTrabajo)
-        if (estimado.sitioNombre.isNotEmpty()) infoRow("Trabajo en:", estimado.sitioNombre)
-        if (estimado.location.isNotEmpty()) infoRow("Ubicación:", estimado.location)
-        infoRow("Técnico:", estimado.technicianName.ifEmpty { "—" })
-        infoRow("Fecha:", sdf.format(Date(estimado.createdAt)))
-        estimado.approvedAt?.let { infoRow("Aprobado:", sdf.format(Date(it))) }
-
-        y += 4f; hLine(); y += 12f
-
-        // ════════════════════════════════════════════════════════════════════
-        // EQUIPO
-        // ════════════════════════════════════════════════════════════════════
-        if (estimado.manufacturer.isNotEmpty() || estimado.unitSerialNo.isNotEmpty()) {
-            canvas.drawText("DATOS DEL EQUIPO", margin, y, pSection); y += 12f
-            val c2 = margin + contentW / 2 + 8f
-
-            fun equipRow(l1: String, v1: String, l2: String = "", v2: String = "") {
-                canvas.drawText(l1, margin, y, pLabel)
-                canvas.drawText(v1, margin + 72f, y, pBody)
-                if (l2.isNotEmpty()) {
-                    canvas.drawText(l2, c2, y, pLabel)
-                    canvas.drawText(v2, c2 + 72f, y, pBody)
-                }
-                y += 13f
-            }
-
-            if (estimado.manufacturer.isNotEmpty())
-                equipRow("Fabricante:", estimado.manufacturer, "Modelo:", estimado.unitModel)
-            if (estimado.unitSerialNo.isNotEmpty())
-                equipRow("No. Serie:", estimado.unitSerialNo, "No. Modelo:", estimado.unitModelNo)
-            if (estimado.yearOfBuilt.isNotEmpty())
-                equipRow("Año:", estimado.yearOfBuilt, "Tipo:", estimado.unitType)
-
-            // Ficha técnica completa (placa) — pares en dos columnas.
-            if (fichaTecnica.isNotEmpty()) {
-                y += 4f
-                checkBreak(14f)
-                canvas.drawText("FICHA TÉCNICA (PLACA)", margin, y, pSection); y += 12f
-                var i = 0
-                while (i < fichaTecnica.size) {
-                    checkBreak(13f)
-                    val a = fichaTecnica[i]
-                    val b = fichaTecnica.getOrNull(i + 1)
-                    equipRow("${a.etiqueta}:", a.valor, b?.let { "${it.etiqueta}:" } ?: "", b?.valor ?: "")
-                    i += 2
-                }
-            }
-
-            y += 4f; hLine(); y += 12f
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        // MEDICIONES DEL EQUIPO (capturas BLE: presiones, SH/SC, corriente)
-        // ════════════════════════════════════════════════════════════════════
-        if (estimado.mediciones.isNotEmpty()) {
-            fun num(v: Double?, dec: Int = 1): String =
-                v?.let { String.format(Locale.US, "%.${dec}f", it) } ?: "—"
-
-            // ── Paints y colores de la tabla de mediciones ──────────────────
-            val cRojo = 0xFFC62828.toInt()      // ALTA / descarga / líquido (cálido)
-            val cAzul = 0xFF0277BD.toInt()      // BAJA / succión / vapor (frío)
-            val cRojoTenue = 0xFFFCE9E7.toInt()
-            val cAzulTenue = 0xFFE3F2FD.toInt()
-            val cGrisFila = 0xFFF5F5F5.toInt()
-            val pCellHdr = TextPaint().apply { color = Color.WHITE; textSize = 8.5f; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true }
-            val pCellLbl = TextPaint().apply { color = 0xFF555555.toInt(); textSize = 9f; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true }
-            val pCellVal = TextPaint().apply { color = 0xFF222222.toInt(); textSize = 9.5f; isAntiAlias = true }
-
-            fun fillRect(x0: Float, y0: Float, x1: Float, y1: Float, c: Int) =
-                canvas.drawRect(RectF(x0, y0, x1, y1), Paint().apply { color = c; style = Paint.Style.FILL })
-
-            fun centrado(text: String, cx: Float, baseY: Float, p: TextPaint) =
-                canvas.drawText(text, cx - p.measureText(text) / 2f, baseY, p)
-
-            // Geometría de la tabla: columna de etiqueta + dos columnas (ALTA/BAJA).
-            val labelW = 96f
-            val cellW = (contentW - labelW) / 2f
-            val xLbl = margin
-            val xAlta = margin + labelW
-            val xBaja = xAlta + cellW
-            val xEnd = xBaja + cellW
-            val rowH = 15f
-
-            canvas.drawText("MEDICIONES DEL EQUIPO", margin, y, pSection); y += 12f
-
-            estimado.mediciones.forEach { m ->
-                val objetivos = ObjetivoRefrigeracion.efectivos(m.tipoExpansion, m.objetivoManual())
-                val obs = DiagnosticoRefrigeracion.evaluar(m)
-                val diagH = measureHeight(obs.texto, pBody, contentW - 24f) + 8f
-                // Todo el bloque de una captura se mantiene junto (cabecera + tabla + diagnóstico).
-                checkBreak(12f + rowH * 6 + diagH + 14f)
-
-                // Cabecera: fecha · gas · dispositivo de expansión · medidores.
-                val cab = sdfHora.format(Date(m.timestamp)) +
-                    (if (m.refrigerante.isNotEmpty()) "  ·  ${m.refrigerante}" else "") +
-                    (if (m.tipoExpansion != TipoExpansion.NO_ESPECIFICADO) "  ·  ${m.tipoExpansion.abreviatura}" else "") +
-                    (if (m.dispositivos.isNotEmpty()) "  ·  ${m.dispositivos.joinToString(", ")}" else "")
-                canvas.drawText(cab, margin, y, pLabel); y += 12f
-
-                // Fila de encabezado con las dos columnas coloreadas.
-                fillRect(xAlta, y - rowH + 4f, xBaja, y + 4f, cRojo)
-                fillRect(xBaja, y - rowH + 4f, xEnd, y + 4f, cAzul)
-                centrado("ALTA / Descarga", (xAlta + xBaja) / 2f, y, pCellHdr)
-                centrado("BAJA / Succión", (xBaja + xEnd) / 2f, y, pCellHdr)
-                y += rowH
-
-                // Una fila de datos: etiqueta + valor ALTA + valor BAJA, con tinte de columna.
-                fun filaDatos(etiqueta: String, valAlta: String, valBaja: String, guia: Boolean = false) {
-                    fillRect(xLbl, y - rowH + 4f, xAlta, y + 4f, cGrisFila)
-                    fillRect(xAlta, y - rowH + 4f, xBaja, y + 4f, cRojoTenue)
-                    fillRect(xBaja, y - rowH + 4f, xEnd, y + 4f, cAzulTenue)
-                    canvas.drawText(etiqueta + if (guia) "  ★" else "", xLbl + 4f, y, pCellLbl)
-                    centrado(valAlta, (xAlta + xBaja) / 2f, y, pCellVal)
-                    centrado(valBaja, (xBaja + xEnd) / 2f, y, pCellVal)
-                    y += rowH
-                }
-
-                val guiaSH = objetivos.guia == ParametroGuia.RECALENTAMIENTO
-                val guiaSC = objetivos.guia == ParametroGuia.SUBENFRIAMIENTO
-                filaDatos("Presión", "${num(m.presionAltaPsig, 0)} psi", "${num(m.presionBajaPsig, 0)} psi")
-                filaDatos("Temperatura", "${num(m.tempDescargaC)} °C", "${num(m.tempSuccionC)} °C")
-                filaDatos("Saturación", "${num(m.satLiquidoC)} °C", "${num(m.satVaporC)} °C")
-                filaDatos("Subcool / Superheat", "${num(m.subcoolingC)} °C", "${num(m.superheatC)} °C", guia = guiaSH || guiaSC)
-
-                // Fila corriente + objetivo (ancho completo bajo la tabla).
-                val guiaNombre = when (objetivos.guia) {
-                    ParametroGuia.SUBENFRIAMIENTO -> "Subcooling"
-                    ParametroGuia.RECALENTAMIENTO -> "Superheat"
-                    ParametroGuia.NINGUNO -> ""
-                }
-                val objTxt = objetivos.rangoGuia()?.let { "Objetivo $guiaNombre: ${it.etiqueta()}" }
-                    ?: "Objetivo: seleccione dispositivo de expansión"
-                canvas.drawText("Corriente  ${num(m.corrienteA)} A", xLbl + 4f, y + rowH - 4f, pBody)
-                canvas.drawText(objTxt, xBaja - 40f, y + rowH - 4f, pBody)
-                y += rowH + 2f
-
-                // Diagnóstico técnico: caja coloreada por severidad con la observación.
-                val bgDiag = when (obs.severidad) {
-                    Severidad.OK -> 0xFFE8F5E9.toInt()
-                    Severidad.ALERTA -> 0xFFFFF3E0.toInt()
-                    Severidad.INFO -> 0xFFF5F5F5.toInt()
-                }
-                val icono = when (obs.severidad) {
-                    Severidad.OK -> "OK  "
-                    Severidad.ALERTA -> "! "
-                    Severidad.INFO -> "i  "
-                }
-                val txtDiag = icono + obs.texto
-                val hDiag = measureHeight(txtDiag, pBody, contentW - 16f)
-                val topDiag = y
-                fillRect(margin, topDiag, pageW - margin, topDiag + hDiag + 14f, bgDiag)
-                y += 9f
-                drawMultiline(txtDiag, pBody, contentW - 16f, margin + 8f)
-                y = topDiag + hDiag + 14f + 6f
-            }
-
-            y += 4f; hLine(); y += 12f
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        // ÍTEMS DE DAÑO
-        // ════════════════════════════════════════════════════════════════════
-        estimado.damages.forEachIndexed { idx, item ->
-            // Mantener encabezado + descripción juntos. Las fotos se gestionan
-            // solas dentro de photoGrid (que también evita rótulos huérfanos).
-            val descH = measureHeight(item.damageDescription, pBody, contentW)
-            checkBreak((16f + descH + 8f).coerceAtMost(pageH - 2 * margin))
-
-            canvas.drawText("ÍTEM ${idx + 1}", margin, y, pSection); y += 4f
-
-            y += drawMultiline(item.damageDescription, pBody, contentW); y += 8f
-
-            // Fotos: grupo de daño (antes) y grupo de reparación (después).
-            photoGrid("Daño (antes):", item.damagePhotos)
-            photoGrid("Reparación (después):", item.repairPhotos)
-
-            // Acción de reparación
-            if (item.repairAction.isNotEmpty()) {
-                checkBreak(24f)
-                val lw = pBold.measureText("Reparación: ")
-                canvas.drawText("Reparación: ", margin, y, pBold)
-                val rh = drawMultiline(item.repairAction, pBody, contentW - lw, margin + lw)
-                y += maxOf(rh, 13f) + 4f
-            }
-
-            // Costos
-            val lab = item.laborCost ?: 0.0
-            val mat = item.materialCost ?: 0.0
-            if (lab > 0 || mat > 0) {
-                checkBreak(14f)
-                canvas.drawText(
-                    "Mano de obra: ${usd.format(lab)}    Material: ${usd.format(mat)}",
-                    margin, y, pBody,
-                )
-                y += 14f
-            }
-
-            y += 8f; hLine(); y += 12f
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        // RESUMEN DE VALORES
-        // ════════════════════════════════════════════════════════════════════
-        checkBreak(90f)
-        canvas.drawText("RESUMEN DE VALORES", margin, y, pSection); y += 14f
-
-        val totals = EstimadoTotals.calcular(estimado.damages, estimado.hasIva)
-        val labTotal = totals.laborTotal
-        val matTotal = totals.materialTotal
-        val ivaAmt = totals.ivaAmount
-        val total = totals.total
-
-        fun totalRow(label: String, amount: Double, bold: Boolean = false) {
-            val p = if (bold) pBold else pBody
-            canvas.drawText(label, margin + 20f, y, p)
-            val amtStr = usd.format(amount)
-            canvas.drawText(amtStr, pageW - margin - p.measureText(amtStr), y, p)
-            y += 13f
-        }
-
-        totalRow("Mano de obra total:", labTotal)
-        totalRow("Materiales total:", matTotal)
-        if (estimado.hasIva) totalRow("IVA 12%:", ivaAmt)
-        y += 4f; hLine(); y += 10f
-        totalRow("TOTAL:", total, bold = true)
-
-        doc.finishPage(page)
-
+        l.finalizar()
         ByteArrayOutputStream().use { out ->
             doc.writeTo(out)
             doc.close()
             out.toByteArray()
         }
+    }
+
+    /** Sin folio propio todavía: el id de la base sirve de número estable. */
+    private fun numeroEstimado(e: Estimado): String =
+        e.id.takeIf { it > 0 }?.toString()?.padStart(5, '0') ?: "—"
+
+    // ── Encabezado ──────────────────────────────────────────────────────────
+
+    private fun dibujarEncabezado(
+        l: LienzoPdf,
+        p: Pinceles,
+        e: Estimado,
+        referencia: String,
+        esContenedor: Boolean,
+    ) {
+        l.texto("CHECKING CONTAINER", Hoja.MARGEN, p.titulo)
+        l.textoDerecha("ESTIMADO DE REPARACIÓN", Hoja.ANCHO - Hoja.MARGEN, p.subtitulo)
+        l.y += 13f
+        l.textoDerecha(referencia, Hoja.ANCHO - Hoja.MARGEN, p.etiqueta)
+        l.linea(4f)
+        l.y += 14f
+
+        // Dos columnas: identificación del trabajo a la izquierda, cliente a la
+        // derecha. Los valores se recortan al ancho de su columna para que una
+        // dirección larga no se salga de la hoja (antes se desbordaba).
+        val anchoCol = (Hoja.contenidoAncho - 20f) / 2f
+        val xDer = Hoja.MARGEN + anchoCol + 20f
+        val izquierda = buildList {
+            add((if (esContenedor) "Contenedor:" else "Equipo:") to e.containerNo)
+            if (e.ordenTrabajo.isNotEmpty()) add("Orden de trabajo:" to e.ordenTrabajo)
+            if (e.sitioNombre.isNotEmpty()) add("Trabajo en:" to e.sitioNombre)
+            if (e.location.isNotEmpty()) add("Ubicación:" to e.location)
+            add("Técnico:" to e.technicianName.ifEmpty { "—" })
+            add("Fecha:" to sdf.format(Date(e.createdAt)))
+            e.approvedAt?.let { add("Aprobado:" to sdf.format(Date(it))) }
+        }
+        val derecha = buildList {
+            if (e.clientName.isNotEmpty()) add("Cliente:" to e.clientName)
+            if (e.clientIdNumber.isNotEmpty()) add("RUC / CI:" to e.clientIdNumber)
+            if (e.clientDireccion.isNotEmpty()) add("Dirección:" to e.clientDireccion)
+            if (e.clientTelefono.isNotEmpty()) add("Teléfono:" to e.clientTelefono)
+            if (e.clientEmail.isNotEmpty()) add("Correo:" to e.clientEmail)
+        }
+
+        val yInicio = l.y
+        izquierda.forEach { (etiqueta, valor) -> fila(l, p, etiqueta, valor, Hoja.MARGEN, anchoCol) }
+        val yIzq = l.y
+        l.y = yInicio
+        derecha.forEach { (etiqueta, valor) -> fila(l, p, etiqueta, valor, xDer, anchoCol) }
+        l.y = maxOf(yIzq, l.y)
+
+        l.linea(6f)
+        l.y += 14f
+    }
+
+    /** Etiqueta + valor ajustados al ancho de la columna (el valor puede envolver). */
+    private fun fila(l: LienzoPdf, p: Pinceles, etiqueta: String, valor: String, x: Float, ancho: Float) {
+        val anchoEtiqueta = 72f
+        l.texto(etiqueta, x, p.etiqueta)
+        val alto = l.parrafo(valor, p.cuerpo, ancho - anchoEtiqueta, x + anchoEtiqueta)
+        l.y += maxOf(alto, 12f) + 1f
+    }
+
+    // ── Equipo y ficha técnica ──────────────────────────────────────────────
+
+    private fun dibujarEquipo(l: LienzoPdf, p: Pinceles, e: Estimado, ficha: List<CampoFicha>) {
+        if (e.manufacturer.isEmpty() && e.unitSerialNo.isEmpty() && ficha.isEmpty()) return
+        l.asegurar(60f)
+        l.texto("DATOS DEL EQUIPO", Hoja.MARGEN, p.seccion)
+        l.y += 14f
+
+        val anchoCol = (Hoja.contenidoAncho - 20f) / 2f
+        val xDer = Hoja.MARGEN + anchoCol + 20f
+        val campos = buildList {
+            if (e.manufacturer.isNotEmpty()) add("Fabricante:" to e.manufacturer)
+            if (e.unitModel.isNotEmpty()) add("Modelo:" to e.unitModel)
+            if (e.unitSerialNo.isNotEmpty()) add("No. Serie:" to e.unitSerialNo)
+            if (e.unitModelNo.isNotEmpty()) add("No. Modelo:" to e.unitModelNo)
+            if (e.yearOfBuilt.isNotEmpty()) add("Año:" to e.yearOfBuilt)
+            if (e.unitType.isNotEmpty()) add("Tipo:" to e.unitType)
+            ficha.forEach { add("${it.etiqueta}:" to it.valor) }
+        }
+        var i = 0
+        while (i < campos.size) {
+            l.asegurar(16f)
+            val y0 = l.y
+            fila(l, p, campos[i].first, campos[i].second, Hoja.MARGEN, anchoCol)
+            val yIzq = l.y
+            campos.getOrNull(i + 1)?.let {
+                l.y = y0
+                fila(l, p, it.first, it.second, xDer, anchoCol)
+            }
+            l.y = maxOf(yIzq, l.y)
+            i += 2
+        }
+        l.linea(6f)
+        l.y += 14f
+    }
+
+    // ── Mediciones (tabla alta/baja + diagnóstico) ──────────────────────────
+
+    private fun dibujarMediciones(l: LienzoPdf, p: Pinceles, e: Estimado) {
+        if (e.mediciones.isEmpty()) return
+        fun num(v: Double?, dec: Int = 1): String =
+            v?.let { String.format(Locale.US, "%.${dec}f", it) } ?: "—"
+
+        val anchoEtiqueta = 96f
+        val anchoCelda = (Hoja.contenidoAncho - anchoEtiqueta) / 2f
+        val xEtq = Hoja.MARGEN
+        val xAlta = xEtq + anchoEtiqueta
+        val xBaja = xAlta + anchoCelda
+        val xFin = xBaja + anchoCelda
+        val altoFila = 15f
+
+        l.asegurar(30f)
+        l.texto("MEDICIONES DEL EQUIPO", Hoja.MARGEN, p.seccion)
+        l.y += 14f
+
+        e.mediciones.forEach { m ->
+            val objetivos = ObjetivoRefrigeracion.efectivos(m.tipoExpansion, m.objetivoManual())
+            val obs = DiagnosticoRefrigeracion.evaluar(m)
+            val altoDiag = LienzoPdf.medir(obs.texto, p.cuerpo, Hoja.contenidoAncho - 16f)
+            l.asegurar(14f + altoFila * 6 + altoDiag + 24f)
+
+            l.texto(
+                sdfHora.format(Date(m.timestamp)) +
+                    (if (m.refrigerante.isNotEmpty()) "  ·  ${m.refrigerante}" else "") +
+                    (if (m.tipoExpansion != TipoExpansion.NO_ESPECIFICADO) "  ·  ${m.tipoExpansion.abreviatura}" else "") +
+                    (if (m.dispositivos.isNotEmpty()) "  ·  ${m.dispositivos.joinToString(", ")}" else ""),
+                Hoja.MARGEN, p.etiqueta,
+            )
+            l.y += 13f
+
+            l.relleno(xAlta, l.y - altoFila + 4f, xBaja, l.y + 4f, Tinta.ROJO)
+            l.relleno(xBaja, l.y - altoFila + 4f, xFin, l.y + 4f, Tinta.AZUL_FRIO)
+            l.textoCentrado("ALTA / Descarga", (xAlta + xBaja) / 2f, p.columnaHdr)
+            l.textoCentrado("BAJA / Succión", (xBaja + xFin) / 2f, p.columnaHdr)
+            l.y += altoFila
+
+            fun filaDatos(etiqueta: String, alta: String, baja: String, guia: Boolean = false) {
+                l.relleno(xEtq, l.y - altoFila + 4f, xAlta, l.y + 4f, Tinta.GRIS_FILA)
+                l.relleno(xAlta, l.y - altoFila + 4f, xBaja, l.y + 4f, Tinta.ROJO_SUAVE)
+                l.relleno(xBaja, l.y - altoFila + 4f, xFin, l.y + 4f, Tinta.AZUL_SUAVE)
+                l.texto(etiqueta + if (guia) "  ★" else "", xEtq + 4f, p.celdaEtiqueta)
+                l.textoCentrado(alta, (xAlta + xBaja) / 2f, p.celdaValor)
+                l.textoCentrado(baja, (xBaja + xFin) / 2f, p.celdaValor)
+                l.y += altoFila
+            }
+
+            val guia = objetivos.guia != ParametroGuia.NINGUNO
+            filaDatos("Presión", "${num(m.presionAltaPsig, 0)} psi", "${num(m.presionBajaPsig, 0)} psi")
+            filaDatos("Temperatura", "${num(m.tempDescargaC)} °C", "${num(m.tempSuccionC)} °C")
+            filaDatos("Saturación", "${num(m.satLiquidoC)} °C", "${num(m.satVaporC)} °C")
+            filaDatos("Subcool / Superheat", "${num(m.subcoolingC)} °C", "${num(m.superheatC)} °C", guia)
+
+            val nombreGuia = when (objetivos.guia) {
+                ParametroGuia.SUBENFRIAMIENTO -> "Subcooling"
+                ParametroGuia.RECALENTAMIENTO -> "Superheat"
+                ParametroGuia.NINGUNO -> ""
+            }
+            l.y += 11f
+            l.texto("Corriente  ${num(m.corrienteA)} A", xEtq + 4f, p.cuerpo)
+            l.textoDerecha(
+                objetivos.rangoGuia()?.let { "Objetivo $nombreGuia: ${it.etiqueta()}" }
+                    ?: "Objetivo: seleccione dispositivo de expansión",
+                Hoja.ANCHO - Hoja.MARGEN, p.cuerpo,
+            )
+            l.y += 8f
+
+            val fondo = when (obs.severidad) {
+                Severidad.OK -> Tinta.VERDE_SUAVE
+                Severidad.ALERTA -> Tinta.AMBAR_SUAVE
+                Severidad.INFO -> Tinta.GRIS_FILA
+            }
+            val prefijo = when (obs.severidad) {
+                Severidad.OK -> "OK  "
+                Severidad.ALERTA -> "!  "
+                Severidad.INFO -> "i  "
+            }
+            val texto = prefijo + obs.texto
+            val alto = LienzoPdf.medir(texto, p.cuerpo, Hoja.contenidoAncho - 16f)
+            val arriba = l.y
+            l.relleno(Hoja.MARGEN, arriba, Hoja.ANCHO - Hoja.MARGEN, arriba + alto + 14f, fondo, radio = 4f)
+            l.y = arriba + 10f
+            l.parrafo(texto, p.cuerpo, Hoja.contenidoAncho - 16f, Hoja.MARGEN + 8f)
+            l.y = arriba + alto + 14f + 10f
+        }
+        l.linea(2f)
+        l.y += 14f
+    }
+
+    // ── Ítems ───────────────────────────────────────────────────────────────
+
+    private fun dibujarItems(l: LienzoPdf, p: Pinceles, e: Estimado, fotos: Map<String, Bitmap?>) {
+        if (e.damages.isEmpty()) return
+        val renderer = ItemRenderer(l, p, fotos)
+        l.asegurar(30f)
+        l.texto("DETALLE DE TRABAJOS", Hoja.MARGEN, p.seccion)
+        l.y += 16f
+
+        e.damages.forEachIndexed { indice, item ->
+            val alto = renderer.medir(item, indice)
+            // Se mide el ítem ENTERO antes de dibujarlo: así nunca queda el
+            // número y el nombre solos al pie con las fotos en la hoja siguiente.
+            // Si es más alto que una hoja completa no hay salto que lo arregle,
+            // y se dibuja donde esté para no provocar una página en blanco.
+            val cabeEnHoja = alto <= Hoja.limiteInferior - Hoja.MARGEN
+            if (cabeEnHoja) l.asegurar(alto)
+            renderer.dibujar(item, indice)
+            l.y += 6f
+        }
+        l.y += 4f
+    }
+
+    // ── Tabla de valores ────────────────────────────────────────────────────
+
+    private fun dibujarValores(l: LienzoPdf, p: Pinceles, e: Estimado) {
+        val totales = EstimadoTotals.calcular(e.damages, e.hasIva, e.manoDeObraTotal)
+        val filas = e.damages.count { it.precioUnitario != null }
+        l.asegurar(60f + filas * 15f + 80f)
+
+        l.texto("DETALLE DE VALORES", Hoja.MARGEN, p.seccion)
+        l.y += 16f
+
+        val xNum = Hoja.MARGEN + 4f
+        val xDesc = Hoja.MARGEN + 26f
+        val xCant = Hoja.MARGEN + 320f
+        val xUnit = Hoja.MARGEN + 400f
+        val xTotal = Hoja.ANCHO - Hoja.MARGEN - 4f
+        val altoFila = 15f
+
+        l.relleno(Hoja.MARGEN, l.y - 10f, Hoja.ANCHO - Hoja.MARGEN, l.y + 4f, Tinta.GRIS_FILA)
+        l.texto("N°", xNum, p.celdaEtiqueta)
+        l.texto("Descripción", xDesc, p.celdaEtiqueta)
+        l.textoDerecha("Cant.", xCant + 30f, p.celdaEtiqueta)
+        l.textoDerecha("V. Unit.", xUnit + 50f, p.celdaEtiqueta)
+        l.textoDerecha("Total", xTotal, p.celdaEtiqueta)
+        l.y += altoFila
+
+        e.damages.forEachIndexed { indice, item ->
+            if (item.precioUnitario == null) return@forEachIndexed
+            l.asegurar(altoFila)
+            l.texto("${indice + 1}", xNum, p.cuerpo)
+            // El nombre no debe invadir la columna de cantidad.
+            var nombre = item.nombreParaMostrar(indice)
+            while (nombre.isNotEmpty() && p.cuerpo.measureText(nombre) > xCant - xDesc - 12f) {
+                nombre = nombre.dropLast(1)
+            }
+            l.texto(nombre, xDesc, p.cuerpo)
+            l.textoDerecha("${item.cantidad}", xCant + 30f, p.cuerpo)
+            l.textoDerecha(usd.format(item.precioUnitario), xUnit + 50f, p.cuerpo)
+            l.textoDerecha(usd.format(item.totalLinea), xTotal, p.cuerpo)
+            l.y += altoFila
+        }
+
+        l.linea(2f)
+        l.y += 14f
+
+        fun totalRow(etiqueta: String, monto: Double, negrita: Boolean = false) {
+            val pintura = if (negrita) p.negrita else p.cuerpo
+            l.textoDerecha(etiqueta, xUnit + 50f, pintura)
+            l.textoDerecha(usd.format(monto), xTotal, pintura)
+            l.y += 14f
+        }
+
+        totalRow("Subtotal ítems:", totales.itemsTotal)
+        totalRow("Mano de obra:", totales.laborTotal)
+        if (e.hasIva) {
+            totalRow("Subtotal:", totales.subtotal)
+            totalRow("${EstimadoTotals.ivaLabel}:", totales.ivaAmount)
+        }
+        l.linea(2f)
+        l.y += 14f
+        totalRow("TOTAL:", totales.total, negrita = true)
+
+        dibujarFirma(l, p)
+    }
+
+    /** Espacio de aceptación: un estimado aprobado normalmente se firma. */
+    private fun dibujarFirma(l: LienzoPdf, p: Pinceles) {
+        l.asegurar(70f)
+        l.y += 30f
+        val ancho = 200f
+        val x = Hoja.MARGEN
+        l.canvas.drawLine(x, l.y, x + ancho, l.y, p.linea)
+        l.y += 11f
+        l.texto("Aceptado por el cliente (nombre y firma)", x, p.etiqueta)
+        l.y += 12f
+        l.texto("Fecha: ____ / ____ / ________", x, p.etiqueta)
     }
 
     // Un fallo puntual de red dejaba "Sin foto" en el PDF de forma definitiva:
@@ -451,12 +380,11 @@ class EstimadoPdfGenerator @Inject constructor(
 
     private suspend fun loadBitmapOnce(loader: coil3.ImageLoader, url: String): Bitmap? =
         runCatching {
-            // Las fotos se dibujan a ~175pt en el PDF: decodificar a 700px en vez
-            // de la resolución completa de la cámara baja ~10x el pico de memoria
-            // (se retienen todas las fotos a la vez mientras se dibuja).
+            // Las fotos se dibujan a ~125pt: decodificar a 700px en vez de la
+            // resolución completa de la cámara baja ~10x el pico de memoria.
             val req = ImageRequest.Builder(context).data(url).size(700).build()
             val bmp = (loader.execute(req) as? SuccessResult)?.image?.let { (it as? BitmapImage)?.bitmap }
-            // PDF canvas is software-rendered; hardware bitmaps must be copied to software
+            // El canvas del PDF es software: los bitmaps de hardware hay que copiarlos.
             bmp?.let { if (it.config == Bitmap.Config.HARDWARE) it.copy(Bitmap.Config.ARGB_8888, false) else it }
         }.getOrNull()
 }

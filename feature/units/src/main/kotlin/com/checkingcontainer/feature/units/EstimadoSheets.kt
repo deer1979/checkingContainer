@@ -119,11 +119,14 @@ import java.util.Locale
 @Composable
 internal fun AddDamageSheet(
     title: String,
+    initialNombre: String,
     initialDescription: String,
+    onNombreChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
 ) {
+    var nombre by remember { mutableStateOf(initialNombre) }
     var text by remember { mutableStateOf(initialDescription) }
 
     Column(
@@ -131,6 +134,17 @@ internal fun AddDamageSheet(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        // Nombre corto: es el que encabeza el ítem y el que sale en la tabla de
+        // valores. Sirve igual para un repuesto que para un servicio.
+        OutlinedTextField(
+            value = nombre,
+            onValueChange = { nombre = it; onNombreChange(it) },
+            label = { Text("Repuesto o trabajo") },
+            placeholder = { Text("Contactor C12 · P/N 3100-4520") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+        )
         OutlinedTextField(
             value = text,
             onValueChange = { text = it; onDescriptionChange(it) },
@@ -145,8 +159,8 @@ internal fun AddDamageSheet(
             Button(
                 onClick = onConfirm,
                 modifier = Modifier.weight(1f),
-                enabled = text.isNotBlank(),
-            ) { Text("Guardar daño") }
+                enabled = nombre.isNotBlank() || text.isNotBlank(),
+            ) { Text("Guardar") }
         }
     }
 }

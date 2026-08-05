@@ -121,14 +121,12 @@ internal fun ValoresSummaryCard(
     damages: List<DamageItem>,
     hasIva: Boolean,
     isClosed: Boolean,
+    manoDeObraTotal: Double?,
     onIvaToggle: (Boolean) -> Unit,
     onEditValor: (String) -> Unit,
+    onEditManoDeObra: () -> Unit,
 ) {
-    val totals = EstimadoTotals.calcular(damages, hasIva)
-    val totalLabor = totals.laborTotal
-    val totalMaterial = totals.materialTotal
-    val ivaAmount = totals.ivaAmount
-    val total = totals.total
+    val totals = EstimadoTotals.calcular(damages, hasIva, manoDeObraTotal)
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -142,12 +140,16 @@ internal fun ValoresSummaryCard(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "Ítem ${index + 1}",
+                            "${index + 1}. ${item.nombreParaMostrar(index)}",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            "M. obra: ${USD.format(item.laborCost ?: 0.0)}  |  Mat: ${USD.format(item.materialCost ?: 0.0)}",
+                            if (item.precioUnitario == null) {
+                                "Sin valor asignado"
+                            } else {
+                                "${item.cantidad} × ${USD.format(item.precioUnitario)}  =  ${USD.format(item.totalLinea)}"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -167,23 +169,49 @@ internal fun ValoresSummaryCard(
 
             HorizontalDivider()
 
-            ValueRow("Mano de obra total", USD.format(totalLabor))
-            ValueRow("Materiales total", USD.format(totalMaterial))
+            ValueRow("Subtotal ítems", USD.format(totals.itemsTotal))
+
+            // Mano de obra: una sola línea para todo el trabajo (la instalación de
+            // los repuestos). Los servicios ya cobran su labor en su propio valor.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Mano de obra", style = MaterialTheme.typography.bodyMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(USD.format(totals.laborTotal), style = MaterialTheme.typography.bodyMedium)
+                    if (!isClosed) {
+                        Spacer(Modifier.width(8.dp))
+                        FilledTonalButton(
+                            onClick = onEditManoDeObra,
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        ) {
+                            Icon(Icons.Outlined.AttachMoney, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Editar", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("IVA 12%", style = MaterialTheme.typography.bodyMedium)
+                Text(EstimadoTotals.ivaLabel, style = MaterialTheme.typography.bodyMedium)
                 if (!isClosed) {
                     Switch(checked = hasIva, onCheckedChange = onIvaToggle)
                 } else {
-                    Text(USD.format(ivaAmount), style = MaterialTheme.typography.bodyMedium)
+                    Text(USD.format(totals.ivaAmount), style = MaterialTheme.typography.bodyMedium)
                 }
             }
-            if (hasIva) ValueRow("IVA", USD.format(ivaAmount))
+            if (hasIva) {
+                ValueRow("Subtotal", USD.format(totals.subtotal))
+                ValueRow(EstimadoTotals.ivaLabel, USD.format(totals.ivaAmount))
+            }
 
             HorizontalDivider()
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("TOTAL", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(USD.format(total), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(USD.format(totals.total), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
         }
     }

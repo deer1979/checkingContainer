@@ -130,11 +130,40 @@ fun EstimadoScreen(
     onAddRepairPhoto: (String, Uri) -> Unit,
     getPendingDamageDescription: () -> String,
     getPendingRepairAction: () -> String,
-    getPendingLaborCost: () -> String,
-    getPendingMaterialCost: () -> String,
+    getPendingCantidad: () -> String,
+    getPendingPrecioUnitario: () -> String,
+    getPendingManoDeObra: () -> String,
+    getPendingNombreItem: () -> String,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+
+    // Aviso previo al PDF: el encabezado del reporte se arma con los datos del
+    // cliente, así que conviene saber qué falta ANTES de mandárselo. No bloquea:
+    // a veces hace falta el PDF rápido y se completa después.
+    var avisoDatosCliente by remember { mutableStateOf(false) }
+    val faltantes = state.datosClienteFaltantes
+
+    if (avisoDatosCliente) {
+        AlertDialog(
+            onDismissRequest = { avisoDatosCliente = false },
+            title = { Text("Faltan datos del cliente") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("El encabezado del PDF saldrá incompleto. Falta:")
+                    faltantes.forEach { Text("·  $it", style = MaterialTheme.typography.bodySmall) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { avisoDatosCliente = false }) { Text("Completar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { avisoDatosCliente = false; onGeneratePdf() }) {
+                    Text("Generar igual")
+                }
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -192,7 +221,9 @@ fun EstimadoScreen(
                                     Icon(Icons.Outlined.Share, null, Modifier.size(24.dp))
                             },
                             label = if (state.isGeneratingPdf) "Generando…" else "Ver PDF",
-                            onClick = onGeneratePdf,
+                            onClick = {
+                                if (faltantes.isEmpty()) onGeneratePdf() else avisoDatosCliente = true
+                            },
                             enabled = !state.isGeneratingPdf,
                         )
                     }
@@ -360,8 +391,10 @@ fun EstimadoScreen(
                         damages = state.damages,
                         hasIva = state.hasIva,
                         isClosed = state.status == EstimadoStatus.CERRADO,
+                        manoDeObraTotal = state.manoDeObraTotal,
                         onIvaToggle = { onEvent(EstimadoEvent.IvaToggle(it)) },
                         onEditValor = { itemId -> onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.EditValor(itemId))) },
+                        onEditManoDeObra = { onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.EditManoDeObra)) },
                     )
                 }
             }
@@ -388,7 +421,9 @@ fun EstimadoScreen(
             ) {
                 AddDamageSheet(
                     title = "Agregar daño",
+                    initialNombre = getPendingNombreItem(),
                     initialDescription = getPendingDamageDescription(),
+                    onNombreChange = { onEvent(EstimadoEvent.NombreItemChange(it)) },
                     onDescriptionChange = { onEvent(EstimadoEvent.DamageDescriptionChange(it)) },
                     onCancel = { scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(EstimadoEvent.DismissSheet) } },
                     onConfirm = { onEvent(EstimadoEvent.ConfirmAddDamage) },
@@ -402,7 +437,9 @@ fun EstimadoScreen(
             ) {
                 AddDamageSheet(
                     title = "Editar daño",
+                    initialNombre = getPendingNombreItem(),
                     initialDescription = getPendingDamageDescription(),
+                    onNombreChange = { onEvent(EstimadoEvent.NombreItemChange(it)) },
                     onDescriptionChange = { onEvent(EstimadoEvent.DamageDescriptionChange(it)) },
                     onCancel = { scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(EstimadoEvent.DismissSheet) } },
                     onConfirm = { onEvent(EstimadoEvent.ConfirmEditDamage(sheet.itemId)) },
@@ -429,15 +466,29 @@ fun EstimadoScreen(
                 onDismissRequest = { onEvent(EstimadoEvent.DismissSheet) },
                 sheetState = sheetState,
             ) {
-                val damageName = state.damages.find { it.id == sheet.itemId }?.damageDescription ?: ""
+                val indice = state.damages.indexOfFirst { it.id == sheet.itemId }
+                val referencia = state.damages.getOrNull(indice)?.nombreParaMostrar(indice).orEmpty()
                 EditValorSheet(
-                    damageReference = damageName,
-                    initialLabor = getPendingLaborCost(),
-                    initialMaterial = getPendingMaterialCost(),
-                    onLaborChange = { onEvent(EstimadoEvent.LaborCostChange(sheet.itemId, it)) },
-                    onMaterialChange = { onEvent(EstimadoEvent.MaterialCostChange(sheet.itemId, it)) },
+                    damageReference = referencia,
+                    initialCantidad = getPendingCantidad(),
+                    initialPrecio = getPendingPrecioUnitario(),
+                    onCantidadChange = { onEvent(EstimadoEvent.CantidadChange(sheet.itemId, it)) },
+                    onPrecioChange = { onEvent(EstimadoEvent.PrecioUnitarioChange(sheet.itemId, it)) },
                     onCancel = { scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(EstimadoEvent.DismissSheet) } },
                     onConfirm = { onEvent(EstimadoEvent.ConfirmValor(sheet.itemId)) },
+                )
+            }
+        }
+        EstimadoSheet.EditManoDeObra -> {
+            ModalBottomSheet(
+                onDismissRequest = { onEvent(EstimadoEvent.DismissSheet) },
+                sheetState = sheetState,
+            ) {
+                EditManoDeObraSheet(
+                    initialValor = getPendingManoDeObra(),
+                    onValorChange = { onEvent(EstimadoEvent.ManoDeObraChange(it)) },
+                    onCancel = { scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(EstimadoEvent.DismissSheet) } },
+                    onConfirm = { onEvent(EstimadoEvent.ConfirmManoDeObra) },
                 )
             }
         }

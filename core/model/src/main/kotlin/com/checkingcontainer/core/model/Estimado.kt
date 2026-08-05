@@ -4,14 +4,72 @@ import java.util.UUID
 
 data class DamageItem(
     val id: String = UUID.randomUUID().toString(),
+    /**
+     * Nombre corto del ítem tal como aparece en la tabla de valores: el repuesto
+     * ("Contactor C12 · P/N 3100-4520") o el servicio ("Limpieza de condensador
+     * + lavado"). Un servicio se cobra igual que una pieza — cantidad × valor —
+     * porque pueden ser dos o tres equipos, y su valor ya incluye la labor.
+     */
+    val nombre: String = "",
+    /** Qué estaba mal. Va en la columna ANTES, junto a [damagePhotos]. */
     val damageDescription: String = "",
     val damagePhotos: List<String> = emptyList(),
+    /** Qué se hizo. Va en la columna DESPUÉS, junto a [repairPhotos]. */
     val repairAction: String = "",
     val repairPhotos: List<String> = emptyList(),
     val status: DamageItemStatus = DamageItemStatus.PENDIENTE,
-    val laborCost: Double? = null,
-    val materialCost: Double? = null,
-)
+    /** Unidades del ítem (2 contactores, 3 limpiezas…). */
+    val cantidad: Int = 1,
+    /** Precio por unidad; el total de la línea es [cantidad] × este valor. */
+    val precioUnitario: Double? = null,
+    /**
+     * Campos del esquema anterior (costo por ítem). Se conservan solo para poder
+     * leer estimados creados antes de la tabla de valores con cantidades; al
+     * cargarlos se convierten con [migrarDesdeCostosPorItem]. No se escriben.
+     */
+    @Deprecated("Usar precioUnitario × cantidad") val laborCost: Double? = null,
+    @Deprecated("La mano de obra ahora es única por estimado") val materialCost: Double? = null,
+) {
+    /** Total de la línea en la tabla de valores. */
+    val totalLinea: Double get() = (precioUnitario ?: 0.0) * cantidad
+
+    /** Etiqueta para el PDF y la lista cuando el ítem aún no tiene nombre. */
+    fun nombreParaMostrar(indice: Int): String =
+        nombre.ifBlank { damageDescription.lineSequence().firstOrNull()?.take(60).orEmpty() }
+            .ifBlank { "Ítem ${indice + 1}" }
+}
+
+/**
+ * Convierte los ítems del esquema viejo (mano de obra + material por ítem) al
+ * nuevo (cantidad × precio unitario + una mano de obra por estimado).
+ *
+ * El material del ítem pasa a precio unitario con cantidad 1 y la suma de todas
+ * las manos de obra va al total único, de modo que **el total del estimado no
+ * cambia**. Solo se aplica cuando el estimado aún no tiene datos nuevos.
+ */
+fun migrarDesdeCostosPorItem(
+    damages: List<DamageItem>,
+    manoDeObraTotal: Double?,
+): Pair<List<DamageItem>, Double?> {
+    @Suppress("DEPRECATION")
+    val yaMigrado = manoDeObraTotal != null ||
+        damages.all { it.laborCost == null && it.materialCost == null }
+    if (yaMigrado) return damages to manoDeObraTotal
+
+    @Suppress("DEPRECATION")
+    val labor = damages.sumOf { it.laborCost ?: 0.0 }.takeIf { it > 0.0 }
+
+    @Suppress("DEPRECATION")
+    val convertidos = damages.map { item ->
+        item.copy(
+            cantidad = 1,
+            precioUnitario = item.precioUnitario ?: item.materialCost,
+            laborCost = null,
+            materialCost = null,
+        )
+    }
+    return convertidos to labor
+}
 
 /** Máximo de fotos por grupo (daño / reparación) en cada ítem. */
 const val MAX_FOTOS_POR_GRUPO = 6
@@ -53,6 +111,12 @@ data class Estimado(
     val damages: List<DamageItem> = emptyList(),
     // Mediciones BLE capturadas (presiones, SH/SC, corriente) — ver MedicionSnapshot
     val mediciones: List<MedicionSnapshot> = emptyList(),
+    /**
+     * Mano de obra de todo el trabajo, en una sola línea: la instalación de los
+     * repuestos listados. Los servicios (limpiezas, lavados) NO se cuentan aquí
+     * porque ya cobran su labor dentro de su propio valor unitario.
+     */
+    val manoDeObraTotal: Double? = null,
     // Configuración
     val hasIva: Boolean = false,
     val reportUrl: String? = null,

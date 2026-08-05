@@ -112,28 +112,32 @@ import java.util.Date
 import java.util.Locale
 
 
-// Hoja inferior para editar mano de obra y materiales de un ítem.
+// Hoja inferior para editar cantidad y valor unitario de un ítem, y la mano de
+// obra única del estimado.
 
 // ── Bottom sheet: Editar valores ──────────────────────────────────────────────
 
 @Composable
 internal fun EditValorSheet(
     damageReference: String,
-    initialLabor: String,
-    initialMaterial: String,
-    onLaborChange: (String) -> Unit,
-    onMaterialChange: (String) -> Unit,
+    initialCantidad: String,
+    initialPrecio: String,
+    onCantidadChange: (String) -> Unit,
+    onPrecioChange: (String) -> Unit,
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    var labor by remember { mutableStateOf(initialLabor) }
-    var material by remember { mutableStateOf(initialMaterial) }
+    var cantidad by remember { mutableStateOf(initialCantidad) }
+    var precio by remember { mutableStateOf(initialPrecio) }
+
+    val cantidadNum = cantidad.toIntOrNull() ?: 0
+    val precioNum = precio.replace(',', '.').toDoubleOrNull() ?: 0.0
 
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Valores del ítem", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text("Valor del ítem", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         if (damageReference.isNotEmpty()) {
             Text(
                 damageReference,
@@ -141,19 +145,68 @@ internal fun EditValorSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        OutlinedTextField(
-            value = labor,
-            onValueChange = { labor = it; onLaborChange(it) },
-            label = { Text("Mano de obra ($)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            leadingIcon = { Icon(Icons.Outlined.AttachMoney, contentDescription = null) },
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(
+                value = cantidad,
+                onValueChange = { nuevo ->
+                    val limpio = nuevo.filter { it.isDigit() }.take(4)
+                    cantidad = limpio
+                    onCantidadChange(limpio)
+                },
+                label = { Text("Cantidad") },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+            OutlinedTextField(
+                value = precio,
+                onValueChange = { precio = it; onPrecioChange(it) },
+                label = { Text("Valor unitario") },
+                modifier = Modifier.weight(1.4f),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                leadingIcon = { Icon(Icons.Outlined.AttachMoney, contentDescription = null) },
+            )
+        }
+        // El total se calcula a la vista para que no haya que confiar en la cuenta
+        // mental al cargar varias piezas iguales.
+        Text(
+            "Total de la línea:  ${USD.format(cantidadNum * precioNum)}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancelar") }
+            Button(onClick = onConfirm, modifier = Modifier.weight(1f)) { Text("Guardar") }
+        }
+    }
+}
+
+/** Hoja para la mano de obra total del trabajo (instalación de los repuestos). */
+@Composable
+internal fun EditManoDeObraSheet(
+    initialValor: String,
+    onValorChange: (String) -> Unit,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    var valor by remember { mutableStateOf(initialValor) }
+
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Mano de obra", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            "Un solo valor por todo el trabajo: la instalación de los repuestos. " +
+                "Las limpiezas y servicios ya cobran su labor en su propio valor.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
-            value = material,
-            onValueChange = { material = it; onMaterialChange(it) },
-            label = { Text("Costo de material ($)") },
+            value = valor,
+            onValueChange = { valor = it; onValorChange(it) },
+            label = { Text("Mano de obra ($)") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),

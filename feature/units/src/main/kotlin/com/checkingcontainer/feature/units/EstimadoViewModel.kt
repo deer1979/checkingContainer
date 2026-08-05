@@ -61,8 +61,10 @@ class EstimadoViewModel @Inject constructor(
     // Temporary fields for bottom-sheet forms
     private var pendingDamageDescription = ""
     private var pendingRepairAction = ""
-    private var pendingLaborCost = ""
-    private var pendingMaterialCost = ""
+    private var pendingCantidad = ""
+    private var pendingPrecioUnitario = ""
+    private var pendingManoDeObra = ""
+    private var pendingNombreItem = ""
     private var activePhotoUploads = 0
 
     init {
@@ -93,6 +95,7 @@ class EstimadoViewModel @Inject constructor(
                         status = existing?.status ?: EstimadoStatus.ABIERTO,
                         damages = existing?.damages ?: emptyList(),
                         mediciones = existing?.mediciones ?: emptyList(),
+                        manoDeObraTotal = existing?.manoDeObraTotal,
                         clientId = existing?.clientId,
                         clientIdNumber = existing?.clientIdNumber ?: "",
                         clientDireccion = existing?.clientDireccion ?: "",
@@ -131,11 +134,13 @@ class EstimadoViewModel @Inject constructor(
                 when (val sheet = event.sheet) {
                     is EstimadoSheet.AddDamage -> {
                         pendingDamageDescription = ""
+                        pendingNombreItem = ""
                         _state.update { it.copy(activeSheet = sheet) }
                     }
                     is EstimadoSheet.EditDamage -> {
-                        pendingDamageDescription = _state.value.damages
-                            .find { it.id == sheet.itemId }?.damageDescription ?: ""
+                        val item = _state.value.damages.find { it.id == sheet.itemId }
+                        pendingDamageDescription = item?.damageDescription ?: ""
+                        pendingNombreItem = item?.nombre ?: ""
                         _state.update { it.copy(activeSheet = sheet) }
                     }
                     is EstimadoSheet.RepairItem -> {
@@ -145,8 +150,12 @@ class EstimadoViewModel @Inject constructor(
                     }
                     is EstimadoSheet.EditValor -> {
                         val item = _state.value.damages.find { it.id == sheet.itemId }
-                        pendingLaborCost = item?.laborCost?.toString() ?: ""
-                        pendingMaterialCost = item?.materialCost?.toString() ?: ""
+                        pendingCantidad = (item?.cantidad ?: 1).toString()
+                        pendingPrecioUnitario = item?.precioUnitario?.toString() ?: ""
+                        _state.update { it.copy(activeSheet = sheet) }
+                    }
+                    EstimadoSheet.EditManoDeObra -> {
+                        pendingManoDeObra = _state.value.manoDeObraTotal?.toString() ?: ""
                         _state.update { it.copy(activeSheet = sheet) }
                     }
                 }
@@ -158,9 +167,12 @@ class EstimadoViewModel @Inject constructor(
             is EstimadoEvent.DamageDescriptionChange ->
                 pendingDamageDescription = event.value
             is EstimadoEvent.ConfirmAddDamage -> {
-                if (pendingDamageDescription.isBlank()) return
+                // Basta con uno de los dos: un servicio puede no necesitar
+                // descripción, y un daño puede registrarse antes de saber la pieza.
+                if (pendingNombreItem.isBlank() && pendingDamageDescription.isBlank()) return
                 val newItem = DamageItem(
                     id = UUID.randomUUID().toString(),
+                    nombre = pendingNombreItem.trim(),
                     damageDescription = pendingDamageDescription.trim(),
                 )
                 _state.update {
@@ -172,12 +184,15 @@ class EstimadoViewModel @Inject constructor(
                 }
             }
             is EstimadoEvent.ConfirmEditDamage -> {
-                if (pendingDamageDescription.isBlank()) return
+                if (pendingNombreItem.isBlank() && pendingDamageDescription.isBlank()) return
                 _state.update { s ->
                     s.copy(
                         damages = s.damages.map { item ->
                             if (item.id == event.itemId)
-                                item.copy(damageDescription = pendingDamageDescription.trim())
+                                item.copy(
+                                    nombre = pendingNombreItem.trim(),
+                                    damageDescription = pendingDamageDescription.trim(),
+                                )
                             else item
                         },
                         activeSheet = null,
@@ -236,16 +251,26 @@ class EstimadoViewModel @Inject constructor(
                     )
                 }
             }
-            is EstimadoEvent.LaborCostChange -> pendingLaborCost = event.value
-            is EstimadoEvent.MaterialCostChange -> pendingMaterialCost = event.value
+            is EstimadoEvent.CantidadChange -> pendingCantidad = event.value
+            is EstimadoEvent.PrecioUnitarioChange -> pendingPrecioUnitario = event.value
+            is EstimadoEvent.NombreItemChange -> pendingNombreItem = event.value
+            is EstimadoEvent.ManoDeObraChange -> pendingManoDeObra = event.value
+            is EstimadoEvent.ConfirmManoDeObra -> {
+                _state.update {
+                    it.copy(
+                        manoDeObraTotal = pendingManoDeObra.replace(',', '.').toDoubleOrNull(),
+                        activeSheet = null,
+                    )
+                }
+            }
             is EstimadoEvent.ConfirmValor -> {
                 _state.update { s ->
                     s.copy(
                         damages = s.damages.map { item ->
                             if (item.id == event.itemId)
                                 item.copy(
-                                    laborCost = pendingLaborCost.toDoubleOrNull(),
-                                    materialCost = pendingMaterialCost.toDoubleOrNull(),
+                                    cantidad = pendingCantidad.toIntOrNull()?.coerceAtLeast(1) ?: 1,
+                                    precioUnitario = pendingPrecioUnitario.replace(',', '.').toDoubleOrNull(),
                                 )
                             else item
                         },
@@ -263,8 +288,10 @@ class EstimadoViewModel @Inject constructor(
             EstimadoEvent.DismissSheet,
             is EstimadoEvent.DamageDescriptionChange,
             is EstimadoEvent.RepairActionChange,
-            is EstimadoEvent.LaborCostChange,
-            is EstimadoEvent.MaterialCostChange -> Unit
+            is EstimadoEvent.CantidadChange,
+            is EstimadoEvent.PrecioUnitarioChange,
+            is EstimadoEvent.ManoDeObraChange,
+            is EstimadoEvent.NombreItemChange -> Unit
             else -> _state.update { it.copy(isDirty = true) }
         }
     }
@@ -413,6 +440,7 @@ class EstimadoViewModel @Inject constructor(
                 status = if (allReparado) EstimadoStatus.CERRADO else EstimadoStatus.ABIERTO,
                 damages = current.damages,
                 mediciones = current.mediciones,
+                manoDeObraTotal = current.manoDeObraTotal,
                 hasIva = current.hasIva,
             )
             runCatching { estimadosRepo.save(estimado) }
@@ -436,8 +464,10 @@ class EstimadoViewModel @Inject constructor(
 
     fun getPendingDamageDescription() = pendingDamageDescription
     fun getPendingRepairAction() = pendingRepairAction
-    fun getPendingLaborCost() = pendingLaborCost
-    fun getPendingMaterialCost() = pendingMaterialCost
+    fun getPendingCantidad() = pendingCantidad
+    fun getPendingPrecioUnitario() = pendingPrecioUnitario
+    fun getPendingManoDeObra() = pendingManoDeObra
+    fun getPendingNombreItem() = pendingNombreItem
 
     fun generateAndSharePdf() {
         val current = _state.value
@@ -476,6 +506,7 @@ class EstimadoViewModel @Inject constructor(
                 status = current.status,
                 damages = current.damages,
                 mediciones = current.mediciones,
+                manoDeObraTotal = current.manoDeObraTotal,
                 hasIva = current.hasIva,
             )
             runCatching { pdfGenerator.generate(estimado, current.fichaTecnica) }

@@ -6,6 +6,7 @@ import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoStatus
+import com.checkingcontainer.core.model.migrarDesdeCostosPorItem
 import com.checkingcontainer.core.model.MedicionSnapshot
 import com.checkingcontainer.core.model.TipoExpansion
 import org.json.JSONArray
@@ -40,6 +41,7 @@ data class EstimadoEntity(
     val status: EstimadoStatus = EstimadoStatus.ABIERTO,
     val damages: String = "[]",
     val mediciones: String = "[]",
+    val manoDeObraTotal: Double? = null,
     val hasIva: Int = 0,
     val reportUrl: String? = null,
 ) {
@@ -69,11 +71,22 @@ data class EstimadoEntity(
         approvedAt = approvedAt,
         closedAt = closedAt,
         status = status,
-        damages = parseDamages(damages),
+        damages = damagesMigrados,
         mediciones = parseMediciones(mediciones),
+        manoDeObraTotal = manoDeObraMigrada,
         hasIva = hasIva != 0,
         reportUrl = reportUrl,
     )
+
+    /**
+     * Los estimados creados antes de la tabla con cantidades traen el costo
+     * dentro de cada ítem. Se convierten al vuelo, sin reescribir la fila: el
+     * total no cambia y al guardar de nuevo ya queda en el formato nuevo.
+     */
+    private val migracion
+        get() = migrarDesdeCostosPorItem(parseDamages(damages), manoDeObraTotal)
+    private val damagesMigrados get() = migracion.first
+    private val manoDeObraMigrada get() = migracion.second
 }
 
 private fun parseDamages(json: String): List<DamageItem> = buildList {
@@ -83,6 +96,9 @@ private fun parseDamages(json: String): List<DamageItem> = buildList {
         add(
             DamageItem(
                 id = obj.optString("id"),
+                nombre = obj.optString("nombre"),
+                cantidad = obj.optInt("cantidad", 1).coerceAtLeast(1),
+                precioUnitario = obj.optDoubleOrNull("precioUnitario"),
                 damageDescription = obj.optString("damageDescription"),
                 // Lee la lista nueva (damagePhotos) y, si no existe, migra desde el
                 // campo único legado (damagePhoto). Igual para reparación.
@@ -118,6 +134,9 @@ private fun List<DamageItem>.toJson(): String {
         arr.put(
             JSONObject().apply {
                 put("id", item.id)
+                put("nombre", item.nombre)
+                put("cantidad", item.cantidad)
+                put("precioUnitario", item.precioUnitario ?: JSONObject.NULL)
                 put("damageDescription", item.damageDescription)
                 put("damagePhotos", JSONArray(item.damagePhotos))
                 put("repairAction", item.repairAction)
@@ -159,6 +178,7 @@ fun Estimado.toEntity(): EstimadoEntity = EstimadoEntity(
     status = status,
     damages = damages.toJson(),
     mediciones = mediciones.medicionesToJson(),
+    manoDeObraTotal = manoDeObraTotal,
     hasIva = if (hasIva) 1 else 0,
     reportUrl = reportUrl,
 )

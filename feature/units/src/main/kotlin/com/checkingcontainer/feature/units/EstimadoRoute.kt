@@ -238,7 +238,9 @@ fun EstimadoRoute(
         onAddRepairPhoto = viewModel::addRepairPhoto,
         getPendingDamageDescription = viewModel::getPendingDamageDescription,
         getPendingRepairAction = viewModel::getPendingRepairAction,
-        getPendingLaborCost = viewModel::getPendingLaborCost,
-        getPendingMaterialCost = viewModel::getPendingMaterialCost,
+        getPendingCantidad = viewModel::getPendingCantidad,
+        getPendingPrecioUnitario = viewModel::getPendingPrecioUnitario,
+        getPendingManoDeObra = viewModel::getPendingManoDeObra,
+        getPendingNombreItem = viewModel::getPendingNombreItem,
     )
 }

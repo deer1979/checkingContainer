@@ -432,6 +432,7 @@ class FirestoreService @Inject constructor(
                 .getOrDefault(EstimadoStatus.ABIERTO),
             damages = getString("damages") ?: "[]",
             mediciones = getString("mediciones") ?: "[]",
+            manoDeObraTotal = getDouble("manoDeObraTotal"),
             hasIva = safeInt("hasIva") ?: 0,
             reportUrl = getString("reportUrl"),
         )
@@ -565,6 +566,7 @@ private fun EstimadoEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "status"        to status.name,
     "damages"       to damages,
     "mediciones"    to mediciones,
+    "manoDeObraTotal" to manoDeObraTotal,
     "hasIva"        to hasIva,
     "reportUrl"     to reportUrl,
 )

@@ -26,6 +26,8 @@ data class EstimadoUiState(
     // Ítems
     val damages: List<DamageItem> = emptyList(),
     val mediciones: List<MedicionSnapshot> = emptyList(),
+    /** Mano de obra única del trabajo (instalación de los repuestos). */
+    val manoDeObraTotal: Double? = null,
     // Cliente del catálogo (referencia + snapshot congelado al asignar)
     val clientId: Long? = null,
     val clientIdNumber: String = "",
@@ -54,13 +56,27 @@ data class EstimadoUiState(
     val pdfPreviewPath: String? = null,
     // Bottom sheet activo
     val activeSheet: EstimadoSheet? = null,
-)
+) {
+    /**
+     * Datos del cliente que faltan para que el encabezado del PDF salga completo.
+     * No bloquea nada: solo alimenta el aviso previo a generar el reporte.
+     */
+    val datosClienteFaltantes: List<String>
+        get() = buildList {
+            if (clientName.isBlank()) add("Nombre del cliente")
+            if (clientIdNumber.isBlank()) add("RUC / Cédula")
+            if (clientTelefono.isBlank()) add("Teléfono")
+            if (clientEmail.isBlank()) add("Correo electrónico")
+            if (clientDireccion.isBlank()) add("Dirección")
+        }
+}
 
 sealed interface EstimadoSheet {
     data object AddDamage : EstimadoSheet
     data class EditDamage(val itemId: String) : EstimadoSheet
     data class RepairItem(val itemId: String) : EstimadoSheet
     data class EditValor(val itemId: String) : EstimadoSheet
+    data object EditManoDeObra : EstimadoSheet
 }
 
 sealed interface EstimadoEvent {
@@ -84,7 +100,10 @@ sealed interface EstimadoEvent {
     data class RepairActionChange(val itemId: String, val value: String) : EstimadoEvent
     data class ConfirmRepair(val itemId: String) : EstimadoEvent
     // Valores
-    data class LaborCostChange(val itemId: String, val value: String) : EstimadoEvent
-    data class MaterialCostChange(val itemId: String, val value: String) : EstimadoEvent
+    data class CantidadChange(val itemId: String, val value: String) : EstimadoEvent
+    data class PrecioUnitarioChange(val itemId: String, val value: String) : EstimadoEvent
+    data class ManoDeObraChange(val value: String) : EstimadoEvent
+    data object ConfirmManoDeObra : EstimadoEvent
+    data class NombreItemChange(val value: String) : EstimadoEvent
     data class ConfirmValor(val itemId: String) : EstimadoEvent
 }
