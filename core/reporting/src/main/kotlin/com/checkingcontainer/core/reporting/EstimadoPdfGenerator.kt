@@ -262,8 +262,12 @@ class EstimadoPdfGenerator @Inject constructor(
 
     private fun dibujarMediciones(l: LienzoPdf, p: Pinceles, e: Estimado) {
         if (e.mediciones.isEmpty()) return
-        fun num(v: Double?, dec: Int = 1): String =
-            v?.let { String.format(Locale.US, "%.${dec}f", it) } ?: "—"
+        fun num(v: Double?, dec: Int = 1): String {
+            v ?: return "—"
+            val s = String.format(Locale.US, "%.${dec}f", v)
+            // Un -0.3 psig redondeado a entero imprimía "-0": cero no lleva signo.
+            return if (s.trimStart('-').all { it == '0' || it == '.' }) s.trimStart('-') else s
+        }
 
         // Columnas del informe de servicio: parámetro, lado de alta, lado de baja
         // y el rango objetivo. Los números van alineados a la derecha para que las
@@ -276,7 +280,8 @@ class EstimadoPdfGenerator @Inject constructor(
         val xObjetivo = Hoja.ANCHO - Hoja.MARGEN - 6f
         val altoFila = 15f
 
-        l.asegurar(34f)
+        // Título reservado junto con la primera tabla, para no dejarlo huérfano.
+        l.asegurar(34f + 16f + altoFila * 6)
         l.texto("MEDICIONES DEL EQUIPO", Hoja.MARGEN, p.seccion)
         l.y += 16f
 
@@ -363,7 +368,12 @@ class EstimadoPdfGenerator @Inject constructor(
     private fun dibujarItems(l: LienzoPdf, p: Pinceles, e: Estimado, fotos: Map<String, Bitmap?>) {
         if (e.damages.isEmpty()) return
         val renderer = ItemRenderer(l, p, fotos)
-        l.asegurar(30f)
+        // El título se reserva JUNTO con el primer ítem: si no caben los dos, se
+        // salta de página ANTES de dibujar el rótulo. Sin esto quedaba
+        // "DETALLE DE TRABAJOS" huérfano al pie con toda la hoja vacía debajo.
+        val altoPrimero = e.damages.firstOrNull()?.let { renderer.medir(it, 0) } ?: 0f
+        val altoUtil = Hoja.limiteInferior - Hoja.MARGEN - 30f
+        l.asegurar(30f + minOf(altoPrimero, altoUtil))
         l.texto("DETALLE DE TRABAJOS", Hoja.MARGEN, p.seccion)
         l.y += 16f
 

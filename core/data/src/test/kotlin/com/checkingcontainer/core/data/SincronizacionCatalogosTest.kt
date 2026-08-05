@@ -8,6 +8,7 @@ import com.checkingcontainer.core.database.dao.EstimadoDao
 import com.checkingcontainer.core.database.dao.InspectionDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
+import com.checkingcontainer.core.database.entity.EstimadoEntity
 import com.checkingcontainer.core.database.entity.InspectionEntity
 import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.model.User
@@ -75,27 +76,56 @@ class SincronizacionCatalogosTest {
     }
 
     @Test
-    fun `si no quedan inspecciones locales se reponen desde la nube`() = runTest {
-        // Es el caso de los teléfonos donde la cascada ya se llevó las inspecciones.
+    fun `solo se reponen las inspecciones que faltan, una a una`() = runTest {
+        // La cascada pudo borrar UNA inspección dejando otras vivas. El atajo
+        // "si hay alguna local no hago nada" dejaba esa sin reponer para siempre
+        // y su estimado seguía sin contenedor.
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val remotas: List<InspectionEntity> = listOf(mockk(), mockk(), mockk())
-        coEvery { inspectionDao.count() } returns 0
-        coEvery { firestoreService.fetchAllInspections() } returns remotas
+        val existente: InspectionEntity = mockk { coEvery { id } returns 1L }
+        val borrada: InspectionEntity = mockk { coEvery { id } returns 2L }
+        coEvery { firestoreService.fetchAllInspections() } returns listOf(existente, borrada)
+        coEvery { inspectionDao.findById(1L) } returns existente
+        coEvery { inspectionDao.findById(2L) } returns null
 
         repositorio(dispatcher).syncRecentPublico(tecnico)
 
-        coVerify(exactly = 3) { inspectionDao.upsert(any()) }
+        // La que existe NO se toca (no pisar ediciones); la borrada se repone.
+        coVerify(exactly = 0) { inspectionDao.upsert(existente) }
+        coVerify(exactly = 1) { inspectionDao.upsert(borrada) }
     }
 
     @Test
-    fun `con inspecciones locales no se toca nada`() = runTest {
+    fun `un estimado bajado de la nube no queda marcado como sin subir`() = runTest {
+        // subidoEn es solo-local: los bajados llegan con null y el upsert directo
+        // marcaba TODOS los estimados como "Sin subir" en cada login.
         val dispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { inspectionDao.count() } returns 12
+        val remoto = EstimadoEntity(id = 9L, inspectionId = 1L, containerNo = "MSCU1234567", updatedAt = 100L)
+        coEvery { firestoreService.fetchOpenEstimados() } returns listOf(remoto)
+        coEvery { estimadoDao.findById(9L) } returns null
 
         repositorio(dispatcher).syncRecentPublico(tecnico)
 
-        coVerify(exactly = 0) { firestoreService.fetchAllInspections() }
-        coVerify(exactly = 0) { inspectionDao.upsert(any()) }
+        coVerify {
+            estimadoDao.upsert(
+                match { it.id == 9L && it.subidoEn != null && it.subidoEn!! >= it.updatedAt },
+            )
+        }
+    }
+
+    @Test
+    fun `una copia remota no pisa trabajo local pendiente de subir`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val remoto = EstimadoEntity(id = 9L, inspectionId = 1L, containerNo = "", updatedAt = 500L)
+        val localPendiente = EstimadoEntity(
+            id = 9L, inspectionId = 1L, containerNo = "MSCU1234567",
+            updatedAt = 400L, subidoEn = null,
+        )
+        coEvery { firestoreService.fetchOpenEstimados() } returns listOf(remoto)
+        coEvery { estimadoDao.findById(9L) } returns localPendiente
+
+        repositorio(dispatcher).syncRecentPublico(tecnico)
+
+        coVerify(exactly = 0) { estimadoDao.upsert(match { it.id == 9L }) }
     }
 }
 

@@ -111,7 +111,7 @@ class BootstrapRepositoryImpl @Inject constructor(
             Log.i(BOOT_TAG, "Inspecciones: ${insertar(inspections, "inspecciones") { inspectionDao.upsert(it) }}")
 
             val estimados = firestoreService.fetchAllEstimados()
-            Log.i(BOOT_TAG, "Estimados: ${insertar(estimados, "estimados") { estimadoDao.upsert(it) }}")
+            Log.i(BOOT_TAG, "Estimados: ${insertar(estimados, "estimados") { guardarBajadoDeLaNube(it) }}")
 
             val clients = firestoreService.fetchAllClients()
             Log.i(BOOT_TAG, "Clientes: ${insertar(clients, "clientes") { clientDao.upsert(it) }}")
@@ -158,6 +158,29 @@ class BootstrapRepositoryImpl @Inject constructor(
     }
 
     /**
+     * Guarda en Room un estimado que VIENE de la nube.
+     *
+     * `subidoEn` es un campo solo-local (la nube no lo guarda), así que los
+     * documentos bajados llegan con null y el upsert directo marcaba TODOS los
+     * estimados como "Sin subir" en cada login — la advertencia no se quitaba
+     * nunca. Si está en la nube, por definición está subido.
+     *
+     * Además, una copia remota nunca pisa trabajo local pendiente de subir ni
+     * uno editado más recientemente aquí.
+     */
+    private suspend fun guardarBajadoDeLaNube(remoto: com.checkingcontainer.core.database.entity.EstimadoEntity) {
+        val local = estimadoDao.findById(remoto.id)
+        if (local != null) {
+            val subidoLocal = local.subidoEn
+            val localPendiente = subidoLocal == null || subidoLocal < local.updatedAt
+            if (localPendiente || local.updatedAt > remoto.updatedAt) return
+        }
+        estimadoDao.upsert(
+            remoto.copy(subidoEn = maxOf(System.currentTimeMillis(), remoto.updatedAt)),
+        )
+    }
+
+    /**
      * Rellena el número de contenedor de los estimados que se quedaron sin él.
      *
      * Cuando la cascada borró la inspección, la pantalla del estimado se abría con
@@ -173,7 +196,19 @@ class BootstrapRepositoryImpl @Inject constructor(
             runCatching {
                 val inspeccion = inspectionDao.findById(estimado.inspectionId) ?: return@runCatching
                 if (inspeccion.containerNo.isBlank()) return@runCatching
-                val arreglado = estimado.copy(containerNo = inspeccion.containerNo)
+                // Los datos de placa del estimado también se blanquearon: se
+                // reponen desde el equipo, que es su fuente.
+                val unidad = reeferUnitDao.findByContainerNo(inspeccion.containerNo)
+                val arreglado = estimado.copy(
+                    containerNo = inspeccion.containerNo,
+                    manufacturer = estimado.manufacturer.ifBlank { unidad?.manufacturer ?: "" },
+                    unitModel = estimado.unitModel.ifBlank { unidad?.unitModel ?: "" },
+                    unitModelNo = estimado.unitModelNo.ifBlank { unidad?.unitModelNo ?: "" },
+                    unitSerialNo = estimado.unitSerialNo.ifBlank { unidad?.unitSerialNo ?: "" },
+                    yearOfBuilt = estimado.yearOfBuilt.ifBlank { unidad?.yearOfBuilt ?: "" },
+                    unitType = estimado.unitType.ifBlank { unidad?.unitType ?: "" },
+                    technicianName = estimado.technicianName.ifBlank { inspeccion.technicianName },
+                )
                 estimadoDao.upsert(arreglado)
                 firestoreService.upsertEstimado(arreglado)
                 reparados += 1
@@ -193,20 +228,23 @@ class BootstrapRepositoryImpl @Inject constructor(
      * para no pisar lo que se haya editado en campo.
      */
     private suspend fun restaurarInspeccionesFaltantes() {
-        if (inspectionDao.count() > 0) {
-            // Camino normal: hay inspecciones locales, no hay nada que reponer.
-            return
-        }
         val remotas = firestoreService.fetchAllInspections()
         if (remotas.isEmpty()) return
 
+        // Solo se INSERTAN las que no existen localmente: una inspección presente
+        // nunca se toca, para no pisar ediciones de campo. Se revisa una a una
+        // porque el atajo anterior ("si hay alguna local, no hacer nada") dejaba
+        // sin reponer las borradas cuando sobrevivían otras.
         var repuestas = 0
         remotas.forEach { fila ->
-            runCatching { inspectionDao.upsert(fila) }
-                .onSuccess { repuestas += 1 }
-                .onFailure { Log.w(BOOT_TAG, "inspección no repuesta: ${it.message}") }
+            runCatching {
+                if (inspectionDao.findById(fila.id) == null) {
+                    inspectionDao.upsert(fila)
+                    repuestas += 1
+                }
+            }.onFailure { Log.w(BOOT_TAG, "inspección no repuesta: ${it.message}") }
         }
-        Log.i(BOOT_TAG, "Inspecciones restauradas desde la nube: $repuestas/${remotas.size}")
+        if (repuestas > 0) Log.i(BOOT_TAG, "Inspecciones restauradas desde la nube: $repuestas/${remotas.size}")
     }
 
     /**
@@ -273,7 +311,7 @@ class BootstrapRepositoryImpl @Inject constructor(
         // Aislado por fila: un estimado remoto corrupto no debe impedir que se
         // sincronicen los demás en cada login.
         incoming.forEach { estimado ->
-            runCatching { estimadoDao.upsert(estimado) }
+            runCatching { guardarBajadoDeLaNube(estimado) }
                 .onFailure { Log.w(BOOT_TAG, "syncRecent: estimado ${estimado.id} descartado (${it.message})") }
         }
 
@@ -285,7 +323,7 @@ class BootstrapRepositoryImpl @Inject constructor(
         val staleOpenIds = estimadoDao.findOpenIds()
             .filter { it !in remoteOpenIds && it !in incomingIds }
         staleOpenIds.forEach { id ->
-            runCatching { firestoreService.fetchEstimadoById(id)?.let { estimadoDao.upsert(it) } }
+            runCatching { firestoreService.fetchEstimadoById(id)?.let { guardarBajadoDeLaNube(it) } }
                 .onFailure { Log.w(BOOT_TAG, "syncRecent: reconciliación de $id falló (${it.message})") }
         }
 

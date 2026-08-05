@@ -86,20 +86,27 @@ class EstimadoViewModel @Inject constructor(
                 val inspectionDeferred = async { inspectionRepo.findById(inspectionId) }
                 val existingDeferred = async { estimadosRepo.findByInspectionId(inspectionId) }
                 val inspection = inspectionDeferred.await()
-                val unit = inspection?.containerNo?.let { reeferUnitRepo.findByContainerNo(it) }
                 val existing = existingDeferred.await()
                 estimadoBase = existing
+                // La identidad del equipo sale de la inspección o, si falta (se
+                // borró y aún no se repuso de la nube), del snapshot que guarda el
+                // propio estimado. Sin este respaldo la pantalla abría en blanco y
+                // el siguiente Guardar escribía esos vacíos encima de los buenos.
+                val containerNo = inspection?.containerNo?.ifBlank { null }
+                    ?: existing?.containerNo.orEmpty()
+                val unit = containerNo.ifBlank { null }?.let { reeferUnitRepo.findByContainerNo(it) }
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        containerNo = inspection?.containerNo ?: "",
-                        technicianName = inspection?.technicianName ?: "",
-                        manufacturer = unit?.manufacturer ?: "",
-                        unitModel = unit?.unitModel ?: "",
-                        unitModelNo = unit?.unitModelNo ?: "",
-                        unitSerialNo = unit?.unitSerialNo ?: "",
-                        yearOfBuilt = unit?.yearOfBuilt ?: "",
-                        unitType = unit?.unitType ?: "",
+                        containerNo = containerNo,
+                        technicianName = inspection?.technicianName?.ifBlank { null }
+                            ?: existing?.technicianName.orEmpty(),
+                        manufacturer = unit?.manufacturer ?: existing?.manufacturer.orEmpty(),
+                        unitModel = unit?.unitModel ?: existing?.unitModel.orEmpty(),
+                        unitModelNo = unit?.unitModelNo ?: existing?.unitModelNo.orEmpty(),
+                        unitSerialNo = unit?.unitSerialNo ?: existing?.unitSerialNo.orEmpty(),
+                        yearOfBuilt = unit?.yearOfBuilt ?: existing?.yearOfBuilt.orEmpty(),
+                        unitType = unit?.unitType ?: existing?.unitType.orEmpty(),
                         fichaTecnica = unit?.fichaTecnica ?: emptyList(),
                         estimadoId = existing?.id ?: 0L,
                         clientName = existing?.clientName ?: "",
