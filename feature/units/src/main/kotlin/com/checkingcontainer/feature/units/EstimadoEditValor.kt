@@ -71,6 +71,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
+import com.checkingcontainer.core.model.Iso6346
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -215,6 +216,76 @@ internal fun EditManoDeObraSheet(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancelar") }
             Button(onClick = onConfirm, modifier = Modifier.weight(1f)) { Text("Guardar") }
+        }
+    }
+}
+
+/**
+ * Hoja para reasignar el estimado al equipo correcto.
+ *
+ * Un estimado puede acabar con el equipo equivocado: OCR que lee otra placa,
+ * unidad elegida por error, o un cruce de datos en la sincronización. Corregirlo
+ * evita tener que borrarlo y rehacer todas las fotos.
+ */
+@Composable
+internal fun CorregirEquipoSheet(
+    contenedorActual: String,
+    initialValor: String,
+    onValorChange: (String) -> Unit,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    var valor by remember { mutableStateOf(initialValor) }
+    val normalizado = valor.trim().uppercase()
+    val esIso = Iso6346.isValid(normalizado)
+
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Corregir equipo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            "Reasigna este estimado a otro equipo. Se conservan las fotos, los " +
+                "ítems y las mediciones; solo cambia el equipo y su ficha.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (contenedorActual.isNotBlank()) {
+            Text(
+                "Actual:  $contenedorActual",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        OutlinedTextField(
+            value = valor,
+            onValueChange = { nuevo ->
+                valor = nuevo.uppercase()
+                onValorChange(valor)
+            },
+            label = { Text("Contenedor o código de equipo") },
+            placeholder = { Text("CXRU1604130") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            supportingText = {
+                // Aviso, no bloqueo: los equipos que no son contenedores usan
+                // códigos libres que no pasan ISO 6346.
+                Text(
+                    when {
+                        normalizado.isBlank() -> "Escribe el código del equipo"
+                        esIso -> "✓ Número de contenedor válido (ISO 6346)"
+                        else -> "No cumple ISO 6346 — correcto si no es un contenedor"
+                    },
+                )
+            },
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancelar") }
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier.weight(1f),
+                enabled = normalizado.isNotBlank() && normalizado != contenedorActual,
+            ) { Text("Corregir") }
         }
     }
 }

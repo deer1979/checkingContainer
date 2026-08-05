@@ -83,6 +83,7 @@ sealed interface EstimadoSheet {
     data class RepairItem(val itemId: String) : EstimadoSheet
     data class EditValor(val itemId: String) : EstimadoSheet
     data object EditManoDeObra : EstimadoSheet
+    data object CorregirEquipo : EstimadoSheet
 }
 
 sealed interface EstimadoEvent {
@@ -111,5 +112,7 @@ sealed interface EstimadoEvent {
     data class ManoDeObraChange(val value: String) : EstimadoEvent
     data object ConfirmManoDeObra : EstimadoEvent
     data class NombreItemChange(val value: String) : EstimadoEvent
+    data class ContenedorCorregidoChange(val value: String) : EstimadoEvent
+    data object ConfirmCorregirEquipo : EstimadoEvent
     data class ConfirmValor(val itemId: String) : EstimadoEvent
 }

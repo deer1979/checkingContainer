@@ -244,5 +244,6 @@ fun EstimadoRoute(
         getPendingPrecioUnitario = viewModel::getPendingPrecioUnitario,
         getPendingManoDeObra = viewModel::getPendingManoDeObra,
         getPendingNombreItem = viewModel::getPendingNombreItem,
+        getPendingContenedor = viewModel::getPendingContenedor,
     )
 }

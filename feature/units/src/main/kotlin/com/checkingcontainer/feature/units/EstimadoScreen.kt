@@ -136,6 +136,7 @@ fun EstimadoScreen(
     getPendingPrecioUnitario: () -> String,
     getPendingManoDeObra: () -> String,
     getPendingNombreItem: () -> String,
+    getPendingContenedor: () -> String = { "" },
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -379,6 +380,12 @@ fun EstimadoScreen(
                         if (state.unitModelNo.isNotEmpty()) InfoRow("No. Modelo", state.unitModelNo)
                         if (state.yearOfBuilt.isNotEmpty()) InfoRow("Año", state.yearOfBuilt)
                         if (state.unitType.isNotEmpty()) InfoRow("Tipo", state.unitType)
+                        if (state.status != EstimadoStatus.CERRADO) {
+                            OutlinedButton(
+                                onClick = { onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.CorregirEquipo)) },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Corregir equipo") }
+                        }
                     }
                 }
             }
@@ -547,6 +554,20 @@ fun EstimadoScreen(
                     onPrecioChange = { onEvent(EstimadoEvent.PrecioUnitarioChange(sheet.itemId, it)) },
                     onCancel = { scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(EstimadoEvent.DismissSheet) } },
                     onConfirm = { onEvent(EstimadoEvent.ConfirmValor(sheet.itemId)) },
+                )
+            }
+        }
+        EstimadoSheet.CorregirEquipo -> {
+            ModalBottomSheet(
+                onDismissRequest = { onEvent(EstimadoEvent.DismissSheet) },
+                sheetState = sheetState,
+            ) {
+                CorregirEquipoSheet(
+                    contenedorActual = state.containerNo,
+                    initialValor = getPendingContenedor(),
+                    onValorChange = { onEvent(EstimadoEvent.ContenedorCorregidoChange(it)) },
+                    onCancel = { scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(EstimadoEvent.DismissSheet) } },
+                    onConfirm = { onEvent(EstimadoEvent.ConfirmCorregirEquipo) },
                 )
             }
         }

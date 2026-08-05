@@ -71,6 +71,7 @@ class EstimadoViewModel @Inject constructor(
     private var pendingPrecioUnitario = ""
     private var pendingManoDeObra = ""
     private var pendingNombreItem = ""
+    private var pendingContenedor = ""
     private var activePhotoUploads = 0
 
     /**
@@ -88,12 +89,17 @@ class EstimadoViewModel @Inject constructor(
                 val inspection = inspectionDeferred.await()
                 val existing = existingDeferred.await()
                 estimadoBase = existing
-                // La identidad del equipo sale de la inspección o, si falta (se
-                // borró y aún no se repuso de la nube), del snapshot que guarda el
-                // propio estimado. Sin este respaldo la pantalla abría en blanco y
-                // el siguiente Guardar escribía esos vacíos encima de los buenos.
-                val containerNo = inspection?.containerNo?.ifBlank { null }
-                    ?: existing?.containerNo.orEmpty()
+                // MANDA el snapshot del propio estimado; la inspección solo se usa
+                // cuando el estimado aún no tiene equipo (recién creado).
+                //
+                // Es al revés de lo que parece intuitivo, y a propósito: el
+                // estimado es el documento de registro y guarda su equipo desde
+                // que se crea. Dejar mandar a la inspección hacía que una fila de
+                // inspección equivocada (ids que chocan entre teléfonos, ver
+                // PLAN_DEUDA_TECNICA.md) le cambiara el contenedor al estimado en
+                // cada apertura, incluso después de corregirlo a mano.
+                val containerNo = existing?.containerNo?.ifBlank { null }
+                    ?: inspection?.containerNo.orEmpty()
                 val unit = containerNo.ifBlank { null }?.let { reeferUnitRepo.findByContainerNo(it) }
                 _state.update {
                     it.copy(
@@ -101,12 +107,12 @@ class EstimadoViewModel @Inject constructor(
                         containerNo = containerNo,
                         technicianName = inspection?.technicianName?.ifBlank { null }
                             ?: existing?.technicianName.orEmpty(),
-                        manufacturer = unit?.manufacturer ?: existing?.manufacturer.orEmpty(),
-                        unitModel = unit?.unitModel ?: existing?.unitModel.orEmpty(),
-                        unitModelNo = unit?.unitModelNo ?: existing?.unitModelNo.orEmpty(),
-                        unitSerialNo = unit?.unitSerialNo ?: existing?.unitSerialNo.orEmpty(),
-                        yearOfBuilt = unit?.yearOfBuilt ?: existing?.yearOfBuilt.orEmpty(),
-                        unitType = unit?.unitType ?: existing?.unitType.orEmpty(),
+                        manufacturer = existing?.manufacturer?.ifBlank { null } ?: unit?.manufacturer.orEmpty(),
+                        unitModel = existing?.unitModel?.ifBlank { null } ?: unit?.unitModel.orEmpty(),
+                        unitModelNo = existing?.unitModelNo?.ifBlank { null } ?: unit?.unitModelNo.orEmpty(),
+                        unitSerialNo = existing?.unitSerialNo?.ifBlank { null } ?: unit?.unitSerialNo.orEmpty(),
+                        yearOfBuilt = existing?.yearOfBuilt?.ifBlank { null } ?: unit?.yearOfBuilt.orEmpty(),
+                        unitType = existing?.unitType?.ifBlank { null } ?: unit?.unitType.orEmpty(),
                         fichaTecnica = unit?.fichaTecnica ?: emptyList(),
                         estimadoId = existing?.id ?: 0L,
                         clientName = existing?.clientName ?: "",
@@ -175,6 +181,10 @@ class EstimadoViewModel @Inject constructor(
                         val item = _state.value.damages.find { it.id == sheet.itemId }
                         pendingCantidad = (item?.cantidad ?: 1).toString()
                         pendingPrecioUnitario = item?.precioUnitario?.toString() ?: ""
+                        _state.update { it.copy(activeSheet = sheet) }
+                    }
+                    EstimadoSheet.CorregirEquipo -> {
+                        pendingContenedor = _state.value.containerNo
                         _state.update { it.copy(activeSheet = sheet) }
                     }
                     EstimadoSheet.EditManoDeObra -> {
@@ -277,6 +287,10 @@ class EstimadoViewModel @Inject constructor(
             is EstimadoEvent.CantidadChange -> pendingCantidad = event.value
             is EstimadoEvent.PrecioUnitarioChange -> pendingPrecioUnitario = event.value
             is EstimadoEvent.NombreItemChange -> pendingNombreItem = event.value
+            is EstimadoEvent.ContenedorCorregidoChange -> pendingContenedor = event.value
+            is EstimadoEvent.ConfirmCorregirEquipo -> {
+                corregirEquipo(pendingContenedor.trim().uppercase())
+            }
             is EstimadoEvent.ManoDeObraChange -> pendingManoDeObra = event.value
             is EstimadoEvent.ConfirmManoDeObra -> {
                 _state.update {
@@ -314,7 +328,8 @@ class EstimadoViewModel @Inject constructor(
             is EstimadoEvent.CantidadChange,
             is EstimadoEvent.PrecioUnitarioChange,
             is EstimadoEvent.ManoDeObraChange,
-            is EstimadoEvent.NombreItemChange -> Unit
+            is EstimadoEvent.NombreItemChange,
+            is EstimadoEvent.ContenedorCorregidoChange -> Unit
             else -> _state.update { it.copy(isDirty = true) }
         }
     }
@@ -600,6 +615,44 @@ class EstimadoViewModel @Inject constructor(
     fun getPendingPrecioUnitario() = pendingPrecioUnitario
     fun getPendingManoDeObra() = pendingManoDeObra
     fun getPendingNombreItem() = pendingNombreItem
+    fun getPendingContenedor() = pendingContenedor
+
+    /**
+     * Reasigna el estimado al equipo correcto y repone su ficha desde esa unidad.
+     *
+     * Hace falta porque el equipo puede quedar mal: un OCR que lee otra placa, una
+     * unidad elegida por error, o el fallo de ids de inspección que llegó a
+     * escribir un contenedor ajeno. Borrar y rehacer el estimado costaría todas
+     * las fotos y el trabajo ya cargado.
+     */
+    private fun corregirEquipo(contenedor: String) {
+        if (contenedor.isBlank()) return
+        viewModelScope.launch {
+            val unidad = runCatching { reeferUnitRepo.findByContainerNo(contenedor) }.getOrNull()
+            _state.update {
+                it.copy(
+                    containerNo = contenedor,
+                    // Si el equipo está en el catálogo se repone su ficha completa;
+                    // si no, se cambia solo el código y el resto queda como estaba
+                    // para no borrar datos que el técnico ya había cargado.
+                    manufacturer = unidad?.manufacturer ?: it.manufacturer,
+                    unitModel = unidad?.unitModel ?: it.unitModel,
+                    unitModelNo = unidad?.unitModelNo ?: it.unitModelNo,
+                    unitSerialNo = unidad?.unitSerialNo ?: it.unitSerialNo,
+                    yearOfBuilt = unidad?.yearOfBuilt ?: it.yearOfBuilt,
+                    unitType = unidad?.unitType ?: it.unitType,
+                    fichaTecnica = unidad?.fichaTecnica ?: it.fichaTecnica,
+                    activeSheet = null,
+                    isDirty = true,
+                    savedMessage = if (unidad != null) {
+                        "Equipo corregido a $contenedor. Recuerda guardar."
+                    } else {
+                        "Código cambiado a $contenedor (no está en el catálogo). Recuerda guardar."
+                    },
+                )
+            }
+        }
+    }
 
     fun generateAndSharePdf() {
         val current = _state.value
