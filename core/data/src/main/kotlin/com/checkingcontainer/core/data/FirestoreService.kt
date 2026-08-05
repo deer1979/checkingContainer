@@ -240,6 +240,30 @@ class FirestoreService @Inject constructor(
         }
 
     /**
+     * Escucha en vivo UN estimado.
+     *
+     * Firestore avisa por su cuenta cuando el documento cambia, así que mientras
+     * la pantalla está abierta los cambios del compañero llegan solos, sin que
+     * el técnico tenga que refrescar. Se escucha un único documento a propósito:
+     * las lecturas se cobran y observar la colección entera saldría caro.
+     */
+    fun observeEstimado(id: Long): Flow<EstimadoEntity?> = callbackFlow {
+        val registro = firestore.collection(COL_ESTIMADOS)
+            .document(id.toString())
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(TAG, "observeEstimado($id): ${error.message}")
+                    return@addSnapshotListener
+                }
+                // Los eventos que vienen del propio caché local no aportan nada
+                // nuevo: solo interesa lo que ya está confirmado en el servidor.
+                if (snapshot?.metadata?.isFromCache == true) return@addSnapshotListener
+                trySend(snapshot?.toEstimadoEntity())
+            }
+        awaitClose { registro.remove() }
+    }
+
+    /**
      * Todas las copias remotas de una inspección. Normalmente hay una; puede
      * haber más si un dispositivo creó un duplicado al abrir el estimado sin
      * tenerlo en local.

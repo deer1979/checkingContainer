@@ -125,6 +125,7 @@ fun EstimadoScreen(
     onSave: () -> Unit,
     onGeneratePdf: () -> Unit,
     onReintentarSubida: () -> Unit = {},
+    onCargarCambios: () -> Unit = {},
     onSelectClientClick: () -> Unit = {},
     onSelectSitioClick: () -> Unit = {},
     onAddDamagePhoto: (String, Uri) -> Unit,
@@ -287,6 +288,39 @@ fun EstimadoScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // El compañero guardó mientras yo tenía esto abierto. No se recarga
+            // solo: puedo estar escribiendo. Decido yo cuándo traerlo.
+            if (state.hayCambiosDelCompanero) {
+                item(key = "cambios-companero", contentType = "aviso") {
+                    ElevatedCard(
+                        Modifier.fillMaxWidth(),
+                        colors = androidx.compose.material3.CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        ),
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "Tu compañero actualizó este estimado",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
+                                Text(
+                                    "Tus cambios sin guardar no se pierden al cargarlos.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
+                            }
+                            FilledTonalButton(onClick = onCargarCambios) { Text("Ver cambios") }
+                        }
+                    }
+                }
+            }
+
             // Aviso de que el trabajo está solo en el teléfono. Va arriba del
             // todo porque es lo primero que el técnico debe saber al abrirlo.
             if (state.pendienteDeSubir) {

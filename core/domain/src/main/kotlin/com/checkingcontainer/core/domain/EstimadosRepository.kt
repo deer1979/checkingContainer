@@ -1,13 +1,22 @@
 package com.checkingcontainer.core.domain
 
 import com.checkingcontainer.core.model.Estimado
+import com.checkingcontainer.core.model.ResultadoGuardado
 import com.checkingcontainer.core.model.MedicionSnapshot
 import kotlinx.coroutines.flow.Flow
 
 interface EstimadosRepository {
-    suspend fun save(estimado: Estimado): Long
+    /**
+     * Guarda fusionando con la nube. [base] es la versión que se cargó al abrir
+     * la pantalla; sirve para saber qué cambió cada uno y no pisar el trabajo
+     * del compañero.
+     */
+    suspend fun save(estimado: Estimado, base: Estimado? = null): ResultadoGuardado
     fun observeByInspectionId(inspectionId: Long): Flow<Estimado?>
     suspend fun findByInspectionId(inspectionId: Long): Estimado?
+
+    /** Cambios que otra persona guarde en este estimado, en vivo. */
+    fun observeCambiosRemotos(id: Long, desdeUpdatedAt: Long): Flow<Estimado>
 
     /** Lectura local directa, para consultar el estado de sincronización. */
     suspend fun findById(id: Long): Estimado?

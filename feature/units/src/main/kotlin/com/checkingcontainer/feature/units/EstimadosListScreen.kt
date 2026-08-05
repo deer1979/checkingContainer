@@ -25,6 +25,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
@@ -57,11 +58,14 @@ fun EstimadosListRoute(
     viewModel: EstimadosListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val refrescando by viewModel.refrescando.collectAsStateWithLifecycle()
     EstimadosListScreen(
         state = state,
         onEstimadoClick = onEstimadoClick,
         onMeasureClick = onMeasureClick,
         onSearchClick = onSearchClick,
+        refrescando = refrescando,
+        onRefrescar = viewModel::refrescar,
     )
 }
 
@@ -72,6 +76,8 @@ fun EstimadosListScreen(
     onEstimadoClick: (Long) -> Unit,
     onMeasureClick: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
+    refrescando: Boolean = false,
+    onRefrescar: () -> Unit = {},
 ) {
     val pagerState = rememberPagerState { 2 }
     val scope = rememberCoroutineScope()
@@ -115,6 +121,11 @@ fun EstimadosListScreen(
                 )
             }
 
+            PullToRefreshBox(
+                isRefreshing = refrescando,
+                onRefresh = onRefrescar,
+                modifier = Modifier.fillMaxSize(),
+            ) {
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                 val list = if (page == 0) state.openList else state.closedList
                 if (state.isLoading) {
@@ -145,6 +156,7 @@ fun EstimadosListScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

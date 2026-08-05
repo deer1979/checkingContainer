@@ -8,10 +8,15 @@ import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.MedicionSnapshot
+import com.checkingcontainer.core.model.ResultadoFusion
+import com.checkingcontainer.core.model.ResultadoGuardado
+import com.checkingcontainer.core.model.fusionarEstimado
 import com.checkingcontainer.core.model.mejorCopia
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,25 +40,62 @@ class EstimadosRepositoryImpl @Inject constructor(
         }
 
     /**
-     * Guarda SIEMPRE en el teléfono y luego intenta subir.
+     * Guarda fusionando con la nube y SIEMPRE en el teléfono.
+     *
+     * Antes de escribir se consulta la copia remota. Si otra persona la tocó
+     * desde que yo abrí la pantalla, se fusiona campo por campo en vez de pisar
+     * su trabajo: él agregó una foto, yo puse el valor, y quedan las dos cosas.
+     * Solo cuando los dos cambiamos el MISMO campo se reporta el conflicto.
      *
      * Room nunca falla; Firestore sí cuando no hay cobertura. Si la nube no
-     * confirma, la fila queda con `subidoEn` viejo y por tanto **pendiente**, que
-     * es lo que alimenta el aviso al usuario y el reintento posterior. Antes se
-     * ignoraba el resultado de la subida y la app decía "Guardado" igual.
+     * confirma, la fila queda pendiente, que es lo que alimenta el aviso al
+     * usuario y el reintento posterior.
      */
-    override suspend fun save(estimado: Estimado): Long = withContext(ioDispatcher) {
-        val ahora = System.currentTimeMillis()
-        val marcado = estimado.copy(updatedAt = ahora)
-        val entity = marcado.toEntity()
-        val savedId = dao.upsert(entity)
-        val persisted = entity.copy(id = if (estimado.id == 0L) savedId else estimado.id)
+    override suspend fun save(estimado: Estimado, base: Estimado?): ResultadoGuardado =
+        withContext(ioDispatcher) {
+            val fusion = fusionarConRemoto(estimado, base)
+            val ahora = System.currentTimeMillis()
+            val marcado = fusion.estimado.copy(updatedAt = ahora)
+            val entity = marcado.toEntity()
+            val savedId = dao.upsert(entity)
+            val persisted = entity.copy(id = if (marcado.id == 0L) savedId else marcado.id)
 
-        if (firestoreService.upsertEstimado(persisted)) {
-            dao.upsert(persisted.copy(subidoEn = ahora))
+            val subido = firestoreService.upsertEstimado(persisted)
+            if (subido) dao.upsert(persisted.copy(subidoEn = ahora))
+
+            ResultadoGuardado(
+                estimado = persisted.copy(subidoEn = if (subido) ahora else persisted.subidoEn).toDomain(),
+                pendienteDeSubir = !subido,
+                huboCambiosDelOtro = fusion.huboCambiosDelOtro,
+                camposEnConflicto = fusion.camposEnConflicto,
+            )
         }
-        savedId
+
+    /**
+     * Trae la copia remota y la fusiona con la mía. Si no hay remota, o es la
+     * misma que cargué, no hay nada que fusionar.
+     */
+    private suspend fun fusionarConRemoto(mio: Estimado, base: Estimado?): ResultadoFusion {
+        if (mio.id == 0L) return ResultadoFusion(mio, huboCambiosDelOtro = false, camposEnConflicto = emptyList())
+
+        val remoto = firestoreService.fetchEstimadoById(mio.id)?.toDomain()
+            ?: return ResultadoFusion(mio, huboCambiosDelOtro = false, camposEnConflicto = emptyList())
+
+        // La nube no ha cambiado desde que abrí: no hace falta fusionar nada.
+        if (base != null && remoto.updatedAt <= base.updatedAt) {
+            return ResultadoFusion(mio, huboCambiosDelOtro = false, camposEnConflicto = emptyList())
+        }
+        return fusionarEstimado(base, mio, remoto)
     }
+
+    /**
+     * Cambios en vivo del estimado abierto. Emite solo cuando la versión remota
+     * es más nueva que [desdeUpdatedAt], es decir, cuando otra persona guardó.
+     */
+    override fun observeCambiosRemotos(id: Long, desdeUpdatedAt: Long): Flow<Estimado> =
+        firestoreService.observeEstimado(id)
+            .mapNotNull { it?.toDomain() }
+            .filter { it.updatedAt > desdeUpdatedAt }
 
     override suspend fun findById(id: Long): Estimado? =
         withContext(ioDispatcher) { dao.findById(id)?.toDomain() }

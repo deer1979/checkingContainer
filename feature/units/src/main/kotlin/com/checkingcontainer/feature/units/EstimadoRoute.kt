@@ -233,6 +233,7 @@ fun EstimadoRoute(
         onSave = viewModel::save,
         onGeneratePdf = viewModel::generateAndSharePdf,
         onReintentarSubida = viewModel::reintentarSubida,
+        onCargarCambios = viewModel::cargarCambiosDelCompanero,
         onSelectClientClick = { showClientPicker = true },
         onSelectSitioClick = { showSitioPicker = true },
         onAddDamagePhoto = viewModel::addDamagePhoto,

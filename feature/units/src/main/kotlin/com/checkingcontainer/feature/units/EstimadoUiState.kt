@@ -56,6 +56,10 @@ data class EstimadoUiState(
     val pdfPreviewPath: String? = null,
     /** El estimado está guardado en el teléfono pero la nube no lo tiene. */
     val pendienteDeSubir: Boolean = false,
+    /** Otra persona guardó cambios mientras yo tenía esto abierto. */
+    val hayCambiosDelCompanero: Boolean = false,
+    /** Campos que ambos editamos distinto en el último guardado. */
+    val camposEnConflicto: List<String> = emptyList(),
     // Bottom sheet activo
     val activeSheet: EstimadoSheet? = null,
 ) {

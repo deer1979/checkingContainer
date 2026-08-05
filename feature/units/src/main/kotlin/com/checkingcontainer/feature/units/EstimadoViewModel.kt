@@ -18,6 +18,7 @@ import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.MAX_FOTOS_POR_GRUPO
+import com.checkingcontainer.core.model.fusionarEstimado
 import com.checkingcontainer.feature.units.navigation.ESTIMADO_INSPECTION_ID_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -71,6 +73,13 @@ class EstimadoViewModel @Inject constructor(
     private var pendingNombreItem = ""
     private var activePhotoUploads = 0
 
+    /**
+     * Versión tal como se cargó al abrir la pantalla. Es la referencia para
+     * saber qué cambié yo y qué cambió el compañero al guardar.
+     */
+    private var estimadoBase: Estimado? = null
+    private var escuchaJob: kotlinx.coroutines.Job? = null
+
     init {
         viewModelScope.launch {
             try {
@@ -79,6 +88,7 @@ class EstimadoViewModel @Inject constructor(
                 val inspection = inspectionDeferred.await()
                 val unit = inspection?.containerNo?.let { reeferUnitRepo.findByContainerNo(it) }
                 val existing = existingDeferred.await()
+                estimadoBase = existing
                 _state.update {
                     it.copy(
                         isLoading = false,
@@ -112,6 +122,7 @@ class EstimadoViewModel @Inject constructor(
                         pendienteDeSubir = existing?.pendienteDeSubir ?: false,
                     )
                 }
+                existing?.let { escucharCambiosDelCompanero(it) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -410,6 +421,37 @@ class EstimadoViewModel @Inject constructor(
     }
 
 
+    /** Convierte el estado de la pantalla en el modelo que se guarda/fusiona. */
+    private fun aEstimado(s: EstimadoUiState) = Estimado(
+        id = s.estimadoId,
+        inspectionId = inspectionId,
+        containerNo = s.containerNo,
+        manufacturer = s.manufacturer,
+        unitModel = s.unitModel,
+        unitModelNo = s.unitModelNo,
+        unitSerialNo = s.unitSerialNo,
+        yearOfBuilt = s.yearOfBuilt,
+        unitType = s.unitType,
+        clientName = s.clientName.trim(),
+        clientId = s.clientId,
+        clientIdNumber = s.clientIdNumber,
+        clientDireccion = s.clientDireccion,
+        clientTelefono = s.clientTelefono,
+        clientEmail = s.clientEmail,
+        sitioClienteId = s.sitioClienteId,
+        sitioNombre = s.sitioNombre,
+        ordenTrabajo = s.ordenTrabajo.trim(),
+        location = s.location.trim(),
+        technicianName = s.technicianName,
+        createdAt = s.createdAt,
+        approvedAt = s.approvedAt,
+        status = s.status,
+        damages = s.damages,
+        mediciones = s.mediciones,
+        manoDeObraTotal = s.manoDeObraTotal,
+        hasIva = s.hasIva,
+    )
+
     /** Id del técnico con la sesión abierta; 0 solo si no hay sesión. */
     private suspend fun technicianIdActual(): Long =
         (authRepository.state.first() as? AuthState.Authenticated)?.user?.id ?: 0L
@@ -421,54 +463,51 @@ class EstimadoViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             val allReparado = current.damages.isNotEmpty() &&
                 current.damages.all { it.status == DamageItemStatus.REPARADO }
-            val estimado = Estimado(
-                id = current.estimadoId,
-                inspectionId = inspectionId,
-                containerNo = current.containerNo,
-                manufacturer = current.manufacturer,
-                unitModel = current.unitModel,
-                unitModelNo = current.unitModelNo,
-                unitSerialNo = current.unitSerialNo,
-                yearOfBuilt = current.yearOfBuilt,
-                unitType = current.unitType,
-                clientName = current.clientName.trim(),
-                clientId = current.clientId,
-                clientIdNumber = current.clientIdNumber,
-                clientDireccion = current.clientDireccion,
-                clientTelefono = current.clientTelefono,
-                clientEmail = current.clientEmail,
-                sitioClienteId = current.sitioClienteId,
-                sitioNombre = current.sitioNombre,
-                ordenTrabajo = current.ordenTrabajo.trim(),
-                location = current.location.trim(),
+            val estimado = aEstimado(current).copy(
                 technicianId = technicianIdActual(),
-                technicianName = current.technicianName,
                 createdAt = if (current.estimadoId == 0L) now else current.createdAt,
-                approvedAt = current.approvedAt,
                 closedAt = if (allReparado) now else null,
                 status = if (allReparado) EstimadoStatus.CERRADO else EstimadoStatus.ABIERTO,
-                damages = current.damages,
-                mediciones = current.mediciones,
-                manoDeObraTotal = current.manoDeObraTotal,
-                hasIva = current.hasIva,
             )
-            runCatching { estimadosRepo.save(estimado) }
-                .onSuccess { savedId ->
-                    val idFinal = if (current.estimadoId == 0L) savedId else current.estimadoId
-                    // Si la nube no confirmó, el estimado queda marcado como
-                    // pendiente y hay que DECIRLO: antes se anunciaba "Guardado"
-                    // aunque el trabajo se hubiera quedado solo en el teléfono.
-                    val pendiente = estimadosRepo.findById(idFinal)?.pendienteDeSubir ?: false
+            runCatching { estimadosRepo.save(estimado, estimadoBase) }
+                .onSuccess { resultado ->
+                    // El guardado pudo traer trabajo del compañero: la pantalla se
+                    // repuebla con lo FUSIONADO, no con lo que yo tenía en mano.
+                    val guardado = resultado.estimado
+                    estimadoBase = guardado
                     _state.update {
                         it.copy(
                             isSaving = false,
                             isDirty = false,
-                            estimadoId = idFinal,
-                            createdAt = if (current.estimadoId == 0L) now else current.createdAt,
-                            status = estimado.status,
-                            pendienteDeSubir = pendiente,
+                            estimadoId = guardado.id,
+                            createdAt = guardado.createdAt,
+                            status = guardado.status,
+                            damages = guardado.damages,
+                            mediciones = guardado.mediciones,
+                            manoDeObraTotal = guardado.manoDeObraTotal,
+                            clientName = guardado.clientName,
+                            clientId = guardado.clientId,
+                            clientIdNumber = guardado.clientIdNumber,
+                            clientDireccion = guardado.clientDireccion,
+                            clientTelefono = guardado.clientTelefono,
+                            clientEmail = guardado.clientEmail,
+                            sitioClienteId = guardado.sitioClienteId,
+                            sitioNombre = guardado.sitioNombre,
+                            ordenTrabajo = guardado.ordenTrabajo,
+                            location = guardado.location,
+                            hasIva = guardado.hasIva,
+                            pendienteDeSubir = resultado.pendienteDeSubir,
+                            hayCambiosDelCompanero = false,
+                            camposEnConflicto = resultado.camposEnConflicto,
                             savedMessage = when {
-                                pendiente -> "Guardado en el teléfono — sin subir. Se reintentará al haber señal."
+                                resultado.camposEnConflicto.isNotEmpty() ->
+                                    "Guardado. Ojo: tu compañero también cambió " +
+                                        resultado.camposEnConflicto.joinToString(", ") +
+                                        " — quedó tu versión."
+                                resultado.huboCambiosDelOtro ->
+                                    "Guardado. Se incorporaron los cambios de tu compañero."
+                                resultado.pendienteDeSubir ->
+                                    "Guardado en el teléfono — sin subir. Se reintentará al haber señal."
                                 allReparado -> "Estimado cerrado y subido"
                                 else -> "Guardado y subido"
                             },
@@ -478,6 +517,56 @@ class EstimadoViewModel @Inject constructor(
                 .onFailure { error ->
                     _state.update { it.copy(isSaving = false, errorMessage = error.message ?: "Error al guardar") }
                 }
+        }
+    }
+
+    /**
+     * Escucha en vivo el estimado abierto. Cuando el compañero guarda, Firestore
+     * avisa solo y aquí se levanta la bandera; NO se recarga la pantalla por las
+     * bravas, porque el técnico puede estar escribiendo. Él decide cuándo verlo.
+     */
+    private fun escucharCambiosDelCompanero(cargado: Estimado) {
+        if (cargado.id == 0L) return
+        escuchaJob?.cancel()
+        escuchaJob = viewModelScope.launch {
+            estimadosRepo.observeCambiosRemotos(cargado.id, cargado.updatedAt)
+                .catch { /* sin red no hay aviso en vivo; el guardado igual fusiona */ }
+                .collect { _state.update { s -> s.copy(hayCambiosDelCompanero = true) } }
+        }
+    }
+
+    /** Trae lo que guardó el compañero y lo fusiona con lo que tengo en pantalla. */
+    fun cargarCambiosDelCompanero() {
+        viewModelScope.launch {
+            val actual = _state.value
+            val remoto = estimadosRepo.findById(actual.estimadoId) ?: return@launch
+            // Se pasa por la misma fusión que el guardado: si yo tenía algo a
+            // medio escribir, no se pierde.
+            val fusion = fusionarEstimado(estimadoBase, aEstimado(actual), remoto)
+            val e = fusion.estimado
+            estimadoBase = remoto
+            _state.update {
+                it.copy(
+                    damages = e.damages,
+                    mediciones = e.mediciones,
+                    manoDeObraTotal = e.manoDeObraTotal,
+                    clientName = e.clientName,
+                    clientId = e.clientId,
+                    clientIdNumber = e.clientIdNumber,
+                    clientDireccion = e.clientDireccion,
+                    clientTelefono = e.clientTelefono,
+                    clientEmail = e.clientEmail,
+                    sitioClienteId = e.sitioClienteId,
+                    sitioNombre = e.sitioNombre,
+                    ordenTrabajo = e.ordenTrabajo,
+                    location = e.location,
+                    hasIva = e.hasIva,
+                    hayCambiosDelCompanero = false,
+                    camposEnConflicto = fusion.camposEnConflicto,
+                    savedMessage = "Se cargaron los cambios de tu compañero",
+                )
+            }
+            escucharCambiosDelCompanero(remoto)
         }
     }
 
