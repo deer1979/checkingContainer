@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.checkingcontainer.core.model.Client
+import com.checkingcontainer.core.model.coincideCon
 
 /**
  * Selector de cliente para el estimado: búsqueda sobre el catálogo (por nombre
@@ -54,7 +55,8 @@ internal fun ClientPickerSheet(
     val filtrados = remember(clients, query) {
         if (query.isBlank()) clients
         else clients.filter {
-            it.razonSocial.contains(query, ignoreCase = true) || it.idNumber.contains(query)
+            // Sin tildes: "compania" tiene que encontrar "Compañía".
+            it.razonSocial.coincideCon(query) || it.idNumber.contains(query.trim())
         }
     }
 

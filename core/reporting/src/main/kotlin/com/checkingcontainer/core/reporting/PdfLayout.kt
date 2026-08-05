@@ -74,6 +74,50 @@ class Pinceles {
 }
 
 /**
+ * Lleva la cuenta de las hojas y hace cumplir la regla que impone `PdfDocument`:
+ * **nunca abrir una hoja con otra todavía sin cerrar.**
+ *
+ * Vive aparte del dibujo a propósito. Saltársela costó un fallo en producción
+ * ("Current page not finished!") que dejó la app sin poder generar ningún PDF, y
+ * como `PdfDocument` es nativo no se puede ejercitar en un test de JVM. Aquí la
+ * secuencia sí queda cubierta: el test usa un doble que se comporta igual.
+ */
+internal class ControlDePaginas(
+    private val alAbrir: (numero: Int) -> Unit,
+    private val alCerrar: (numero: Int) -> Unit,
+) {
+    var numero: Int = 0
+        private set
+    private var abierta = false
+
+    fun iniciar() {
+        check(!abierta) { "Ya hay una hoja abierta" }
+        numero = 1
+        alAbrir(numero)
+        abierta = true
+    }
+
+    fun siguiente() {
+        cerrarActual()
+        numero += 1
+        alAbrir(numero)
+        abierta = true
+    }
+
+    /** Cierra la última hoja y devuelve cuántas se emitieron. */
+    fun terminar(): Int {
+        cerrarActual()
+        return numero
+    }
+
+    private fun cerrarActual() {
+        check(abierta) { "No hay hoja abierta que cerrar" }
+        alCerrar(numero)
+        abierta = false
+    }
+}
+
+/**
  * Lienzo paginado: lleva la posición vertical, abre páginas nuevas cuando hace
  * falta y numera el pie al cerrar.
  *
@@ -90,18 +134,31 @@ class LienzoPdf(
     private val totalPaginas: Int? = null,
 ) {
 
-    private var numero = 1
-    private var pagina = nuevaPagina(1)
+    private var pagina: PdfDocument.Page? = null
 
-    var canvas: Canvas = pagina.canvas
+    lateinit var canvas: Canvas
         private set
     var y: Float = Hoja.MARGEN
 
+    private val control = ControlDePaginas(
+        alAbrir = { n ->
+            val nueva = doc.startPage(PdfDocument.PageInfo.Builder(Hoja.ANCHO, Hoja.ALTO, n).create())
+            pagina = nueva
+            canvas = nueva.canvas
+            y = Hoja.MARGEN
+        },
+        alCerrar = { n ->
+            pieDePagina(n)
+            pagina?.let { doc.finishPage(it) }
+        },
+    )
+
+    init {
+        control.iniciar()
+    }
+
     /** Se dibuja al abrir cada página después de la primera (encabezado repetido). */
     var encabezadoContinuacion: (() -> Unit)? = null
-
-    private fun nuevaPagina(n: Int) =
-        doc.startPage(PdfDocument.PageInfo.Builder(Hoja.ANCHO, Hoja.ALTO, n).create())
 
     /**
      * Estampa el pie y CIERRA la hoja.
@@ -111,7 +168,7 @@ class LienzoPdf(
      * numerarlas al final rompía la generación entera con
      * "Current page not finished!".
      */
-    private fun cerrarPagina() {
+    private fun pieDePagina(numero: Int) {
         val etiqueta = if (totalPaginas != null) "Página $numero de $totalPaginas" else "Página $numero"
         canvas.drawText(
             etiqueta,
@@ -119,7 +176,6 @@ class LienzoPdf(
             Hoja.ALTO - Hoja.MARGEN + 8f,
             p.pie,
         )
-        doc.finishPage(pagina)
     }
 
     val espacioLibre: Float get() = Hoja.limiteInferior - y
@@ -132,11 +188,7 @@ class LienzoPdf(
     }
 
     fun saltarPagina() {
-        cerrarPagina()
-        numero++
-        pagina = nuevaPagina(numero)
-        canvas = pagina.canvas
-        y = Hoja.MARGEN
+        control.siguiente()
         encabezadoContinuacion?.invoke()
     }
 
@@ -197,10 +249,7 @@ class LienzoPdf(
     }
 
     /** Cierra la última hoja y devuelve cuántas salieron en total. */
-    fun finalizar(): Int {
-        cerrarPagina()
-        return numero
-    }
+    fun finalizar(): Int = control.terminar()
 
     companion object {
         /** Alto que ocuparía [t] sin dibujarlo (para decidir saltos de página). */

@@ -131,6 +131,30 @@ class BootstrapRepositoryImpl @Inject constructor(
     }
 
     /**
+     * Vuelve a bajar los catálogos compartidos (clientes y equipos). Se hace fila
+     * a fila y sin abortar: un registro corrupto no debe impedir el resto.
+     */
+    private suspend fun refrescarCatalogos() {
+        val clientes = firestoreService.fetchAllClients()
+        var ok = 0
+        clientes.forEach { fila ->
+            runCatching { clientDao.upsert(fila) }
+                .onSuccess { ok += 1 }
+                .onFailure { Log.w(BOOT_TAG, "cliente descartado: ${it.message}") }
+        }
+        if (clientes.isNotEmpty()) Log.i(BOOT_TAG, "Clientes sincronizados: $ok/${clientes.size}")
+
+        val equipos = firestoreService.fetchAllReeferUnits()
+        var okEquipos = 0
+        equipos.forEach { fila ->
+            runCatching { reeferUnitDao.upsert(fila) }
+                .onSuccess { okEquipos += 1 }
+                .onFailure { Log.w(BOOT_TAG, "equipo descartado: ${it.message}") }
+        }
+        if (equipos.isNotEmpty()) Log.i(BOOT_TAG, "Equipos sincronizados: $okEquipos/${equipos.size}")
+    }
+
+    /**
      * Trabajo real hecho en este teléfono. El usuario sembrado en la primera
      * instalación no cuenta: no es trabajo, es semilla.
      */
@@ -168,6 +192,13 @@ class BootstrapRepositoryImpl @Inject constructor(
         // en cuanto hay señal, sin depender de que vuelva a tocar Guardar.
         val subidos = estimadosRepo.subirPendientes()
         if (subidos > 0) Log.i(BOOT_TAG, "Subidos $subidos estimados que estaban pendientes.")
+
+        // Clientes y equipos: hasta ahora solo se descargaban en la PRIMERA
+        // instalación, así que un cliente creado por un compañero en otro teléfono
+        // no llegaba nunca — no aparecía en el buscador por más que existiera en
+        // la nube. Son catálogos pequeños y de cambio lento, así que refrescarlos
+        // en cada login es barato.
+        refrescarCatalogos()
 
         val isAdmin = user.role == UserRole.SuperAdmin || user.role == UserRole.Admin
         val since = System.currentTimeMillis() - RECENT_WINDOW_MS
