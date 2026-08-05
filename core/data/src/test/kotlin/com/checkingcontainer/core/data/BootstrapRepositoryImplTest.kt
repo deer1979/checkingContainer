@@ -11,6 +11,7 @@ import com.checkingcontainer.core.database.dao.InspectionDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.database.entity.UserEntity
+import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.network.AnonymousAuth
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -46,6 +47,7 @@ class BootstrapRepositoryImplTest {
     private val reeferUnitDao: ReeferUnitDao = mockk(relaxed = true)
     private val firestoreService: FirestoreService = mockk(relaxed = true)
     private val anonymousAuth: AnonymousAuth = mockk(relaxed = true)
+    private val estimadosRepo: EstimadosRepository = mockk(relaxed = true)
     private val dataStore = FakePreferencesDataStore()
 
     private fun repositorio(dispatcher: TestDispatcher) = BootstrapRepositoryImpl(
@@ -56,6 +58,7 @@ class BootstrapRepositoryImplTest {
         reeferUnitDao = reeferUnitDao,
         firestoreService = firestoreService,
         anonymousAuth = anonymousAuth,
+        estimadosRepo = estimadosRepo,
         dataStore = dataStore,
         ioDispatcher = dispatcher,
         applicationScope = TestScope(dispatcher),
@@ -65,9 +68,9 @@ class BootstrapRepositoryImplTest {
         dataStore.data.first()[KEY_BOOTSTRAP_COMPLETED] == true
 
     @Test
-    fun `instalacion con datos locales no vuelve a descargar y queda marcada`() = runTest {
+    fun `instalacion con trabajo local no vuelve a descargar y queda marcada`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { userDao.count() } returns 7
+        coEvery { inspectionDao.count() } returns 12
 
         repositorio(dispatcher).syncIfNeeded()
 
@@ -79,20 +82,41 @@ class BootstrapRepositoryImplTest {
     }
 
     @Test
-    fun `con el marcador puesto no hace nada`() = runTest {
+    fun `con el marcador puesto no descarga pero si renueva la sesion`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         dataStore.set(KEY_BOOTSTRAP_COMPLETED, true)
 
         repositorio(dispatcher).syncIfNeeded()
 
         coVerify(exactly = 0) { firestoreService.fetchAllUsers() }
-        coVerify(exactly = 0) { userDao.count() }
+        // La credencial anónima debe renovarse SIEMPRE: las reglas la exigen y
+        // pudo perderse desde el arranque anterior.
+        coVerify(exactly = 1) { anonymousAuth.ensureSignedIn() }
+    }
+
+    @Test
+    fun `telefono recien instalado descarga aunque exista el usuario sembrado`() = runTest {
+        // La primera instalación siembra un SuperAdmin local. Si el bootstrap se
+        // guiara por el número de usuarios, creería que ya tiene datos y no
+        // descargaría nada: el equipo nuevo se quedaba sin los usuarios reales y
+        // nadie podía iniciar sesión.
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        coEvery { userDao.count() } returns 1
+        coEvery { estimadoDao.findOpenIds() } returns emptyList()
+        coEvery { inspectionDao.count() } returns 0
+        coEvery { reeferUnitDao.count() } returns 0
+        coEvery { firestoreService.fetchAllUsers() } returns listOf(mockk(), mockk(), mockk())
+
+        repositorio(dispatcher).syncIfNeeded()
+
+        coVerify(exactly = 3) { userDao.upsert(any()) }
+        assertTrue(bootstrapMarcado())
     }
 
     @Test
     fun `instalacion nueva descarga todo y marca completado`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { userDao.count() } returns 0
+        coEvery { inspectionDao.count() } returns 0
         coEvery { firestoreService.fetchAllUsers() } returns listOf(mockk(), mockk())
 
         repositorio(dispatcher).syncIfNeeded()
@@ -110,7 +134,7 @@ class BootstrapRepositoryImplTest {
         val buena1: UserEntity = mockk()
         val mala: UserEntity = mockk()
         val buena2: UserEntity = mockk()
-        coEvery { userDao.count() } returns 0
+        coEvery { inspectionDao.count() } returns 0
         coEvery { firestoreService.fetchAllUsers() } returns listOf(buena1, mala, buena2)
         coEvery { userDao.upsert(mala) } throws IllegalStateException("fila corrupta")
 
@@ -126,7 +150,7 @@ class BootstrapRepositoryImplTest {
     @Test
     fun `si Firestore no devuelve usuarios no se marca y se reintenta luego`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { userDao.count() } returns 0
+        coEvery { inspectionDao.count() } returns 0
         coEvery { firestoreService.fetchAllUsers() } returns emptyList()
 
         repositorio(dispatcher).syncIfNeeded()
@@ -138,7 +162,7 @@ class BootstrapRepositoryImplTest {
     @Test
     fun `un fallo de red deja el bootstrap pendiente sin propagar la excepcion`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { userDao.count() } returns 0
+        coEvery { inspectionDao.count() } returns 0
         coEvery { firestoreService.fetchAllUsers() } throws RuntimeException("sin red")
 
         repositorio(dispatcher).syncIfNeeded()

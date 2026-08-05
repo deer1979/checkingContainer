@@ -8,6 +8,7 @@ import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.MedicionSnapshot
+import com.checkingcontainer.core.model.mejorCopia
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -33,19 +34,97 @@ class EstimadosRepositoryImpl @Inject constructor(
             true
         }
 
+    /**
+     * Guarda SIEMPRE en el teléfono y luego intenta subir.
+     *
+     * Room nunca falla; Firestore sí cuando no hay cobertura. Si la nube no
+     * confirma, la fila queda con `subidoEn` viejo y por tanto **pendiente**, que
+     * es lo que alimenta el aviso al usuario y el reintento posterior. Antes se
+     * ignoraba el resultado de la subida y la app decía "Guardado" igual.
+     */
     override suspend fun save(estimado: Estimado): Long = withContext(ioDispatcher) {
-        val entity = estimado.toEntity()
+        val ahora = System.currentTimeMillis()
+        val marcado = estimado.copy(updatedAt = ahora)
+        val entity = marcado.toEntity()
         val savedId = dao.upsert(entity)
         val persisted = entity.copy(id = if (estimado.id == 0L) savedId else estimado.id)
-        firestoreService.upsertEstimado(persisted)
+
+        if (firestoreService.upsertEstimado(persisted)) {
+            dao.upsert(persisted.copy(subidoEn = ahora))
+        }
         savedId
     }
+
+    override suspend fun findById(id: Long): Estimado? =
+        withContext(ioDispatcher) { dao.findById(id)?.toDomain() }
+
+    override suspend fun subirPendientes(): Int = withContext(ioDispatcher) {
+        val pendientes = dao.findPendientesDeSubir()
+        var subidos = 0
+        pendientes.forEach { entity ->
+            val ahora = System.currentTimeMillis()
+            if (firestoreService.upsertEstimado(entity)) {
+                dao.upsert(entity.copy(subidoEn = ahora))
+                subidos += 1
+            }
+        }
+        subidos
+    }
+
+    override fun observePendientesDeSubir(): Flow<Int> = dao.observeCountPendientes()
 
     override fun observeByInspectionId(inspectionId: Long): Flow<Estimado?> =
         dao.observeByInspectionId(inspectionId).map { it?.toDomain() }
 
+    /**
+     * Carga el estimado de una inspección con prioridad estricta:
+     *
+     * 1. Copia local **pendiente de subir** → siempre gana: es trabajo que aún
+     *    no viajó y ninguna versión de la nube puede pisarlo.
+     * 2. Copia local ya subida → se compara con la nube y se toma la más nueva.
+     * 3. Sin copia local → **se busca en Firestore** antes de darlo por nuevo.
+     *    Omitir este paso era lo que hacía que un teléfono recién instalado
+     *    creara un duplicado en blanco y lo subiera encima del bueno.
+     *
+     * Si en la nube hay varias copias de la misma inspección se conserva la que
+     * más información tiene y **las vacías se eliminan**.
+     */
     override suspend fun findByInspectionId(inspectionId: Long): Estimado? =
-        withContext(ioDispatcher) { dao.findByInspectionId(inspectionId)?.toDomain() }
+        withContext(ioDispatcher) {
+            val local = dao.findByInspectionId(inspectionId)?.toDomain()
+            if (local != null && local.pendienteDeSubir) return@withContext local
+
+            val remotas = firestoreService.fetchEstimadosByInspectionId(inspectionId)
+                .map { it.toDomain() }
+            if (remotas.isEmpty()) return@withContext local
+
+            val mejorRemota = limpiarDuplicados(remotas) ?: return@withContext local
+            if (local == null) {
+                // Llega de la nube: se guarda en local ya marcada como subida.
+                dao.upsert(mejorRemota.toEntity().copy(subidoEn = System.currentTimeMillis()))
+                return@withContext mejorRemota
+            }
+
+            // Ambas subidas: manda la modificación más reciente.
+            val ganadora = if (mejorRemota.updatedAt > local.updatedAt) mejorRemota else local
+            if (ganadora !== local) {
+                dao.upsert(ganadora.toEntity().copy(id = local.id, subidoEn = System.currentTimeMillis()))
+            }
+            ganadora
+        }
+
+    /**
+     * Con varias copias remotas de la misma inspección conserva la más completa
+     * y borra las demás, que son los duplicados en blanco. Devuelve la buena.
+     */
+    private suspend fun limpiarDuplicados(remotas: List<Estimado>): Estimado? {
+        val mejor = mejorCopia(remotas) ?: return null
+        remotas.filter { it.id != mejor.id && it.riqueza == 0 }.forEach { vacio ->
+            firestoreService.deleteEstimado(vacio.id)
+            dao.deleteById(vacio.id)
+        }
+        return mejor
+    }
 
     override suspend fun delete(id: Long): Unit = withContext(ioDispatcher) {
         dao.deleteById(id)

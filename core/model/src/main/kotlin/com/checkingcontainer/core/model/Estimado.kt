@@ -120,6 +120,43 @@ data class Estimado(
     // Configuración
     val hasIva: Boolean = false,
     val reportUrl: String? = null,
-)
+    /** Última modificación. Decide quién gana cuando local y nube difieren. */
+    val updatedAt: Long = 0L,
+    /**
+     * Momento en que Firestore confirmó la subida. `null` o anterior a
+     * [updatedAt] significa que este estimado **solo existe en el teléfono**.
+     */
+    val subidoEn: Long? = null,
+) {
+    /** Hay trabajo guardado en el teléfono que la nube todavía no tiene. */
+    val pendienteDeSubir: Boolean
+        get() = subidoEn == null || subidoEn < updatedAt
+
+    /**
+     * Cuánta información real contiene, para elegir entre copias duplicadas de
+     * la misma inspección: gana la que más datos tiene, nunca la que quedó en
+     * blanco por haberse creado sobre una base local vacía.
+     */
+    val riqueza: Int
+        get() = listOf(
+            clientName, clientIdNumber, clientDireccion, clientTelefono, clientEmail,
+            sitioNombre, ordenTrabajo, location, technicianName,
+        ).count { it.isNotBlank() } +
+            damages.size * 3 +
+            mediciones.size * 2 +
+            (if (manoDeObraTotal != null) 1 else 0)
+}
+
+/**
+ * Elige la mejor copia entre varios estimados de la misma inspección.
+ *
+ * Un teléfono que abrió el estimado sin tenerlo en local llegó a crear un
+ * duplicado en blanco y subirlo, tapando al bueno. Ante el empate de datos
+ * manda la modificación más reciente.
+ */
+fun mejorCopia(candidatos: List<Estimado>): Estimado? =
+    candidatos.maxWithOrNull(
+        compareBy<Estimado> { it.riqueza }.thenBy { it.updatedAt }.thenBy { it.id },
+    )
 
 enum class EstimadoStatus { ABIERTO, CERRADO }

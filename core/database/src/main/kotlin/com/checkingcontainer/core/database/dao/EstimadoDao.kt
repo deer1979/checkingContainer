@@ -40,6 +40,13 @@ interface EstimadoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: EstimadoEntity): Long
 
+    /** Guardados en el teléfono cuya subida la nube nunca confirmó. */
+    @Query("SELECT * FROM estimados WHERE subidoEn IS NULL OR subidoEn < updatedAt")
+    suspend fun findPendientesDeSubir(): List<EstimadoEntity>
+
+    @Query("SELECT COUNT(*) FROM estimados WHERE subidoEn IS NULL OR subidoEn < updatedAt")
+    fun observeCountPendientes(): Flow<Int>
+
     @Query("DELETE FROM estimados WHERE id = :id")
     suspend fun deleteById(id: Long)
 }

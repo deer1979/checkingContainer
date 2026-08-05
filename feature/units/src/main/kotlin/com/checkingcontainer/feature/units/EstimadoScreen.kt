@@ -124,6 +124,7 @@ fun EstimadoScreen(
     onEvent: (EstimadoEvent) -> Unit,
     onSave: () -> Unit,
     onGeneratePdf: () -> Unit,
+    onReintentarSubida: () -> Unit = {},
     onSelectClientClick: () -> Unit = {},
     onSelectSitioClick: () -> Unit = {},
     onAddDamagePhoto: (String, Uri) -> Unit,
@@ -286,6 +287,42 @@ fun EstimadoScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // Aviso de que el trabajo está solo en el teléfono. Va arriba del
+            // todo porque es lo primero que el técnico debe saber al abrirlo.
+            if (state.pendienteDeSubir) {
+                item(key = "pendiente", contentType = "aviso") {
+                    ElevatedCard(
+                        Modifier.fillMaxWidth(),
+                        colors = androidx.compose.material3.CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "Sin subir a la nube",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                                Text(
+                                    "Este estimado está guardado en el teléfono. " +
+                                        "Se subirá solo cuando haya señal.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                            }
+                            FilledTonalButton(onClick = onReintentarSubida, enabled = !state.isSaving) {
+                                Text("Reintentar")
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── CLIENTE ──────────────────────────────────────────────────────────
             item(key = "cliente", contentType = "card") {
                 EstimadoClienteCard(

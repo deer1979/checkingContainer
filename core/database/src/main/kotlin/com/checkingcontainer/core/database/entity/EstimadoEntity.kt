@@ -44,6 +44,8 @@ data class EstimadoEntity(
     val manoDeObraTotal: Double? = null,
     val hasIva: Int = 0,
     val reportUrl: String? = null,
+    val updatedAt: Long = 0L,
+    val subidoEn: Long? = null,
 ) {
     fun toDomain(): Estimado = Estimado(
         id = id,
@@ -76,6 +78,8 @@ data class EstimadoEntity(
         manoDeObraTotal = manoDeObraMigrada,
         hasIva = hasIva != 0,
         reportUrl = reportUrl,
+        updatedAt = updatedAt,
+        subidoEn = subidoEn,
     )
 
     /**
@@ -181,6 +185,8 @@ fun Estimado.toEntity(): EstimadoEntity = EstimadoEntity(
     manoDeObraTotal = manoDeObraTotal,
     hasIva = if (hasIva) 1 else 0,
     reportUrl = reportUrl,
+    updatedAt = updatedAt,
+    subidoEn = subidoEn,
 )
 
 private fun parseMediciones(json: String): List<MedicionSnapshot> = buildList {

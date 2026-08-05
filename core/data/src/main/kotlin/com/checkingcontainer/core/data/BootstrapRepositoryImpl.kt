@@ -14,6 +14,7 @@ import com.checkingcontainer.core.database.dao.InspectionDao
 import com.checkingcontainer.core.database.dao.ReeferUnitDao
 import com.checkingcontainer.core.database.dao.UserDao
 import com.checkingcontainer.core.domain.BootstrapRepository
+import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.model.User
 import com.checkingcontainer.core.model.UserRole
 import com.checkingcontainer.core.network.AnonymousAuth
@@ -37,6 +38,7 @@ class BootstrapRepositoryImpl @Inject constructor(
     private val reeferUnitDao: ReeferUnitDao,
     private val firestoreService: FirestoreService,
     private val anonymousAuth: AnonymousAuth,
+    private val estimadosRepo: EstimadosRepository,
     private val dataStore: DataStore<Preferences>,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
@@ -44,25 +46,31 @@ class BootstrapRepositoryImpl @Inject constructor(
 
     override suspend fun syncIfNeeded(): Unit = withContext(ioDispatcher) {
         try {
+            // La sesión anónima se renueva SIEMPRE, antes de cualquier atajo: las
+            // reglas de Firestore/Storage la exigen y puede haberse perdido desde
+            // el último arranque. Comprobarlo después de los return dejaba a la
+            // app sin credencial cuando el bootstrap ya estaba hecho.
+            anonymousAuth.ensureSignedIn()
+
             if (dataStore.data.first()[KEY_BOOTSTRAP_COMPLETED] == true) {
                 return@withContext
             }
 
-            // Instalación anterior al marcador: ya tiene datos locales, así que
-            // el bootstrap NO debe volver a correr. Bajar de nuevo todo Firestore
-            // sobreescribiría con la copia remota lo que se hizo en campo sin red
-            // y aún no se ha subido (la app es offline-first: el write-through
-            // falla justamente cuando no hay cobertura).
-            if (userDao.count() > 0) {
+            // Instalación con trabajo propio: el bootstrap NO debe volver a
+            // correr, porque bajar Firestore encima sobreescribiría lo capturado
+            // en campo sin red y aún no subido.
+            //
+            // OJO: se mira el TRABAJO (estimados, inspecciones, equipos), no los
+            // usuarios. La primera instalación siembra un SuperAdmin local, así
+            // que contar usuarios daba 1 en un teléfono recién instalado y el
+            // bootstrap se saltaba la descarga entera: el equipo nuevo se quedaba
+            // sin los usuarios reales (nadie podía iniciar sesión), sin clientes
+            // y sin estimados.
+            if (hayTrabajoLocal()) {
                 marcarCompletado()
-                Log.i(BOOT_TAG, "Bootstrap omitido: la instalación ya tenía datos locales.")
+                Log.i(BOOT_TAG, "Bootstrap omitido: la instalación ya tenía trabajo local.")
                 return@withContext
             }
-
-            // Reintento de la sesión anónima en cada arranque pendiente. Las
-            // reglas de Firestore/Storage exigen auth y el primer inicio puede
-            // haber ocurrido sin conexión.
-            anonymousAuth.ensureSignedIn()
 
             Log.i(BOOT_TAG, "Bootstrap pendiente — descargando datos de Firestore...")
 
@@ -122,6 +130,15 @@ class BootstrapRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Trabajo real hecho en este teléfono. El usuario sembrado en la primera
+     * instalación no cuenta: no es trabajo, es semilla.
+     */
+    private suspend fun hayTrabajoLocal(): Boolean =
+        estimadoDao.findOpenIds().isNotEmpty() ||
+            inspectionDao.count() > 0 ||
+            reeferUnitDao.count() > 0
+
     private suspend fun marcarCompletado() {
         dataStore.edit { preferences ->
             preferences[KEY_BOOTSTRAP_COMPLETED] = true
@@ -145,6 +162,12 @@ class BootstrapRepositoryImpl @Inject constructor(
 
     private suspend fun syncRecent(user: User) {
         anonymousAuth.ensureSignedIn()
+
+        // Antes de traer nada, empujar lo que quedó guardado solo en el teléfono
+        // (se guardó sin cobertura). Así el trabajo del técnico llega a la nube
+        // en cuanto hay señal, sin depender de que vuelva a tocar Guardar.
+        val subidos = estimadosRepo.subirPendientes()
+        if (subidos > 0) Log.i(BOOT_TAG, "Subidos $subidos estimados que estaban pendientes.")
 
         val isAdmin = user.role == UserRole.SuperAdmin || user.role == UserRole.Admin
         val since = System.currentTimeMillis() - RECENT_WINDOW_MS

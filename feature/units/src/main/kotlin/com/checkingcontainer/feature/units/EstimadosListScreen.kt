@@ -2,6 +2,9 @@ package com.checkingcontainer.feature.units
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -160,7 +163,26 @@ private fun EstimadoListItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(estimado.containerNo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(estimado.containerNo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    // Distintivo de "solo en el teléfono": se ve de un vistazo
+                    // cuál trabajo todavía no llegó a la nube.
+                    if (estimado.pendienteDeSubir) {
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            shape = RoundedCornerShape(4.dp),
+                        ) {
+                            Text(
+                                "Sin subir",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
                 if (estimado.clientName.isNotEmpty()) {
                     Text(estimado.clientName, style = MaterialTheme.typography.bodyMedium)
                 }

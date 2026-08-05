@@ -17,4 +17,7 @@ interface ReeferUnitDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(unit: ReeferUnitEntity)
+
+    @Query("SELECT COUNT(*) FROM reefer_units")
+    suspend fun count(): Int
 }

@@ -59,18 +59,34 @@ class FirestoreService @Inject constructor(
      * al volver la red — el timeout evita que el guardado offline se cuelgue
      * esperando un ack que no va a llegar (bug previo: spinner infinito).
      */
-    private suspend fun write(op: String, block: suspend () -> Unit): Unit = withContext(ioDispatcher) {
+    private suspend fun write(op: String, block: suspend () -> Unit) {
+        writeConfirmado(op, block)
+    }
+
+    /**
+     * Igual que [write] pero devuelve **si la nube confirmó**. Lo necesita el
+     * guardado del estimado: sin esa confirmación no se puede saber que el
+     * trabajo quedó solo en el teléfono, y era la razón de que la app dijera
+     * "Guardado" aunque no hubiera subido nada.
+     */
+    private suspend fun writeConfirmado(
+        op: String,
+        block: suspend () -> Unit,
+    ): Boolean = withContext(ioDispatcher) {
         try {
             withTimeout(WRITE_ACK_TIMEOUT_MS) { block() }
             syncStatus.recordOk()
+            true
         } catch (e: TimeoutCancellationException) {
             Log.w(TAG, "$op pendiente de sync (sin conexión)")
             syncStatus.recordPending(op)
+            false
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "$op falló: ${e.message}")
             syncStatus.recordError(op, e.message)
+            false
         }
     }
 
@@ -214,12 +230,34 @@ class FirestoreService @Inject constructor(
 
     // ── Estimados ────────────────────────────────────────────────────────────
 
-    suspend fun upsertEstimado(entity: EstimadoEntity): Unit = write("upsertEstimado") {
-        firestore.collection(COL_ESTIMADOS)
-            .document(entity.id.toString())
-            .set(entity.toFirestoreMap())
-            .await()
-    }
+    /** @return true si Firestore confirmó la escritura. */
+    suspend fun upsertEstimado(entity: EstimadoEntity): Boolean =
+        writeConfirmado("upsertEstimado") {
+            firestore.collection(COL_ESTIMADOS)
+                .document(entity.id.toString())
+                .set(entity.toFirestoreMap())
+                .await()
+        }
+
+    /**
+     * Todas las copias remotas de una inspección. Normalmente hay una; puede
+     * haber más si un dispositivo creó un duplicado al abrir el estimado sin
+     * tenerlo en local.
+     */
+    suspend fun fetchEstimadosByInspectionId(inspectionId: Long): List<EstimadoEntity> =
+        try {
+            firestore.collection(COL_ESTIMADOS)
+                .whereEqualTo("inspectionId", inspectionId)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toEstimadoEntity() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchEstimadosByInspectionId: ${e.message}")
+            emptyList()
+        }
 
     suspend fun deleteEstimado(id: Long): Unit = write("deleteEstimado") {
         firestore.collection(COL_ESTIMADOS)
@@ -433,6 +471,7 @@ class FirestoreService @Inject constructor(
             damages = getString("damages") ?: "[]",
             mediciones = getString("mediciones") ?: "[]",
             manoDeObraTotal = getDouble("manoDeObraTotal"),
+            updatedAt = safeLong("updatedAt") ?: 0L,
             hasIva = safeInt("hasIva") ?: 0,
             reportUrl = getString("reportUrl"),
         )
@@ -567,6 +606,7 @@ private fun EstimadoEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "damages"       to damages,
     "mediciones"    to mediciones,
     "manoDeObraTotal" to manoDeObraTotal,
+    "updatedAt"     to updatedAt,
     "hasIva"        to hasIva,
     "reportUrl"     to reportUrl,
 )

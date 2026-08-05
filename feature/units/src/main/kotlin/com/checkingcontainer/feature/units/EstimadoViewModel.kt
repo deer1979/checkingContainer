@@ -6,6 +6,8 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.checkingcontainer.core.domain.AuthRepository
+import com.checkingcontainer.core.domain.AuthState
 import com.checkingcontainer.core.domain.ClientsRepository
 import com.checkingcontainer.core.domain.EstimadosRepository
 import com.checkingcontainer.core.domain.InspectionRepository
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,6 +44,7 @@ class EstimadoViewModel @Inject constructor(
     private val clientsRepo: ClientsRepository,
     private val inspectionRepo: InspectionRepository,
     private val reeferUnitRepo: ReeferEquipmentRepository,
+    private val authRepository: AuthRepository,
     private val pdfGenerator: EstimadoPdfGenerator,
     private val compresorDeFotos: CompresorDeFotos,
     @param:ApplicationContext private val context: Context,
@@ -105,6 +109,7 @@ class EstimadoViewModel @Inject constructor(
                         sitioNombre = existing?.sitioNombre ?: "",
                         ordenTrabajo = existing?.ordenTrabajo ?: "",
                         hasIva = existing?.hasIva ?: false,
+                        pendienteDeSubir = existing?.pendienteDeSubir ?: false,
                     )
                 }
             } catch (error: CancellationException) {
@@ -405,6 +410,10 @@ class EstimadoViewModel @Inject constructor(
     }
 
 
+    /** Id del técnico con la sesión abierta; 0 solo si no hay sesión. */
+    private suspend fun technicianIdActual(): Long =
+        (authRepository.state.first() as? AuthState.Authenticated)?.user?.id ?: 0L
+
     fun save() {
         viewModelScope.launch {
             val current = _state.value
@@ -432,7 +441,7 @@ class EstimadoViewModel @Inject constructor(
                 sitioNombre = current.sitioNombre,
                 ordenTrabajo = current.ordenTrabajo.trim(),
                 location = current.location.trim(),
-                technicianId = 0,
+                technicianId = technicianIdActual(),
                 technicianName = current.technicianName,
                 createdAt = if (current.estimadoId == 0L) now else current.createdAt,
                 approvedAt = current.approvedAt,
@@ -445,20 +454,47 @@ class EstimadoViewModel @Inject constructor(
             )
             runCatching { estimadosRepo.save(estimado) }
                 .onSuccess { savedId ->
+                    val idFinal = if (current.estimadoId == 0L) savedId else current.estimadoId
+                    // Si la nube no confirmó, el estimado queda marcado como
+                    // pendiente y hay que DECIRLO: antes se anunciaba "Guardado"
+                    // aunque el trabajo se hubiera quedado solo en el teléfono.
+                    val pendiente = estimadosRepo.findById(idFinal)?.pendienteDeSubir ?: false
                     _state.update {
                         it.copy(
                             isSaving = false,
                             isDirty = false,
-                            estimadoId = if (current.estimadoId == 0L) savedId else current.estimadoId,
+                            estimadoId = idFinal,
                             createdAt = if (current.estimadoId == 0L) now else current.createdAt,
                             status = estimado.status,
-                            savedMessage = if (allReparado) "Estimado cerrado" else "Guardado",
+                            pendienteDeSubir = pendiente,
+                            savedMessage = when {
+                                pendiente -> "Guardado en el teléfono — sin subir. Se reintentará al haber señal."
+                                allReparado -> "Estimado cerrado y subido"
+                                else -> "Guardado y subido"
+                            },
                         )
                     }
                 }
                 .onFailure { error ->
                     _state.update { it.copy(isSaving = false, errorMessage = error.message ?: "Error al guardar") }
                 }
+        }
+    }
+
+    /** Reintenta subir este estimado a la nube (botón del aviso). */
+    fun reintentarSubida() {
+        viewModelScope.launch {
+            _state.update { it.copy(isSaving = true) }
+            val subidos = runCatching { estimadosRepo.subirPendientes() }.getOrDefault(0)
+            val sigueP = estimadosRepo.findById(_state.value.estimadoId)?.pendienteDeSubir ?: false
+            _state.update {
+                it.copy(
+                    isSaving = false,
+                    pendienteDeSubir = sigueP,
+                    savedMessage = if (subidos > 0 && !sigueP) "Subido a la nube" else null,
+                    errorMessage = if (sigueP) "Todavía sin señal. Se reintentará solo." else null,
+                )
+            }
         }
     }
 

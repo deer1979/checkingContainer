@@ -54,6 +54,8 @@ data class EstimadoUiState(
     val savedMessage: String? = null,
     // PDF listo para previsualizar (ruta al archivo temporal)
     val pdfPreviewPath: String? = null,
+    /** El estimado está guardado en el teléfono pero la nube no lo tiene. */
+    val pendienteDeSubir: Boolean = false,
     // Bottom sheet activo
     val activeSheet: EstimadoSheet? = null,
 ) {

@@ -63,4 +63,7 @@ interface InspectionDao {
 
     @Query("DELETE FROM inspections WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("SELECT COUNT(*) FROM inspections")
+    suspend fun count(): Int
 }
