@@ -129,11 +129,14 @@ class EstimadoPdfGenerator @Inject constructor(
         val anchoBloque = (Hoja.contenidoAncho - 16f) / 2f
         val xDer = Hoja.MARGEN + anchoBloque + 16f
 
+        // Cada dato con su etiqueta: una dirección o un teléfono sueltos no se
+        // distinguen entre sí, y quien recibe el documento no tiene por qué
+        // adivinar qué es cada línea.
         val datosCliente = buildList {
-            if (e.clientIdNumber.isNotEmpty()) add("RUC / CI:  ${e.clientIdNumber}")
-            if (e.clientDireccion.isNotEmpty()) add(e.clientDireccion)
-            listOf(e.clientTelefono, e.clientEmail).filter { it.isNotEmpty() }
-                .takeIf { it.isNotEmpty() }?.let { add(it.joinToString("  ·  ")) }
+            if (e.clientIdNumber.isNotEmpty()) add("RUC / CI" to e.clientIdNumber)
+            if (e.clientDireccion.isNotEmpty()) add("Dirección" to e.clientDireccion)
+            if (e.clientTelefono.isNotEmpty()) add("Teléfono" to e.clientTelefono)
+            if (e.clientEmail.isNotEmpty()) add("Correo" to e.clientEmail)
         }
         val datosTrabajo = buildList {
             add((if (esContenedor) "Contenedor" else "Equipo") to e.containerNo)
@@ -145,7 +148,7 @@ class EstimadoPdfGenerator @Inject constructor(
         }
 
         val altoCliente = altoBloqueCliente(p, e, datosCliente, anchoBloque)
-        val altoTrabajo = ALTO_TITULO_BLOQUE + datosTrabajo.size * 13f + 10f
+        val altoTrabajo = ALTO_TITULO_BLOQUE + altoCampos(p, datosTrabajo, anchoBloque) + 12f
         val alto = maxOf(altoCliente, altoTrabajo)
         l.asegurar(alto + 20f)
 
@@ -157,26 +160,55 @@ class EstimadoPdfGenerator @Inject constructor(
         l.y = yBloques + alto + 16f
     }
 
+    /** Ancho de la columna de etiquetas, ajustado a la etiqueta más larga. */
+    private fun anchoEtiquetas(p: Pinceles, campos: List<Pair<String, String>>): Float =
+        (campos.maxOfOrNull { p.etiqueta.measureText(it.first) } ?: 0f) + 10f
+
+    /**
+     * Alto real de las filas etiqueta/valor, contando los valores que envuelven.
+     * Medir y dibujar usan el MISMO cálculo para que el recuadro nunca corte el
+     * contenido (una dirección larga ocupa dos líneas).
+     */
+    private fun altoCampos(p: Pinceles, campos: List<Pair<String, String>>, anchoBloque: Float): Float {
+        val anchoValor = anchoBloque - 16f - anchoEtiquetas(p, campos)
+        return campos.sumOf {
+            (maxOf(LienzoPdf.medir(it.second, p.cuerpo, anchoValor), 12f) + 2f).toDouble()
+        }.toFloat()
+    }
+
+    private fun dibujarCampos(
+        l: LienzoPdf,
+        p: Pinceles,
+        campos: List<Pair<String, String>>,
+        x: Float,
+        ancho: Float,
+    ) {
+        val anchoEtq = anchoEtiquetas(p, campos)
+        val anchoValor = ancho - 16f - anchoEtq
+        campos.forEach { (etiqueta, valor) ->
+            l.texto(etiqueta, x + 8f, p.etiqueta)
+            val alto = l.parrafoEnLineaBase(valor, p.cuerpo, anchoValor, x + 8f + anchoEtq)
+            l.y += maxOf(alto, 12f) + 2f
+        }
+    }
+
     private fun altoBloqueCliente(
         p: Pinceles,
         e: Estimado,
-        detalles: List<String>,
+        campos: List<Pair<String, String>>,
         ancho: Float,
     ): Float {
         val nombre = e.clientName.ifBlank { "Sin cliente asignado" }
         val altoNombre = LienzoPdf.medir(nombre, p.itemNombre, ancho - 16f)
-        val altoDetalles = detalles.sumOf {
-            LienzoPdf.medir(it, p.cuerpo, ancho - 16f).toDouble()
-        }.toFloat()
-        return ALTO_TITULO_BLOQUE + altoNombre + altoDetalles + detalles.size * 2f + 12f
+        return ALTO_TITULO_BLOQUE + altoNombre + 6f + altoCampos(p, campos, ancho) + 12f
     }
 
-    /** Bloque "a quién se le factura": nombre destacado y contacto debajo. */
+    /** Bloque "a quién se le factura": nombre destacado y contacto etiquetado. */
     private fun bloqueCliente(
         l: LienzoPdf,
         p: Pinceles,
         e: Estimado,
-        detalles: List<String>,
+        campos: List<Pair<String, String>>,
         x: Float,
         ancho: Float,
         alto: Float,
@@ -186,14 +218,13 @@ class EstimadoPdfGenerator @Inject constructor(
         l.y = arriba + 14f
         l.texto("CLIENTE", x + 8f, p.seccion)
         l.y += 16f
+        // El nombre va sin etiqueta y destacado: es el titular del bloque.
         l.y += l.parrafoEnLineaBase(
             e.clientName.ifBlank { "Sin cliente asignado" },
             p.itemNombre, ancho - 16f, x + 8f,
         )
-        l.y += 4f
-        detalles.forEach {
-            l.y += l.parrafoEnLineaBase(it, p.cuerpo, ancho - 16f, x + 8f) + 2f
-        }
+        l.y += 6f
+        dibujarCampos(l, p, campos, x, ancho)
     }
 
     /** Bloque "sobre qué": equipo, orden, sitio y técnico. */
@@ -210,12 +241,7 @@ class EstimadoPdfGenerator @Inject constructor(
         l.y = arriba + 14f
         l.texto("DATOS DEL TRABAJO", x + 8f, p.seccion)
         l.y += 16f
-        val xValor = x + 8f + 86f
-        campos.forEach { (etiqueta, valor) ->
-            l.texto(etiqueta, x + 8f, p.etiqueta)
-            l.parrafoEnLineaBase(valor, p.cuerpo, ancho - 16f - 86f, xValor)
-            l.y += 13f
-        }
+        dibujarCampos(l, p, campos, x, ancho)
     }
 
     // ── Equipo y ficha técnica ──────────────────────────────────────────────
