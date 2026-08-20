@@ -27,6 +27,18 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Los dos papeles que salen del mismo trabajo.
+ *
+ * Antes de reparar se cotiza (con precios); después se entrega constancia de lo
+ * hecho, y ahí los valores sobran. El título cambia con el tipo porque un
+ * documento sin precios que se llame "estimado" confunde a quien lo recibe.
+ */
+enum class TipoDocumento(val titulo: String, val piePara: String) {
+    ESTIMADO("ESTIMADO DE REPARACIÓN", "Aceptado por el cliente (nombre y firma)"),
+    INFORME("INFORME DE REPARACIÓN", "Recibido conforme (nombre y firma)"),
+}
+
 @Singleton
 class EstimadoPdfGenerator @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -41,6 +53,7 @@ class EstimadoPdfGenerator @Inject constructor(
     suspend fun generate(
         estimado: Estimado,
         fichaTecnica: List<CampoFicha> = emptyList(),
+        tipo: TipoDocumento = TipoDocumento.ESTIMADO,
     ): ByteArray = withContext(Dispatchers.Default) {
         val loader = SingletonImageLoader.get(context)
         val fotos = mutableMapOf<String, Bitmap?>()
@@ -52,7 +65,7 @@ class EstimadoPdfGenerator @Inject constructor(
 
         val p = Pinceles()
         val esContenedor = Iso6346.isValid(estimado.containerNo)
-        val referencia = "Estimado N.º ${numeroEstimado(estimado)}"
+        val referencia = "${if (tipo == TipoDocumento.INFORME) "Informe" else "Estimado"} N.º ${numeroEstimado(estimado)}"
 
         // Todo el documento se dibuja con esta función, que se ejecuta DOS veces.
         val dibujarTodo: (LienzoPdf) -> Unit = { l ->
@@ -68,11 +81,14 @@ class EstimadoPdfGenerator @Inject constructor(
                 l.linea(4f)
                 l.y += 14f
             }
-            dibujarEncabezado(l, p, estimado, referencia, esContenedor)
+            dibujarEncabezado(l, p, estimado, referencia, esContenedor, tipo)
             dibujarEquipo(l, p, estimado, fichaTecnica)
             dibujarMediciones(l, p, estimado)
             dibujarItems(l, p, estimado, fotos)
-            dibujarValores(l, p, estimado)
+            // El informe de reparación NO lleva valores: es constancia del
+            // trabajo hecho, no una cotización.
+            if (tipo == TipoDocumento.ESTIMADO) dibujarValores(l, p, estimado)
+            dibujarFirma(l, p, tipo)
         }
 
         // Primera pasada: solo para saber cuántas hojas salen. El pie necesita el
@@ -112,10 +128,11 @@ class EstimadoPdfGenerator @Inject constructor(
         e: Estimado,
         referencia: String,
         esContenedor: Boolean,
+        tipo: TipoDocumento,
     ) {
         // Cabecera: quién emite a la izquierda, qué documento es a la derecha.
         l.texto("CHECKING CONTAINER", Hoja.MARGEN, p.titulo)
-        l.textoDerecha("ESTIMADO DE REPARACIÓN", Hoja.ANCHO - Hoja.MARGEN, p.subtitulo)
+        l.textoDerecha(tipo.titulo, Hoja.ANCHO - Hoja.MARGEN, p.subtitulo)
         l.y += 14f
         l.textoDerecha(
             "$referencia  ·  ${sdf.format(Date(e.createdAt))}",
@@ -485,19 +502,20 @@ class EstimadoPdfGenerator @Inject constructor(
         l.linea(2f)
         l.y += 14f
         totalRow("TOTAL:", totales.total, negrita = true)
-
-        dibujarFirma(l, p)
     }
 
-    /** Espacio de aceptación: un estimado aprobado normalmente se firma. */
-    private fun dibujarFirma(l: LienzoPdf, p: Pinceles) {
+    /**
+     * Espacio de firma. El texto cambia con el documento: un estimado se
+     * **acepta** antes de trabajar; un informe se **recibe conforme** después.
+     */
+    private fun dibujarFirma(l: LienzoPdf, p: Pinceles, tipo: TipoDocumento) {
         l.asegurar(70f)
         l.y += 30f
-        val ancho = 200f
+        val ancho = 220f
         val x = Hoja.MARGEN
         l.canvas.drawLine(x, l.y, x + ancho, l.y, p.linea)
         l.y += 11f
-        l.texto("Aceptado por el cliente (nombre y firma)", x, p.etiqueta)
+        l.texto(tipo.piePara, x, p.etiqueta)
         l.y += 12f
         l.texto("Fecha: ____ / ____ / ________", x, p.etiqueta)
     }

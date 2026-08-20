@@ -231,7 +231,7 @@ fun EstimadoRoute(
         onBack = onBackSafe,
         onEvent = viewModel::onEvent,
         onSave = viewModel::save,
-        onGeneratePdf = viewModel::generateAndSharePdf,
+        onGeneratePdf = { tipo -> viewModel.generateAndSharePdf(tipo) },
         onReintentarSubida = viewModel::reintentarSubida,
         onCargarCambios = viewModel::cargarCambiosDelCompanero,
         onSelectClientClick = { showClientPicker = true },

@@ -1,6 +1,7 @@
 package com.checkingcontainer.feature.units
 
 import com.checkingcontainer.core.model.Iso6346
+import com.checkingcontainer.core.reporting.TipoDocumento
 import android.content.Intent
 import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
@@ -123,7 +124,7 @@ fun EstimadoScreen(
     onBack: () -> Unit,
     onEvent: (EstimadoEvent) -> Unit,
     onSave: () -> Unit,
-    onGeneratePdf: () -> Unit,
+    onGeneratePdf: (TipoDocumento) -> Unit,
     onReintentarSubida: () -> Unit = {},
     onCargarCambios: () -> Unit = {},
     onSelectClientClick: () -> Unit = {},
@@ -141,29 +142,48 @@ fun EstimadoScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
-    // Aviso previo al PDF: el encabezado del reporte se arma con los datos del
-    // cliente, así que conviene saber qué falta ANTES de mandárselo. No bloquea:
-    // a veces hace falta el PDF rápido y se completa después.
-    var avisoDatosCliente by remember { mutableStateOf(false) }
+    // Un solo diálogo antes de generar: qué documento se quiere y, si falta algo
+    // del cliente, el aviso en el mismo sitio. Encadenar dos ventanas seguidas
+    // para lo mismo es peor que juntarlas.
+    var pidiendoDocumento by remember { mutableStateOf(false) }
     val faltantes = state.datosClienteFaltantes
 
-    if (avisoDatosCliente) {
+    if (pidiendoDocumento) {
         AlertDialog(
-            onDismissRequest = { avisoDatosCliente = false },
-            title = { Text("Faltan datos del cliente") },
+            onDismissRequest = { pidiendoDocumento = false },
+            title = { Text("¿Qué documento generar?") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("El encabezado del PDF saldrá incompleto. Falta:")
-                    faltantes.forEach { Text("·  $it", style = MaterialTheme.typography.bodySmall) }
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OpcionDocumento(
+                        titulo = "Estimado",
+                        detalle = "Con la tabla de valores, mano de obra e IVA. Para cotizar.",
+                        onClick = {
+                            pidiendoDocumento = false
+                            onGeneratePdf(TipoDocumento.ESTIMADO)
+                        },
+                    )
+                    OpcionDocumento(
+                        titulo = "Informe de reparación",
+                        detalle = "Sin valores. Constancia del trabajo hecho, con fotos y mediciones.",
+                        onClick = {
+                            pidiendoDocumento = false
+                            onGeneratePdf(TipoDocumento.INFORME)
+                        },
+                    )
+                    if (faltantes.isNotEmpty()) {
+                        // Aviso, no bloqueo: a veces hace falta el PDF ya mismo.
+                        Text(
+                            "⚠  El encabezado saldrá incompleto. Falta: " +
+                                faltantes.joinToString(", "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { avisoDatosCliente = false }) { Text("Completar") }
-            },
+            confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { avisoDatosCliente = false; onGeneratePdf() }) {
-                    Text("Generar igual")
-                }
+                TextButton(onClick = { pidiendoDocumento = false }) { Text("Cancelar") }
             },
         )
     }
@@ -224,9 +244,7 @@ fun EstimadoScreen(
                                     Icon(Icons.Outlined.Share, null, Modifier.size(24.dp))
                             },
                             label = if (state.isGeneratingPdf) "Generando…" else "Ver PDF",
-                            onClick = {
-                                if (faltantes.isEmpty()) onGeneratePdf() else avisoDatosCliente = true
-                            },
+                            onClick = { pidiendoDocumento = true },
                             enabled = !state.isGeneratingPdf,
                         )
                     }
@@ -585,5 +603,25 @@ fun EstimadoScreen(
             }
         }
         null -> Unit
+    }
+}
+
+/** Una opción del diálogo de documento: título, para qué sirve, y toca para elegir. */
+@Composable
+private fun OpcionDocumento(titulo: String, detalle: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(titulo, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                detalle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

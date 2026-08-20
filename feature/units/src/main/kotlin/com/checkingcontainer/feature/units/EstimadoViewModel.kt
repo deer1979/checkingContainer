@@ -1,6 +1,7 @@
 package com.checkingcontainer.feature.units
 
 import com.checkingcontainer.core.reporting.EstimadoPdfGenerator
+import com.checkingcontainer.core.reporting.TipoDocumento
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
@@ -654,7 +655,7 @@ class EstimadoViewModel @Inject constructor(
         }
     }
 
-    fun generateAndSharePdf() {
+    fun generateAndSharePdf(tipo: TipoDocumento = TipoDocumento.ESTIMADO) {
         val current = _state.value
         // Antes exigía daños; ahora también genera si solo hay mediciones (un
         // mantenimiento puede ser solo lecturas del manómetro, sin ítems de daño).
@@ -694,7 +695,7 @@ class EstimadoViewModel @Inject constructor(
                 manoDeObraTotal = current.manoDeObraTotal,
                 hasIva = current.hasIva,
             )
-            runCatching { pdfGenerator.generate(estimado, current.fichaTecnica) }
+            runCatching { pdfGenerator.generate(estimado, current.fichaTecnica, tipo) }
                 .onSuccess { bytes ->
                     val file = File(context.cacheDir, "estimado_${inspectionId}.pdf")
                     withContext(Dispatchers.IO) { file.writeBytes(bytes) }
