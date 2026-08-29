@@ -120,6 +120,13 @@ class EstimadosRepositoryImpl @Inject constructor(
             .mapNotNull { it?.toDomain() }
             .filter { it.updatedAt > desdeUpdatedAt }
 
+    override suspend fun findAbiertoPorContenedor(containerNo: String, exceptoId: Long): Estimado? =
+        withContext(ioDispatcher) {
+            dao.findByContainerNo(containerNo)
+                .firstOrNull { it.status == EstimadoStatus.ABIERTO && it.id != exceptoId }
+                ?.toDomain()
+        }
+
     override suspend fun findById(id: Long): Estimado? =
         withContext(ioDispatcher) { dao.findById(id)?.toDomain() }
 

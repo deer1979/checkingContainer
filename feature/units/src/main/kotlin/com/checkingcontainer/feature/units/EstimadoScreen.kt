@@ -138,6 +138,12 @@ fun EstimadoScreen(
     getPendingManoDeObra: () -> String,
     getPendingNombreItem: () -> String,
     getPendingContenedor: () -> String = { "" },
+    getPendingObservaciones: () -> String = { "" },
+    onCerrar: () -> Unit = {},
+    onReabrir: () -> Unit = {},
+    onNuevoParaEquipo: () -> Unit = {},
+    onNuevoParaEquipoConfirmado: () -> Unit = {},
+    onDescartarConfirmacion: () -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -184,6 +190,20 @@ fun EstimadoScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { pidiendoDocumento = false }) { Text("Cancelar") }
+            },
+        )
+    }
+
+    state.confirmarNuevoConAbierto?.let { aviso ->
+        AlertDialog(
+            onDismissRequest = onDescartarConfirmacion,
+            title = { Text("Ya hay un estimado abierto") },
+            text = { Text(aviso) },
+            confirmButton = {
+                TextButton(onClick = onNuevoParaEquipoConfirmado) { Text("Crear igual") }
+            },
+            dismissButton = {
+                TextButton(onClick = onDescartarConfirmacion) { Text("Cancelar") }
             },
         )
     }
@@ -495,6 +515,72 @@ fun EstimadoScreen(
                 }
             }
 
+            item(key = "observaciones", contentType = "card") {
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        EstimadoSectionTitle("Observaciones y recomendaciones")
+                        Text(
+                            state.observaciones.ifBlank {
+                                "Sin observaciones. Aquí puedes avisarle al cliente de algo " +
+                                    "que viste y no se cobra en este trabajo."
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (state.observaciones.isBlank()) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        )
+                        if (!state.estaCerrado) {
+                            OutlinedButton(
+                                onClick = { onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.EditarObservaciones)) },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(if (state.observaciones.isBlank()) "Agregar observaciones" else "Editar observaciones") }
+                        }
+                    }
+                }
+            }
+
+            // Cerrar / reabrir y el trabajo siguiente del mismo equipo. La
+            // tarjeta solo aparece cuando tiene algo que ofrecer.
+            val puedeClonar = state.estimadoId != 0L && state.containerNo.isNotBlank()
+            if (state.estaCerrado || state.todoReparado || puedeClonar) {
+                item(key = "acciones-estado", contentType = "card") {
+                    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (state.estaCerrado) {
+                                Text(
+                                    "Estimado cerrado. Reábrelo si necesitas agregar fotos o corregir algo.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Button(onClick = onReabrir, modifier = Modifier.fillMaxWidth()) {
+                                    Text("Reabrir estimado")
+                                }
+                            } else if (state.todoReparado) {
+                                Text(
+                                    "Todos los ítems están reparados.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Button(onClick = onCerrar, modifier = Modifier.fillMaxWidth()) {
+                                    Text("Cerrar estimado")
+                                }
+                            }
+                            if (puedeClonar) {
+                                OutlinedButton(
+                                    onClick = onNuevoParaEquipo,
+                                    enabled = !state.isSaving,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text("Nuevo estimado para este equipo")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             item(key = "mensajes", contentType = "messages") {
                 Column {
                     state.savedMessage?.let { msg ->
@@ -586,6 +672,19 @@ fun EstimadoScreen(
                     onValorChange = { onEvent(EstimadoEvent.ContenedorCorregidoChange(it)) },
                     onCancel = { scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(EstimadoEvent.DismissSheet) } },
                     onConfirm = { onEvent(EstimadoEvent.ConfirmCorregirEquipo) },
+                )
+            }
+        }
+        EstimadoSheet.EditarObservaciones -> {
+            ModalBottomSheet(
+                onDismissRequest = { onEvent(EstimadoEvent.DismissSheet) },
+                sheetState = sheetState,
+            ) {
+                ObservacionesSheet(
+                    initialValor = getPendingObservaciones(),
+                    onValorChange = { onEvent(EstimadoEvent.ObservacionesChange(it)) },
+                    onCancel = { scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(EstimadoEvent.DismissSheet) } },
+                    onConfirm = { onEvent(EstimadoEvent.ConfirmObservaciones) },
                 )
             }
         }

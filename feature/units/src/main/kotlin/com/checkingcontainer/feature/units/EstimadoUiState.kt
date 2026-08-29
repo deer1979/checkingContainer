@@ -2,6 +2,7 @@ package com.checkingcontainer.feature.units
 
 import com.checkingcontainer.core.model.CampoFicha
 import com.checkingcontainer.core.model.DamageItem
+import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.MedicionSnapshot
 import com.checkingcontainer.core.model.EstimadoStatus
 
@@ -22,12 +23,15 @@ data class EstimadoUiState(
     val technicianName: String = "",
     val createdAt: Long = 0,
     val approvedAt: Long? = null,
+    val closedAt: Long? = null,
     val status: EstimadoStatus = EstimadoStatus.ABIERTO,
     // Ítems
     val damages: List<DamageItem> = emptyList(),
     val mediciones: List<MedicionSnapshot> = emptyList(),
     /** Mano de obra única del trabajo (instalación de los repuestos). */
     val manoDeObraTotal: Double? = null,
+    /** Observaciones y recomendaciones para el cliente. */
+    val observaciones: String = "",
     // Cliente del catálogo (referencia + snapshot congelado al asignar)
     val clientId: Long? = null,
     val clientIdNumber: String = "",
@@ -60,6 +64,10 @@ data class EstimadoUiState(
     val hayCambiosDelCompanero: Boolean = false,
     /** Campos que ambos editamos distinto en el último guardado. */
     val camposEnConflicto: List<String> = emptyList(),
+    /** Id del estimado recién clonado, para navegar hacia él. */
+    val navegarAInspeccion: Long? = null,
+    /** Aviso cuando ya hay otro estimado abierto para el mismo equipo. */
+    val confirmarNuevoConAbierto: String? = null,
     // Bottom sheet activo
     val activeSheet: EstimadoSheet? = null,
 ) {
@@ -67,6 +75,12 @@ data class EstimadoUiState(
      * Datos del cliente que faltan para que el encabezado del PDF salga completo.
      * No bloquea nada: solo alimenta el aviso previo a generar el reporte.
      */
+    /** Todo reparado: se puede ofrecer cerrar, pero lo decide el técnico. */
+    val todoReparado: Boolean
+        get() = damages.isNotEmpty() && damages.all { it.status == DamageItemStatus.REPARADO }
+
+    val estaCerrado: Boolean get() = status == EstimadoStatus.CERRADO
+
     val datosClienteFaltantes: List<String>
         get() = buildList {
             if (clientName.isBlank()) add("Nombre del cliente")
@@ -84,6 +98,7 @@ sealed interface EstimadoSheet {
     data class EditValor(val itemId: String) : EstimadoSheet
     data object EditManoDeObra : EstimadoSheet
     data object CorregirEquipo : EstimadoSheet
+    data object EditarObservaciones : EstimadoSheet
 }
 
 sealed interface EstimadoEvent {
@@ -114,5 +129,7 @@ sealed interface EstimadoEvent {
     data class NombreItemChange(val value: String) : EstimadoEvent
     data class ContenedorCorregidoChange(val value: String) : EstimadoEvent
     data object ConfirmCorregirEquipo : EstimadoEvent
+    data class ObservacionesChange(val value: String) : EstimadoEvent
+    data object ConfirmObservaciones : EstimadoEvent
     data class ConfirmValor(val itemId: String) : EstimadoEvent
 }

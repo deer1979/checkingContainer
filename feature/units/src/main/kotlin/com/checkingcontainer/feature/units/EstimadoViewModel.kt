@@ -18,6 +18,7 @@ import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoStatus
+import com.checkingcontainer.core.model.Inspection
 import com.checkingcontainer.core.model.MAX_FOTOS_POR_GRUPO
 import com.checkingcontainer.core.model.fusionarEstimado
 import com.checkingcontainer.feature.units.navigation.ESTIMADO_INSPECTION_ID_ARG
@@ -73,6 +74,7 @@ class EstimadoViewModel @Inject constructor(
     private var pendingManoDeObra = ""
     private var pendingNombreItem = ""
     private var pendingContenedor = ""
+    private var pendingObservaciones = ""
     private var activePhotoUploads = 0
 
     /**
@@ -120,10 +122,12 @@ class EstimadoViewModel @Inject constructor(
                         location = existing?.location ?: inspection?.location ?: "",
                         createdAt = existing?.createdAt ?: System.currentTimeMillis(),
                         approvedAt = existing?.approvedAt,
+                        closedAt = existing?.closedAt,
                         status = existing?.status ?: EstimadoStatus.ABIERTO,
                         damages = existing?.damages ?: emptyList(),
                         mediciones = existing?.mediciones ?: emptyList(),
                         manoDeObraTotal = existing?.manoDeObraTotal,
+                        observaciones = existing?.observaciones ?: "",
                         clientId = existing?.clientId,
                         clientIdNumber = existing?.clientIdNumber ?: "",
                         clientDireccion = existing?.clientDireccion ?: "",
@@ -174,6 +178,9 @@ class EstimadoViewModel @Inject constructor(
                         _state.update { it.copy(activeSheet = sheet) }
                     }
                     is EstimadoSheet.RepairItem -> {
+                        // Vale igual para registrar la reparación por primera vez
+                        // que para corregirla después: el texto ya escrito se
+                        // precarga y se puede completar.
                         pendingRepairAction = _state.value.damages
                             .find { it.id == sheet.itemId }?.repairAction ?: ""
                         _state.update { it.copy(activeSheet = sheet) }
@@ -182,6 +189,10 @@ class EstimadoViewModel @Inject constructor(
                         val item = _state.value.damages.find { it.id == sheet.itemId }
                         pendingCantidad = (item?.cantidad ?: 1).toString()
                         pendingPrecioUnitario = item?.precioUnitario?.toString() ?: ""
+                        _state.update { it.copy(activeSheet = sheet) }
+                    }
+                    EstimadoSheet.EditarObservaciones -> {
+                        pendingObservaciones = _state.value.observaciones
                         _state.update { it.copy(activeSheet = sheet) }
                     }
                     EstimadoSheet.CorregirEquipo -> {
@@ -289,6 +300,16 @@ class EstimadoViewModel @Inject constructor(
             is EstimadoEvent.PrecioUnitarioChange -> pendingPrecioUnitario = event.value
             is EstimadoEvent.NombreItemChange -> pendingNombreItem = event.value
             is EstimadoEvent.ContenedorCorregidoChange -> pendingContenedor = event.value
+            is EstimadoEvent.ObservacionesChange -> pendingObservaciones = event.value
+            is EstimadoEvent.ConfirmObservaciones -> {
+                _state.update {
+                    it.copy(
+                        observaciones = pendingObservaciones.trim(),
+                        activeSheet = null,
+                        isDirty = true,
+                    )
+                }
+            }
             is EstimadoEvent.ConfirmCorregirEquipo -> {
                 corregirEquipo(pendingContenedor.trim().uppercase())
             }
@@ -472,6 +493,8 @@ class EstimadoViewModel @Inject constructor(
         damages = s.damages,
         mediciones = s.mediciones,
         manoDeObraTotal = s.manoDeObraTotal,
+        observaciones = s.observaciones,
+        closedAt = s.closedAt,
         hasIva = s.hasIva,
     )
 
@@ -484,13 +507,16 @@ class EstimadoViewModel @Inject constructor(
             val current = _state.value
             _state.update { it.copy(isSaving = true, errorMessage = null, savedMessage = null) }
             val now = System.currentTimeMillis()
-            val allReparado = current.damages.isNotEmpty() &&
-                current.damages.all { it.status == DamageItemStatus.REPARADO }
+            // El estado NO se deduce del avance: cerrar es una decisión del
+            // técnico. Antes bastaba marcar reparado el último ítem para que el
+            // estimado se cerrara solo y quedara bloqueado sin vuelta atrás, y
+            // faltaba justo lo que uno recuerda después: una foto, un comentario.
+            val allReparado = current.todoReparado
             val estimado = aEstimado(current).copy(
                 technicianId = technicianIdActual(),
                 createdAt = if (current.estimadoId == 0L) now else current.createdAt,
-                closedAt = if (allReparado) now else null,
-                status = if (allReparado) EstimadoStatus.CERRADO else EstimadoStatus.ABIERTO,
+                closedAt = current.closedAt,
+                status = current.status,
             )
             runCatching { estimadosRepo.save(estimado, estimadoBase) }
                 .onSuccess { resultado ->
@@ -531,7 +557,8 @@ class EstimadoViewModel @Inject constructor(
                                     "Guardado. Se incorporaron los cambios de tu compañero."
                                 resultado.pendienteDeSubir ->
                                     "Guardado en el teléfono — sin subir. Se reintentará al haber señal."
-                                allReparado -> "Estimado cerrado y subido"
+                                allReparado && !current.estaCerrado ->
+                                    "Guardado. Todo está reparado: ya puedes cerrar el estimado."
                                 else -> "Guardado y subido"
                             },
                         )
@@ -593,6 +620,153 @@ class EstimadoViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Cierra el estimado: el trabajo terminó. Es una decisión explícita, no algo
+     * que la app deduzca de que todos los ítems estén marcados como reparados.
+     */
+    fun cerrarEstimado() {
+        _state.update {
+            it.copy(
+                status = EstimadoStatus.CERRADO,
+                closedAt = System.currentTimeMillis(),
+                isDirty = true,
+                savedMessage = "Estimado cerrado. Recuerda guardar.",
+            )
+        }
+    }
+
+    /**
+     * Reabre un estimado cerrado para poder seguir editándolo.
+     *
+     * Hace falta porque el trabajo real no termina cuando uno cree: falta una
+     * foto, hay que completar un comentario, o el cliente pregunta algo. Cerrar
+     * no puede ser una puerta de una sola dirección.
+     */
+    fun reabrirEstimado() {
+        _state.update {
+            it.copy(
+                status = EstimadoStatus.ABIERTO,
+                closedAt = null,
+                isDirty = true,
+                savedMessage = "Estimado reabierto. Ya puedes editarlo.",
+            )
+        }
+    }
+
+    /**
+     * Crea un trabajo NUEVO para el mismo equipo, copiando cliente y ficha.
+     *
+     * El contenedor vuelve a dañarse meses después y no tiene sentido reescribir
+     * cliente, RUC, dirección, fabricante y serie. Tampoco sirve editar el
+     * estimado viejo: se perdería el historial de la reparación anterior.
+     *
+     * Cada estimado cuelga de una inspección y la consulta es de una sola fila
+     * por inspección, así que el trabajo nuevo necesita **su propia inspección**;
+     * de paso queda bien en el historial del equipo: una visita, una inspección.
+     */
+    fun crearEstimadoParaMismoEquipo(confirmadoConAbierto: Boolean = false) {
+        val actual = _state.value
+        if (actual.containerNo.isBlank() || actual.isSaving) return
+
+        // Crear el trabajo nuevo saca al técnico de esta pantalla; si deja algo
+        // sin guardar aquí, se perdería sin que nadie le avise.
+        if (actual.isDirty) {
+            _state.update {
+                it.copy(errorMessage = "Guarda los cambios de este estimado antes de crear uno nuevo")
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            // Un toque de más no debe dejar dos estimados abiertos iguales para el
+            // mismo equipo: se avisa antes y decide el técnico.
+            if (!confirmadoConAbierto) {
+                val abiertoExistente = runCatching {
+                    estimadosRepo.findAbiertoPorContenedor(actual.containerNo, actual.estimadoId)
+                }.getOrNull()
+                if (abiertoExistente != null) {
+                    _state.update {
+                        it.copy(
+                            confirmarNuevoConAbierto =
+                                "Ya hay un estimado abierto para ${actual.containerNo} " +
+                                    "(N.º ${abiertoExistente.id.toString().padStart(5, '0')}). " +
+                                    "¿Crear otro de todas formas?",
+                        )
+                    }
+                    return@launch
+                }
+            }
+
+            _state.update { it.copy(isSaving = true, confirmarNuevoConAbierto = null) }
+            val tecnicoId = technicianIdActual()
+            val inspeccion = Inspection(
+                containerNo = actual.containerNo,
+                technicianId = tecnicoId,
+                technicianName = actual.technicianName,
+                location = actual.location,
+            )
+            val resultado = inspectionRepo.create(inspeccion)
+            val nuevaInspeccionId = resultado.getOrNull()
+            if (nuevaInspeccionId == null) {
+                _state.update {
+                    it.copy(isSaving = false, errorMessage = "No se pudo crear la inspección nueva")
+                }
+                return@launch
+            }
+
+            // Se copia la identidad (equipo y cliente) y se limpia el trabajo:
+            // ítems, mediciones, valores, orden y observaciones son del trabajo
+            // anterior y no del nuevo.
+            val nuevo = Estimado(
+                inspectionId = nuevaInspeccionId,
+                containerNo = actual.containerNo,
+                manufacturer = actual.manufacturer,
+                unitModel = actual.unitModel,
+                unitModelNo = actual.unitModelNo,
+                unitSerialNo = actual.unitSerialNo,
+                yearOfBuilt = actual.yearOfBuilt,
+                unitType = actual.unitType,
+                clientName = actual.clientName,
+                clientId = actual.clientId,
+                clientIdNumber = actual.clientIdNumber,
+                clientDireccion = actual.clientDireccion,
+                clientTelefono = actual.clientTelefono,
+                clientEmail = actual.clientEmail,
+                sitioClienteId = actual.sitioClienteId,
+                sitioNombre = actual.sitioNombre,
+                location = actual.location,
+                technicianId = tecnicoId,
+                technicianName = actual.technicianName,
+                hasIva = actual.hasIva,
+                status = EstimadoStatus.ABIERTO,
+            )
+            val guardado = runCatching { estimadosRepo.save(nuevo) }.getOrNull()
+            if (guardado == null) {
+                _state.update {
+                    it.copy(isSaving = false, errorMessage = "No se pudo crear el estimado nuevo")
+                }
+                return@launch
+            }
+
+            _state.update {
+                it.copy(
+                    isSaving = false,
+                    savedMessage = "Estimado N.º ${guardado.estimado.id.toString().padStart(5, '0')} " +
+                        "creado para ${actual.containerNo}",
+                    navegarAInspeccion = nuevaInspeccionId,
+                )
+            }
+        }
+    }
+
+    fun descartarConfirmacionNuevo() {
+        _state.update { it.copy(confirmarNuevoConAbierto = null) }
+    }
+
+    fun consumirNavegacion() {
+        _state.update { it.copy(navegarAInspeccion = null) }
+    }
+
     /** Reintenta subir este estimado a la nube (botón del aviso). */
     fun reintentarSubida() {
         viewModelScope.launch {
@@ -617,6 +791,7 @@ class EstimadoViewModel @Inject constructor(
     fun getPendingManoDeObra() = pendingManoDeObra
     fun getPendingNombreItem() = pendingNombreItem
     fun getPendingContenedor() = pendingContenedor
+    fun getPendingObservaciones() = pendingObservaciones
 
     /**
      * Reasigna el estimado al equipo correcto y repone su ficha desde esa unidad.

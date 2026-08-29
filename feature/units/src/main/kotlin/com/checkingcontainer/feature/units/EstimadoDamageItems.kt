@@ -202,14 +202,19 @@ internal fun DamageItemCard(
             )
         }
 
-        if (estimadoSaved && item.status == DamageItemStatus.PENDIENTE && !isClosed) {
+        // También cuando ya está reparado: siempre falta completar un comentario
+        // o corregir lo que se escribió con prisa en el patio.
+        if (estimadoSaved && !isClosed) {
             FilledTonalButton(
                 onClick = onRepairClick,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Outlined.Build, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Reparar ítem")
+                Text(
+                    if (item.status == DamageItemStatus.REPARADO) "Editar reparación"
+                    else "Reparar ítem",
+                )
             }
         }
     }

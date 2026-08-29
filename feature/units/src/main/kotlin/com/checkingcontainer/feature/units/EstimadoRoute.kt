@@ -118,6 +118,7 @@ import java.util.Locale
 @Composable
 fun EstimadoRoute(
     onBack: () -> Unit,
+    onAbrirEstimado: (Long) -> Unit = {},
     viewModel: EstimadoViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -140,6 +141,16 @@ fun EstimadoRoute(
         if (exitAfterSave && !state.isSaving) {
             if (state.savedMessage != null) onBack()
             else if (state.errorMessage != null) exitAfterSave = false
+        }
+    }
+
+    // Tras clonar el estimado para el mismo equipo, la pantalla salta sola al
+    // trabajo nuevo: el técnico ya está listo para cargarle los daños.
+    val inspeccionNueva = state.navegarAInspeccion
+    LaunchedEffect(inspeccionNueva) {
+        if (inspeccionNueva != null) {
+            viewModel.consumirNavegacion()
+            onAbrirEstimado(inspeccionNueva)
         }
     }
 
@@ -245,5 +256,11 @@ fun EstimadoRoute(
         getPendingManoDeObra = viewModel::getPendingManoDeObra,
         getPendingNombreItem = viewModel::getPendingNombreItem,
         getPendingContenedor = viewModel::getPendingContenedor,
+        getPendingObservaciones = viewModel::getPendingObservaciones,
+        onCerrar = viewModel::cerrarEstimado,
+        onReabrir = viewModel::reabrirEstimado,
+        onNuevoParaEquipo = { viewModel.crearEstimadoParaMismoEquipo() },
+        onNuevoParaEquipoConfirmado = { viewModel.crearEstimadoParaMismoEquipo(confirmadoConAbierto = true) },
+        onDescartarConfirmacion = viewModel::descartarConfirmacionNuevo,
     )
 }

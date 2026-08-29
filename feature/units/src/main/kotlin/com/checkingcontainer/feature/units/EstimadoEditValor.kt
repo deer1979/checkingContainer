@@ -289,3 +289,48 @@ internal fun CorregirEquipoSheet(
         }
     }
 }
+
+/**
+ * Observaciones y recomendaciones: lo que se vio y conviene avisarle al cliente,
+ * aunque no forme parte de lo que se cobra en este trabajo.
+ */
+@Composable
+internal fun ObservacionesSheet(
+    initialValor: String,
+    onValorChange: (String) -> Unit,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    var valor by remember { mutableStateOf(initialValor) }
+
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            "Observaciones y recomendaciones",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            "Lo que viste y quieres avisarle al cliente, aunque no se cobre en " +
+                "este trabajo. Sale al final del documento.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = valor,
+            onValueChange = { valor = it; onValorChange(it) },
+            label = { Text("Observaciones") },
+            placeholder = { Text("El condensador está saturado, se recomienda limpieza…") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 4,
+            maxLines = 10,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancelar") }
+            Button(onClick = onConfirm, modifier = Modifier.weight(1f)) { Text("Guardar") }
+        }
+    }
+}

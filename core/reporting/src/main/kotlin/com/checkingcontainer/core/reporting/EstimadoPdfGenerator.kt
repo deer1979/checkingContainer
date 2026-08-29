@@ -88,6 +88,7 @@ class EstimadoPdfGenerator @Inject constructor(
             // El informe de reparación NO lleva valores: es constancia del
             // trabajo hecho, no una cotización.
             if (tipo == TipoDocumento.ESTIMADO) dibujarValores(l, p, estimado)
+            dibujarObservaciones(l, p, estimado)
             dibujarFirma(l, p, tipo)
         }
 
@@ -502,6 +503,31 @@ class EstimadoPdfGenerator @Inject constructor(
         l.linea(2f)
         l.y += 14f
         totalRow("TOTAL:", totales.total, negrita = true)
+    }
+
+    /**
+     * Lo que el técnico vio y quiere avisar, pero no forma parte de lo cobrado:
+     * "el condensador está saturado, se recomienda limpieza". Va en los dos
+     * documentos — en una cotización también sirve para advertir de algo que se
+     * encontró y no se está incluyendo.
+     */
+    private fun dibujarObservaciones(l: LienzoPdf, p: Pinceles, e: Estimado) {
+        val texto = e.observaciones.trim()
+        if (texto.isEmpty()) return
+
+        val anchoTexto = Hoja.contenidoAncho - 20f
+        val altoTexto = LienzoPdf.medir(texto, p.cuerpo, anchoTexto)
+        l.asegurar(30f + altoTexto + 24f)
+
+        l.y += 12f
+        l.texto("OBSERVACIONES Y RECOMENDACIONES", Hoja.MARGEN, p.seccion)
+        l.y += 16f
+
+        val arriba = l.y
+        l.relleno(Hoja.MARGEN, arriba, Hoja.ANCHO - Hoja.MARGEN, arriba + altoTexto + 20f, Tinta.GRIS_FILA, radio = 4f)
+        l.y = arriba + 15f
+        l.parrafoEnLineaBase(texto, p.cuerpo, anchoTexto, Hoja.MARGEN + 10f)
+        l.y = arriba + altoTexto + 20f
     }
 
     /**

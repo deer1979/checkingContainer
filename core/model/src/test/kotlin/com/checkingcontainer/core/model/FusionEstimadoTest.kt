@@ -202,4 +202,42 @@ class FusionEstimadoTest {
         assertEquals(2, r.estimado.damages.size)
         assertEquals(25.0, r.estimado.damages[0].precioUnitario!!, 0.001)
     }
+
+    // ── Observaciones y cierre ──────────────────────────────────────────────
+
+    @Test
+    fun `las observaciones que escribio el otro no se pierden`() {
+        val comun = base(items = listOf(item("a")))
+        val suyo = comun.copy(observaciones = "El condensador está saturado, se recomienda limpieza")
+        val mio = comun.copy(manoDeObraTotal = 40.0)
+
+        val r = fusionarEstimado(comun, mio, suyo)
+
+        assertEquals("El condensador está saturado, se recomienda limpieza", r.estimado.observaciones)
+        assertTrue(r.camposEnConflicto.isEmpty())
+    }
+
+    @Test
+    fun `si el otro cerro el estimado y yo no lo toque, queda cerrado`() {
+        val comun = base(items = listOf(item("a")))
+        val suyo = comun.copy(status = EstimadoStatus.CERRADO, closedAt = 1_700_000_000_000L)
+        val mio = comun.copy(manoDeObraTotal = 40.0)
+
+        val r = fusionarEstimado(comun, mio, suyo)
+
+        assertEquals(EstimadoStatus.CERRADO, r.estimado.status)
+        assertEquals(1_700_000_000_000L, r.estimado.closedAt)
+    }
+
+    @Test
+    fun `si yo lo reabri, la fecha de cierre no queda colgando`() {
+        val comun = base(items = listOf(item("a")))
+            .copy(status = EstimadoStatus.CERRADO, closedAt = 1_700_000_000_000L)
+        val mio = comun.copy(status = EstimadoStatus.ABIERTO, closedAt = null)
+
+        val r = fusionarEstimado(comun, mio, comun)
+
+        assertEquals(EstimadoStatus.ABIERTO, r.estimado.status)
+        assertEquals(null, r.estimado.closedAt)
+    }
 }

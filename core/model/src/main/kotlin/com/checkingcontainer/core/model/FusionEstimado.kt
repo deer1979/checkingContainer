@@ -70,9 +70,20 @@ fun fusionarEstimado(base: Estimado?, mio: Estimado, remoto: Estimado): Resultad
         manoDeObraTotal = campo("Mano de obra", base?.manoDeObraTotal, mio.manoDeObraTotal, remoto.manoDeObraTotal),
         hasIva = campo("IVA", base?.hasIva, mio.hasIva, remoto.hasIva),
         approvedAt = campo("Aprobación", base?.approvedAt, mio.approvedAt, remoto.approvedAt),
+        observaciones = campo("Observaciones", base?.observaciones, mio.observaciones, remoto.observaciones),
         damages = damages,
         mediciones = mediciones,
-    )
+    ).let { fusion ->
+        // Cerrar y reabrir es una decisión de persona, no un campo más: se
+        // resuelve con la misma regla de tres vías, pero la fecha de cierre
+        // sigue al estado para que no queden contradiciéndose.
+        val estado = campo("Estado", base?.status, mio.status, remoto.status)
+        val cierre = campo("Cierre", base?.closedAt, mio.closedAt, remoto.closedAt)
+        fusion.copy(
+            status = estado,
+            closedAt = if (estado == EstimadoStatus.CERRADO) cierre else null,
+        )
+    }
 
     return ResultadoFusion(
         estimado = fusionado,

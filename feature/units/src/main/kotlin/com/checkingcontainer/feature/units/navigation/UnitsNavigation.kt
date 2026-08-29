@@ -104,6 +104,13 @@ fun NavGraphBuilder.unitsGraph(
     ) {
         EstimadoRoute(
             onBack = { navController.popBackStack() },
+            // El estimado nuevo se abre encima: volver atrás deja al técnico en
+            // el trabajo anterior, que sigue siendo parte del historial.
+            onAbrirEstimado = { inspId ->
+                navController.navigate(estimadoRoute(inspId)) {
+                    launchSingleTop = true
+                }
+            },
         )
     }
 }

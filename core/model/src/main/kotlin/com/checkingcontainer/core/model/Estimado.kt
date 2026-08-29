@@ -117,6 +117,12 @@ data class Estimado(
      * porque ya cobran su labor dentro de su propio valor unitario.
      */
     val manoDeObraTotal: Double? = null,
+    /**
+     * Observaciones y recomendaciones para el cliente: lo que se vio pero NO se
+     * cobra en este trabajo ("el condensador está saturado, se recomienda
+     * limpieza"). Va al final del documento, en los dos tipos.
+     */
+    val observaciones: String = "",
     // Configuración
     val hasIva: Boolean = false,
     val reportUrl: String? = null,
@@ -140,7 +146,7 @@ data class Estimado(
     val riqueza: Int
         get() = listOf(
             clientName, clientIdNumber, clientDireccion, clientTelefono, clientEmail,
-            sitioNombre, ordenTrabajo, location, technicianName,
+            sitioNombre, ordenTrabajo, location, technicianName, observaciones,
         ).count { it.isNotBlank() } +
             damages.size * 3 +
             mediciones.size * 2 +

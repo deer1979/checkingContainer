@@ -18,6 +18,9 @@ interface EstimadosRepository {
     /** Cambios que otra persona guarde en este estimado, en vivo. */
     fun observeCambiosRemotos(id: Long, desdeUpdatedAt: Long): Flow<Estimado>
 
+    /** Otro estimado ABIERTO del mismo equipo, distinto de [exceptoId]. */
+    suspend fun findAbiertoPorContenedor(containerNo: String, exceptoId: Long): Estimado?
+
     /** Lectura local directa, para consultar el estado de sincronización. */
     suspend fun findById(id: Long): Estimado?
 
