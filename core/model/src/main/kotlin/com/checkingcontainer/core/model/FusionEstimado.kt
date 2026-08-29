@@ -71,6 +71,9 @@ fun fusionarEstimado(base: Estimado?, mio: Estimado, remoto: Estimado): Resultad
         hasIva = campo("IVA", base?.hasIva, mio.hasIva, remoto.hasIva),
         approvedAt = campo("Aprobación", base?.approvedAt, mio.approvedAt, remoto.approvedAt),
         observaciones = campo("Observaciones", base?.observaciones, mio.observaciones, remoto.observaciones),
+        // Las fotos se suman, igual que las de los ítems: una evidencia que el
+        // otro subió no puede desaparecer porque yo no la tenía.
+        observacionesFotos = (mio.observacionesFotos + remoto.observacionesFotos).distinct(),
         damages = damages,
         mediciones = mediciones,
     ).let { fusion ->

@@ -19,6 +19,7 @@ import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.Estimado
 import com.checkingcontainer.core.model.EstimadoStatus
 import com.checkingcontainer.core.model.Inspection
+import com.checkingcontainer.core.model.ID_FOTOS_OBSERVACIONES
 import com.checkingcontainer.core.model.MAX_FOTOS_POR_GRUPO
 import com.checkingcontainer.core.model.fusionarEstimado
 import com.checkingcontainer.feature.units.navigation.ESTIMADO_INSPECTION_ID_ARG
@@ -128,6 +129,7 @@ class EstimadoViewModel @Inject constructor(
                         mediciones = existing?.mediciones ?: emptyList(),
                         manoDeObraTotal = existing?.manoDeObraTotal,
                         observaciones = existing?.observaciones ?: "",
+                        observacionesFotos = existing?.observacionesFotos ?: emptyList(),
                         clientId = existing?.clientId,
                         clientIdNumber = existing?.clientIdNumber ?: "",
                         clientDireccion = existing?.clientDireccion ?: "",
@@ -267,6 +269,15 @@ class EstimadoViewModel @Inject constructor(
                     })
                 }
             }
+            is EstimadoEvent.RemoveObservacionPhoto -> {
+                deletePhotoAsync(event.url)
+                _state.update { s ->
+                    s.copy(
+                        observacionesFotos = s.observacionesFotos - event.url,
+                        isDirty = true,
+                    )
+                }
+            }
             is EstimadoEvent.RemoveRepairPhoto -> {
                 deletePhotoAsync(event.url)
                 _state.update { s ->
@@ -359,6 +370,10 @@ class EstimadoViewModel @Inject constructor(
     fun addDamagePhoto(itemId: String, uri: Uri) = uploadPhoto(itemId, isDano = true, uri = uri)
     fun addRepairPhoto(itemId: String, uri: Uri) = uploadPhoto(itemId, isDano = false, uri = uri)
 
+    /** Evidencia de las observaciones: no cuelga de ningún ítem de daño. */
+    fun addObservacionPhoto(uri: Uri) =
+        uploadPhoto(ID_FOTOS_OBSERVACIONES, isDano = true, uri = uri)
+
     private fun uploadPhoto(itemId: String, isDano: Boolean, uri: Uri) {
         viewModelScope.launch {
             activePhotoUploads += 1
@@ -379,17 +394,25 @@ class EstimadoViewModel @Inject constructor(
                         coil3.request.ImageRequest.Builder(context).data(url).build(),
                     )
                     _state.update { state ->
-                        state.copy(
-                            isDirty = true,
-                            damages = state.damages.map { item ->
-                                if (item.id != itemId) item
-                                else if (isDano && item.damagePhotos.size < MAX_FOTOS_POR_GRUPO)
-                                    item.copy(damagePhotos = item.damagePhotos + url)
-                                else if (!isDano && item.repairPhotos.size < MAX_FOTOS_POR_GRUPO)
-                                    item.copy(repairPhotos = item.repairPhotos + url)
-                                else item
-                            },
-                        )
+                        if (itemId == ID_FOTOS_OBSERVACIONES) {
+                            if (state.observacionesFotos.size >= MAX_FOTOS_POR_GRUPO) state
+                            else state.copy(
+                                isDirty = true,
+                                observacionesFotos = state.observacionesFotos + url,
+                            )
+                        } else {
+                            state.copy(
+                                isDirty = true,
+                                damages = state.damages.map { item ->
+                                    if (item.id != itemId) item
+                                    else if (isDano && item.damagePhotos.size < MAX_FOTOS_POR_GRUPO)
+                                        item.copy(damagePhotos = item.damagePhotos + url)
+                                    else if (!isDano && item.repairPhotos.size < MAX_FOTOS_POR_GRUPO)
+                                        item.copy(repairPhotos = item.repairPhotos + url)
+                                    else item
+                                },
+                            )
+                        }
                     }
                 }.onFailure { error ->
                     _state.update {
@@ -494,6 +517,7 @@ class EstimadoViewModel @Inject constructor(
         mediciones = s.mediciones,
         manoDeObraTotal = s.manoDeObraTotal,
         observaciones = s.observaciones,
+        observacionesFotos = s.observacionesFotos,
         closedAt = s.closedAt,
         hasIva = s.hasIva,
     )
@@ -534,6 +558,8 @@ class EstimadoViewModel @Inject constructor(
                             damages = guardado.damages,
                             mediciones = guardado.mediciones,
                             manoDeObraTotal = guardado.manoDeObraTotal,
+                            observaciones = guardado.observaciones,
+                            observacionesFotos = guardado.observacionesFotos,
                             clientName = guardado.clientName,
                             clientId = guardado.clientId,
                             clientIdNumber = guardado.clientIdNumber,
@@ -600,6 +626,10 @@ class EstimadoViewModel @Inject constructor(
                     damages = e.damages,
                     mediciones = e.mediciones,
                     manoDeObraTotal = e.manoDeObraTotal,
+                    observaciones = e.observaciones,
+                    observacionesFotos = e.observacionesFotos,
+                    status = e.status,
+                    closedAt = e.closedAt,
                     clientName = e.clientName,
                     clientId = e.clientId,
                     clientIdNumber = e.clientIdNumber,
@@ -841,35 +871,11 @@ class EstimadoViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _state.update { it.copy(isGeneratingPdf = true, errorMessage = null) }
-            val estimado = Estimado(
-                id = current.estimadoId,
-                inspectionId = inspectionId,
-                containerNo = current.containerNo,
-                manufacturer = current.manufacturer,
-                unitModel = current.unitModel,
-                unitModelNo = current.unitModelNo,
-                unitSerialNo = current.unitSerialNo,
-                yearOfBuilt = current.yearOfBuilt,
-                unitType = current.unitType,
-                clientName = current.clientName,
-                clientId = current.clientId,
-                clientIdNumber = current.clientIdNumber,
-                clientDireccion = current.clientDireccion,
-                clientTelefono = current.clientTelefono,
-                clientEmail = current.clientEmail,
-                sitioClienteId = current.sitioClienteId,
-                sitioNombre = current.sitioNombre,
-                ordenTrabajo = current.ordenTrabajo,
-                location = current.location,
-                technicianName = current.technicianName,
-                createdAt = current.createdAt,
-                approvedAt = current.approvedAt,
-                status = current.status,
-                damages = current.damages,
-                mediciones = current.mediciones,
-                manoDeObraTotal = current.manoDeObraTotal,
-                hasIva = current.hasIva,
-            )
+            // MISMA conversión que la de guardar. Antes había aquí una copia a
+            // mano de los mismos campos y se le olvidó incluir observaciones: el
+            // texto se guardaba bien pero nunca llegaba al PDF. Una sola función
+            // hace imposible que vuelva a pasar con el próximo campo.
+            val estimado = aEstimado(current)
             runCatching { pdfGenerator.generate(estimado, current.fichaTecnica, tipo) }
                 .onSuccess { bytes ->
                     val file = File(context.cacheDir, "estimado_${inspectionId}.pdf")

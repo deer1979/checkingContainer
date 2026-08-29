@@ -43,6 +43,7 @@ data class EstimadoEntity(
     val mediciones: String = "[]",
     val manoDeObraTotal: Double? = null,
     val observaciones: String = "",
+    val observacionesFotos: String = "[]",
     val hasIva: Int = 0,
     val reportUrl: String? = null,
     val updatedAt: Long = 0L,
@@ -78,6 +79,7 @@ data class EstimadoEntity(
         mediciones = parseMediciones(mediciones),
         manoDeObraTotal = manoDeObraMigrada,
         observaciones = observaciones,
+        observacionesFotos = parseUrls(observacionesFotos),
         hasIva = hasIva != 0,
         reportUrl = reportUrl,
         updatedAt = updatedAt,
@@ -134,6 +136,14 @@ private fun parsePhotos(obj: JSONObject, arrayKey: String, legacyKey: String): L
     return obj.optString(legacyKey).takeIf { it.isNotEmpty() }?.let { listOf(it) } ?: emptyList()
 }
 
+/** Lee un array JSON de URLs, tolerando el texto vacío o corrupto. */
+private fun parseUrls(json: String): List<String> {
+    val arr = runCatching { JSONArray(json) }.getOrNull() ?: return emptyList()
+    return buildList {
+        repeat(arr.length()) { i -> arr.optString(i).takeIf { it.isNotEmpty() }?.let { add(it) } }
+    }
+}
+
 private fun List<DamageItem>.toJson(): String {
     val arr = JSONArray()
     forEach { item ->
@@ -186,6 +196,7 @@ fun Estimado.toEntity(): EstimadoEntity = EstimadoEntity(
     mediciones = mediciones.medicionesToJson(),
     manoDeObraTotal = manoDeObraTotal,
     observaciones = observaciones,
+    observacionesFotos = JSONArray(observacionesFotos).toString(),
     hasIva = if (hasIva) 1 else 0,
     reportUrl = reportUrl,
     updatedAt = updatedAt,

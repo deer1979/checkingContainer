@@ -102,6 +102,7 @@ import com.checkingcontainer.core.model.DamageItem
 import com.checkingcontainer.core.model.DamageItemStatus
 import com.checkingcontainer.core.model.DiagnosticoRefrigeracion
 import com.checkingcontainer.core.model.EstimadoStatus
+import com.checkingcontainer.core.model.ID_FOTOS_OBSERVACIONES
 import com.checkingcontainer.core.model.MAX_FOTOS_POR_GRUPO
 import com.checkingcontainer.core.model.MedicionSnapshot
 import com.checkingcontainer.core.model.Severidad
@@ -131,6 +132,7 @@ fun EstimadoScreen(
     onSelectSitioClick: () -> Unit = {},
     onAddDamagePhoto: (String, Uri) -> Unit,
     onAddRepairPhoto: (String, Uri) -> Unit,
+    onAddObservacionPhoto: (Uri) -> Unit = {},
     getPendingDamageDescription: () -> String,
     getPendingRepairAction: () -> String,
     getPendingCantidad: () -> String,
@@ -289,19 +291,24 @@ fun EstimadoScreen(
         var pendingPhotoIsRepair by rememberSaveable { mutableStateOf(false) }
         var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
 
+        // Las fotos de observaciones viajan por los mismos lanzadores usando el
+        // id reservado; así no hay que duplicar cámara y galería.
+        val entregarFoto: (String, Uri) -> Unit = { itemId, uri ->
+            when {
+                itemId == ID_FOTOS_OBSERVACIONES -> onAddObservacionPhoto(uri)
+                pendingPhotoIsRepair -> onAddRepairPhoto(itemId, uri)
+                else -> onAddDamagePhoto(itemId, uri)
+            }
+        }
         val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             val itemId = pendingPhotoItemId
-            if (uri != null && itemId != null) {
-                if (pendingPhotoIsRepair) onAddRepairPhoto(itemId, uri) else onAddDamagePhoto(itemId, uri)
-            }
+            if (uri != null && itemId != null) entregarFoto(itemId, uri)
             pendingPhotoItemId = null
         }
         val capturePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             val itemId = pendingPhotoItemId
             val uri = pendingCameraUri?.let(Uri::parse)
-            if (success && itemId != null && uri != null) {
-                if (pendingPhotoIsRepair) onAddRepairPhoto(itemId, uri) else onAddDamagePhoto(itemId, uri)
-            }
+            if (success && itemId != null && uri != null) entregarFoto(itemId, uri)
             pendingPhotoItemId = null
             pendingCameraUri = null
         }
@@ -536,6 +543,23 @@ fun EstimadoScreen(
                                 onClick = { onEvent(EstimadoEvent.ShowSheet(EstimadoSheet.EditarObservaciones)) },
                                 modifier = Modifier.fillMaxWidth(),
                             ) { Text(if (state.observaciones.isBlank()) "Agregar observaciones" else "Editar observaciones") }
+                        }
+
+                        // Evidencia de lo advertido: al cliente hay que mostrarle
+                        // el condensador sucio, no solo contárselo. Necesita el
+                        // estimado guardado, porque las fotos cuelgan de su carpeta.
+                        if (state.estimadoId != 0L) {
+                            PhotoGroup(
+                                titulo = "Fotos de las observaciones",
+                                fotos = state.observacionesFotos,
+                                isUploading = state.isUploadingPhoto,
+                                puedeAgregar = !state.estaCerrado &&
+                                    state.observacionesFotos.size < MAX_FOTOS_POR_GRUPO,
+                                puedeEliminar = !state.estaCerrado,
+                                onRemove = { url -> onEvent(EstimadoEvent.RemoveObservacionPhoto(url)) },
+                                onGallery = { requestGalleryPhoto(ID_FOTOS_OBSERVACIONES, false) },
+                                onCamera = { requestCameraPhoto(ID_FOTOS_OBSERVACIONES, false) },
+                            )
                         }
                     }
                 }

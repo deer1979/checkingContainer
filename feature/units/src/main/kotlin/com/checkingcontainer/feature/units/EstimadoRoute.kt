@@ -249,6 +249,7 @@ fun EstimadoRoute(
         onSelectSitioClick = { showSitioPicker = true },
         onAddDamagePhoto = viewModel::addDamagePhoto,
         onAddRepairPhoto = viewModel::addRepairPhoto,
+        onAddObservacionPhoto = viewModel::addObservacionPhoto,
         getPendingDamageDescription = viewModel::getPendingDamageDescription,
         getPendingRepairAction = viewModel::getPendingRepairAction,
         getPendingCantidad = viewModel::getPendingCantidad,

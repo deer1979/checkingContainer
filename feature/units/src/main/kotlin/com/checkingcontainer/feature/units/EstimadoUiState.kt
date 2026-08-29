@@ -32,6 +32,8 @@ data class EstimadoUiState(
     val manoDeObraTotal: Double? = null,
     /** Observaciones y recomendaciones para el cliente. */
     val observaciones: String = "",
+    /** Evidencia de esas observaciones (hasta MAX_FOTOS_POR_GRUPO). */
+    val observacionesFotos: List<String> = emptyList(),
     // Cliente del catálogo (referencia + snapshot congelado al asignar)
     val clientId: Long? = null,
     val clientIdNumber: String = "",
@@ -116,6 +118,7 @@ sealed interface EstimadoEvent {
     data class RemoveDamageItem(val itemId: String) : EstimadoEvent
     data class RemoveDamagePhoto(val itemId: String, val url: String) : EstimadoEvent
     data class RemoveRepairPhoto(val itemId: String, val url: String) : EstimadoEvent
+    data class RemoveObservacionPhoto(val url: String) : EstimadoEvent
     // Mediciones BLE
     data class RemoveMedicion(val timestamp: Long) : EstimadoEvent
     // Reparación

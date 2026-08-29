@@ -2,6 +2,7 @@ package com.checkingcontainer.core.reporting
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import coil3.BitmapImage
 import coil3.SingletonImageLoader
@@ -62,6 +63,9 @@ class EstimadoPdfGenerator @Inject constructor(
                 fotos.getOrPut(url) { loadBitmap(loader, url) }
             }
         }
+        estimado.observacionesFotos.forEach { url ->
+            fotos.getOrPut(url) { loadBitmap(loader, url) }
+        }
 
         val p = Pinceles()
         val esContenedor = Iso6346.isValid(estimado.containerNo)
@@ -88,7 +92,7 @@ class EstimadoPdfGenerator @Inject constructor(
             // El informe de reparación NO lleva valores: es constancia del
             // trabajo hecho, no una cotización.
             if (tipo == TipoDocumento.ESTIMADO) dibujarValores(l, p, estimado)
-            dibujarObservaciones(l, p, estimado)
+            dibujarObservaciones(l, p, estimado, fotos)
             dibujarFirma(l, p, tipo)
         }
 
@@ -511,23 +515,50 @@ class EstimadoPdfGenerator @Inject constructor(
      * documentos — en una cotización también sirve para advertir de algo que se
      * encontró y no se está incluyendo.
      */
-    private fun dibujarObservaciones(l: LienzoPdf, p: Pinceles, e: Estimado) {
+    private fun dibujarObservaciones(
+        l: LienzoPdf,
+        p: Pinceles,
+        e: Estimado,
+        fotos: Map<String, Bitmap?>,
+    ) {
         val texto = e.observaciones.trim()
-        if (texto.isEmpty()) return
+        val evidencia = e.observacionesFotos
+        if (texto.isEmpty() && evidencia.isEmpty()) return
+
+        // Tres por fila, igual que las fotos a ancho completo de los ítems.
+        val porFila = 3
+        val hueco = 8f
+        val lado = (Hoja.contenidoAncho - 20f - (porFila - 1) * hueco) / porFila
+        val filas = (evidencia.size + porFila - 1) / porFila
+        val altoFotos = if (filas == 0) 0f else filas * lado + (filas - 1) * hueco + 10f
 
         val anchoTexto = Hoja.contenidoAncho - 20f
-        val altoTexto = LienzoPdf.medir(texto, p.cuerpo, anchoTexto)
-        l.asegurar(30f + altoTexto + 24f)
+        val altoTexto = if (texto.isEmpty()) 0f else LienzoPdf.medir(texto, p.cuerpo, anchoTexto)
+        val altoCaja = altoTexto + altoFotos + 20f
+        // El bloque entero (título, texto y evidencia) salta de hoja junto: una
+        // recomendación separada de su foto no le sirve a nadie.
+        l.asegurar(30f + altoCaja)
 
         l.y += 12f
         l.texto("OBSERVACIONES Y RECOMENDACIONES", Hoja.MARGEN, p.seccion)
         l.y += 16f
 
         val arriba = l.y
-        l.relleno(Hoja.MARGEN, arriba, Hoja.ANCHO - Hoja.MARGEN, arriba + altoTexto + 20f, Tinta.GRIS_FILA, radio = 4f)
-        l.y = arriba + 15f
-        l.parrafoEnLineaBase(texto, p.cuerpo, anchoTexto, Hoja.MARGEN + 10f)
-        l.y = arriba + altoTexto + 20f
+        l.relleno(Hoja.MARGEN, arriba, Hoja.ANCHO - Hoja.MARGEN, arriba + altoCaja, Tinta.GRIS_FILA, radio = 4f)
+        if (texto.isNotEmpty()) {
+            l.y = arriba + 15f
+            l.parrafoEnLineaBase(texto, p.cuerpo, anchoTexto, Hoja.MARGEN + 10f)
+        }
+
+        evidencia.forEachIndexed { i, url ->
+            val px = Hoja.MARGEN + 10f + (i % porFila) * (lado + hueco)
+            val py = arriba + 10f + altoTexto + (i / porFila) * (lado + hueco)
+            val destino = RectF(px, py, px + lado, py + lado)
+            fotos[url]?.let { l.canvas.dibujarFotoProporcional(it, destino) }
+            l.borde(destino.left, destino.top, destino.right, destino.bottom, Tinta.LINEA)
+        }
+
+        l.y = arriba + altoCaja
     }
 
     /**

@@ -71,8 +71,14 @@ fun migrarDesdeCostosPorItem(
     return convertidos to labor
 }
 
-/** Máximo de fotos por grupo (daño / reparación) en cada ítem. */
+/** Máximo de fotos por grupo (daño / reparación / observaciones). */
 const val MAX_FOTOS_POR_GRUPO = 6
+
+/**
+ * Identificador de la carpeta donde viven las fotos de observaciones. No es un
+ * ítem de daño: se usa solo para armarles su propia ruta en el almacenamiento.
+ */
+const val ID_FOTOS_OBSERVACIONES = "observaciones"
 
 enum class DamageItemStatus { PENDIENTE, REPARADO }
 
@@ -123,6 +129,11 @@ data class Estimado(
      * limpieza"). Va al final del documento, en los dos tipos.
      */
     val observaciones: String = "",
+    /**
+     * Evidencia de lo anotado en [observaciones]. Al cliente hay que mostrarle
+     * el condensador sucio, no solo contárselo. Mismo tope que los ítems.
+     */
+    val observacionesFotos: List<String> = emptyList(),
     // Configuración
     val hasIva: Boolean = false,
     val reportUrl: String? = null,
@@ -150,6 +161,7 @@ data class Estimado(
         ).count { it.isNotBlank() } +
             damages.size * 3 +
             mediciones.size * 2 +
+            observacionesFotos.size +
             (if (manoDeObraTotal != null) 1 else 0)
 }
 

@@ -32,6 +32,7 @@ import com.checkingcontainer.core.database.migrations.MIGRATION_18_19
 import com.checkingcontainer.core.database.migrations.MIGRATION_19_20
 import com.checkingcontainer.core.database.migrations.MIGRATION_20_21
 import com.checkingcontainer.core.database.migrations.MIGRATION_21_22
+import com.checkingcontainer.core.database.migrations.MIGRATION_22_23
 import com.checkingcontainer.core.database.migrations.seedAnnouncements
 import com.checkingcontainer.core.database.migrations.seedFullCatalog
 import com.checkingcontainer.core.database.migrations.seedManufacturers
@@ -77,8 +78,9 @@ object DatabaseModule {
             MIGRATION_19_20,
             MIGRATION_20_21,
             MIGRATION_21_22,
+            MIGRATION_22_23,
         )
-        // Las versiones 4–22 tienen migraciones explícitas. Solo instalaciones
+        // Las versiones 4–23 tienen migraciones explícitas. Solo instalaciones
         // históricas 1–3, que nunca tuvieron una ruta registrada, se recrean.
         // Una migración futura omitida fallará sin borrar datos silenciosamente.
         .fallbackToDestructiveMigrationFrom(

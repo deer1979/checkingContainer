@@ -218,6 +218,18 @@ class FusionEstimadoTest {
     }
 
     @Test
+    fun `las fotos de las observaciones de los dos se unen`() {
+        val comun = base(items = listOf(item("a")))
+        val suyo = comun.copy(observacionesFotos = listOf("condensador.jpg"))
+        val mio = comun.copy(observacionesFotos = listOf("evaporador.jpg"))
+
+        val r = fusionarEstimado(comun, mio, suyo)
+
+        assertEquals(listOf("evaporador.jpg", "condensador.jpg"), r.estimado.observacionesFotos)
+        assertTrue(r.camposEnConflicto.isEmpty())
+    }
+
+    @Test
     fun `si el otro cerro el estimado y yo no lo toque, queda cerrado`() {
         val comun = base(items = listOf(item("a")))
         val suyo = comun.copy(status = EstimadoStatus.CERRADO, closedAt = 1_700_000_000_000L)
